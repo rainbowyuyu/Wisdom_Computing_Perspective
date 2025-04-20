@@ -183,7 +183,7 @@ def index_streamlit():
             """
             <div class="button-container">
                 <a href="visualize_calculation" target="_self">
-                    <button class="custom-button">快速开始</button>5
+                    <button class="custom-button">快速开始</button>
                 </a>
             </div>
             """,

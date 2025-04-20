@@ -33,3 +33,8 @@ def page_foot():
         "<p style='text-align: center; color: gray;'>© 2025 智算视界 · Authored by rainbow_yu</p>",
         unsafe_allow_html=True
     )
+
+def add_empty_lines(n=1):
+    """添加指定数量的空行"""
+    for _ in range(n):
+        st.markdown("<br>", unsafe_allow_html=True)

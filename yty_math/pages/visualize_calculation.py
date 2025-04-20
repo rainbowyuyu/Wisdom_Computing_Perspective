@@ -115,8 +115,6 @@ class FinalApp:
 
     def handle_image_selection(self):
         success = select_and_display_image()
-        if success:
-            st.success("图片上传成功！")
 
         self.selected_model_version = st.sidebar.selectbox(
             "选择模型版本",
@@ -301,7 +299,7 @@ def create_matrix():
 
         progress_bar.progress(100, text="🎉 渲染完成！")
 
-        st.success("Manim 渲染完成 ✅")
+        st.success("✅ LaTeX 渲染完成")
     except Exception as e:
         st.error(f"渲染失败：{e}")
         progress_bar.empty()
