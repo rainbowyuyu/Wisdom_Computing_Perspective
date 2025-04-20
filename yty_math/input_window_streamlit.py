@@ -10,7 +10,7 @@ def add_empty_lines(n=1):
         st.markdown("<br>", unsafe_allow_html=True)
 
 def index_streamlit():
-    st.set_page_config(page_title="智算视界", page_icon="pure_logo.png", layout="centered")
+    st.set_page_config(page_title="智算视界", page_icon="pure_logo.png", layout="wide")
     st.markdown(
         """
         <style>
@@ -121,7 +121,9 @@ def index_streamlit():
 
     # logo 和标题
     logo = Image.open("logo.png")
-    st.image(logo, use_container_width=True)
+    col1, col2, col3 = st.columns([0.5, 2, 0.5])
+    with col2:
+        st.image(logo, use_container_width=True)
 
     st.markdown(
         """
@@ -182,7 +184,7 @@ def index_streamlit():
                     <button class="custom-button">快速开始</button>
                 </a>
                 <a href="help_document" target="_self">
-                    <button class="custom-button">教程文档</button>
+                    <button class="custom-button">帮助文档</button>
                 </a>
             </div>
             """,
