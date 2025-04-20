@@ -1,9 +1,9 @@
-# rainbow_yu streamlit_app 🐋✨
+# rainbow_yu animate_cal_index 🐋✨
 
 import streamlit as st
 from PIL import Image
 from streamlit_extras import let_it_rain
-from streamlit_js_eval import streamlit_js_eval, get_geolocation
+from default_streamlit_app_util import *
 
 def add_empty_lines(n=1):
     """添加指定数量的空行"""
@@ -183,7 +183,7 @@ def index_streamlit():
             """
             <div class="button-container">
                 <a href="visualize_calculation" target="_self">
-                    <button class="custom-button">快速开始</button>
+                    <button class="custom-button">快速开始</button>5
                 </a>
             </div>
             """,
@@ -274,14 +274,9 @@ def index_streamlit():
             </div>
             """, unsafe_allow_html=True)
 
-    # 页脚
-    st.markdown("---")
-    st.markdown(
-        "<p style='text-align: center; color: gray;'>© 2025 智算视界 · Authored by RainbowYu</p>",
-        unsafe_allow_html=True
-    )
-    if st.session_state.get("logged_in"):
-        st.sidebar.success(f"已登录：{st.session_state['username']}")
+    login_config()
+
+    page_foot()
 
 if __name__ == "__main__":
     index_streamlit()

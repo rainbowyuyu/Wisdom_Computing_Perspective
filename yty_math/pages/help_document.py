@@ -1,13 +1,15 @@
 # rainbow_yu pages.help_document 🐋✨
 
 import streamlit as st
-from streamlit_js_eval import streamlit_js_eval, get_geolocation
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from default_streamlit_app_util import *
 
-st.set_page_config(page_title="帮助文档", layout="wide")
+st.set_page_config(page_title="智算视界 · 帮助文档", page_icon="pure_logo.png", layout="wide")
 
 # === 侧边导航栏 ===
-if st.session_state.get("logged_in"):
-    st.sidebar.success(f"已登录：{st.session_state['username']}")
+login_config()
+
 st.sidebar.title("📚 帮助文档导航")
 section = st.sidebar.radio("跳转到章节", [
     "用户功能概述",
@@ -18,14 +20,7 @@ section = st.sidebar.radio("跳转到章节", [
 ])
 
 # === 页面标题 ===
-device_info = streamlit_js_eval(js_expressions="window.innerWidth", key="width")
-
-if device_info:
-    width = device_info
-    if width < 768:
-        st.warning("👆 当前为手机端，需要切换页面和其他功能设置请展开侧边导航栏按钮")
-    else:
-        st.warning("👈 当前为电脑端，需要切换页面和其他功能设置请点击侧边导航栏按钮")
+mobile_or_computer_warning()
 
 st.title("📘 使用帮助文档")
 
@@ -105,3 +100,5 @@ elif section == "常见问题（FAQ）":
 # === 结束语 ===
 st.markdown("---")
 st.success("🎉 感谢您的使用！如有建议或反馈，欢迎联系我们开发团队。")
+
+page_foot()

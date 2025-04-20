@@ -8,7 +8,7 @@ import uuid
 import hashlib
 
 # 配置页面
-st.set_page_config(page_title="智算视界·用户登录", page_icon="pure_logo.png", layout="wide")
+st.set_page_config(page_title="智算视界 · 用户登录", page_icon="pure_logo.png", layout="wide")
 
 # 初始化 Supabase 客户端
 url = "https://fzmjkkiaibpjevtaeasl.supabase.co"
@@ -144,3 +144,5 @@ if st.session_state.get("logged_in"):
     if st.button("登出"):
         st.session_state.clear()  # 清除 session，登出用户
         st.rerun()  # 刷新页面
+else:
+    st.sidebar.warning("未登录")

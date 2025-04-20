@@ -2,7 +2,6 @@
 
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
-from streamlit_js_eval import streamlit_js_eval, get_geolocation
 import shutil
 from PIL import Image
 import numpy as np
@@ -17,6 +16,7 @@ import pandas as pd
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from default_streamlit_app_util import *
 from manim_animation import MatrixCreation  # 假设你在这个模块定义了 MatrixCreation 类
 import picture_roi as picture_roi
 import yolo_detection as yolo_detection
@@ -27,21 +27,15 @@ import manim_animation as manim_animation
 import file_operation
 
 
+
 class FinalApp:
     def __init__(self):
         self.selected_model_version = None
 
     def run(self):
-        st.set_page_config(page_title="智算视界·可视化计算", page_icon="pure_logo.png", layout="wide")
+        st.set_page_config(page_title="智算视界 · 可视化计算", page_icon="pure_logo.png", layout="wide")
 
-        device_info = streamlit_js_eval(js_expressions="window.innerWidth", key="width")
-
-        if device_info:
-            width = device_info
-            if width < 768:
-                st.warning("👆 当前为手机端，需要切换页面和其他功能设置请展开侧边导航栏按钮")
-            else:
-                st.warning("👈 当前为电脑端，需要切换页面和其他功能设置请点击侧边导航栏按钮")
+        mobile_or_computer_warning()
 
         st.markdown(
             """
@@ -62,8 +56,7 @@ class FinalApp:
         if "page" not in st.session_state:
             st.session_state.page = "识别算式"
 
-        if st.session_state.get("logged_in"):
-            st.sidebar.success(f"已登录：{st.session_state['username']}")
+        login_config()
 
         st.sidebar.title("页面")
 
@@ -72,18 +65,40 @@ class FinalApp:
         action = st.sidebar.radio("选择页面", ["识别算式", "手写输入", "动画演示"],
                                   index=["识别算式", "手写输入", "动画演示"].index(st.session_state.page))
 
-
         if action == "识别算式":
             st.session_state.page = action
             st.title("识别算式")
-            self.handle_image_selection()
 
-            if "image_bytes" in st.session_state:
-                if st.button("识别图片"):
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                self.handle_image_selection()
+                if is_computer():
+                    st.markdown(
+                        "<div style='height:100%; border-right: 2px solid #C0C0C0;'></div>",
+                        unsafe_allow_html=True
+                    )  # 添加右侧分割线
+
+            with col2:
+                st.markdown("## 🔍 图片识别与矩阵提取")
+                # 设置识别图片按钮，并使用唯一的 key
+                rec_but = st.button(
+                    "识别图片",
+                    key="recognize_button",  # 这里的 key 需要确保唯一
+                    disabled="image_bytes" not in st.session_state  # 没有图片时禁用按钮
+                )
+                if rec_but:  # 触发识别图片
                     process_and_display_image()
 
-            if "matrix" in st.session_state:
-                if st.button("创建矩阵"):
+            with col3:
+                st.markdown("## 📝 算式创建")
+                # 设置创建矩阵按钮，并使用唯一的 key
+                cre_but = st.button(
+                    "创建矩阵",
+                    key="create_button",  # 这里的 key 需要确保唯一
+                    disabled="matrix" not in st.session_state  # 没有矩阵时禁用按钮
+                )
+                if cre_but:  # 触发创建矩阵
                     create_matrix()
 
         elif action == "手写输入":
@@ -95,6 +110,8 @@ class FinalApp:
             st.session_state.page = action
             st.title("动画演示")
             self.animate()
+
+        page_foot()
 
     def handle_image_selection(self):
         success = select_and_display_image()
@@ -120,6 +137,8 @@ def draw_canvas(
     canvas_width=600,
     bg_color="#FFFFFF",
 ):
+    st.markdown("## ✏️ 绘图区域")
+    st.markdown("使用下方工具进行手绘，支持导出当前图像")
 
     # 初始化 session_state
     if "history" not in st.session_state:
@@ -128,86 +147,88 @@ def draw_canvas(
     if "current_image" not in st.session_state:
         st.session_state.current_image = None
 
-    # 工具选择
-    tool = st.radio("选择工具", ["笔", "橡皮擦"], horizontal=True)
-    stroke_width = st.slider("笔刷大小", 1, 50, 5)
-    stroke_color = "#000000" if tool == "笔" else "#FFFFFF"
+    # 分栏布局：工具选择 & 设置
+    col1, col2 = st.columns(2)
+    with col1:
+        tool = st.radio("🛠️ 选择工具", ["🖊️ 笔", "🩹 橡皮擦"], horizontal=True)
+        stroke_color = "#000000" if tool == "🖊️ 笔" else "#FFFFFF"
+        stroke_width = st.slider("🎨 画笔大小", 1, 50, 5)
+    with col2:
+        # 创建画布
+        canvas_result = st_canvas(
+            fill_color="rgba(255,255,255,1)",
+            stroke_width=stroke_width,
+            stroke_color=stroke_color,
+            background_color=bg_color,
+            height=canvas_height,
+            width=canvas_width,
+            drawing_mode="freedraw",
+            key=canvas_key,
+            update_streamlit=True,
+        )
 
-    # 创建画布
-    canvas_result = st_canvas(
-        fill_color="rgba(255,255,255,1)",
-        stroke_width=stroke_width,
-        stroke_color=stroke_color,
-        background_color=bg_color,
-        height=canvas_height,
-        width=canvas_width,
-        drawing_mode="freedraw",
-        key=canvas_key,
-        update_streamlit=True,
-    )
 
-    # 保存当前步骤
-    if st.button("保存当前步骤"):
-        if canvas_result.image_data is not None:
-            img_copy = copy.deepcopy(canvas_result.image_data)
-            st.session_state.history.append(img_copy)
-            st.session_state.current_image = img_copy
+    st.markdown("---")
 
-    # 撤销操作
-    if st.button("撤回"):
-        if st.session_state.history:
-            st.session_state.history.pop()
-            if st.session_state.history:
-                st.session_state.current_image = st.session_state.history[-1]
-            else:
-                st.session_state.current_image = None
-        else:
-            st.warning("没有可以撤回的步骤")
+    # 导出功能按钮
+    export_col1, export_col2 = st.columns([1, 3])
+    with export_col1:
+        if st.button("📤 导出图像"):
+            if canvas_result.image_data is not None:
+                img_copy = copy.deepcopy(canvas_result.image_data)
+                st.session_state.history.append(img_copy)
+                st.session_state.current_image = img_copy
+                st.success("✅ 图像导出成功!")
 
-    # 显示当前画布
+    # 显示导出后的图像
     if st.session_state.current_image is not None:
-        st.image(st.session_state.current_image, caption="当前画布", use_container_width=True)
+        st.image(st.session_state.current_image, caption="🖼️ 当前画布预览", use_container_width=True)
 
-    # 返回当前图像（可保存或后续使用）
     return st.session_state.current_image
 
 def select_and_display_image():
-    uploaded_file = st.file_uploader("选择一张图片", type=["jpg", "jpeg", "png"])
+    st.markdown("## 📤 上传图片")
+    uploaded_file = st.file_uploader(
+        "请选择一张图片（jpg / jpeg / png）", type=["jpg", "jpeg", "png"], label_visibility="collapsed"
+    )
 
     if uploaded_file is not None:
-        # 读取文件内容为字节流（只读一次）
+        st.success("✅ 图片上传成功！")
+
         image_bytes = uploaded_file.read()
-
-        # 显示图片（可以用 BytesIO）
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        st.image(image, caption="上传的图片", use_container_width=True)
 
-        # 保存状态
+        st.image(image, caption="🖼️ 上传的图片预览", use_container_width=True)
+
         st.session_state.uploaded_image = image
         st.session_state.image_bytes = image_bytes
         return True
+
+    st.info("👆 请上传一张图片以开始")
     return False
 
 
 def process_and_display_image():
+
     if "image_bytes" not in st.session_state:
-        st.warning("未找到上传图片，请先上传。")
+        st.warning("⚠️ 请先上传一张图片")
         return
 
+    # 获取 YOLO 模型版本
     selected_model_version = st.session_state.get("selected_model_version", "v4.2")
 
-    # 转换为 OpenCV 图像
+    # OpenCV 解码图片
     file_bytes = np.asarray(bytearray(st.session_state.image_bytes), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     if img is None:
-        st.error("图片加载失败")
+        st.error("图片加载失败，请确认格式正确")
         return
 
+    # 处理图像（你自己的函数）
     img = picture_roi.extract_roi(picture=img, output_mode="cv2")
     img, msk, detections = yolo_detection.detect_objects(
         img, yolo_detection.load_model(selected_model_version)
     )
-
     img, col_list, row_list = dbscan_line.create_line(img, msk)
     matrix = get_number.organize_detections(
         get_number.class_name_and_center(detections, img),
@@ -218,22 +239,38 @@ def process_and_display_image():
     st.session_state.col = len(col_list)
     st.session_state.row = len(row_list)
 
+    # 显示处理后图像
     img = picture_roi.opencv_to_pillow(img)
-    st.image(img, caption="处理后的图片", use_container_width=True)
+    st.image(img, caption="✅ 处理后的图片", use_container_width=True)
 
     update_entry_widgets()
 
+
 def update_entry_widgets():
-    matrix = st.session_state.matrix
+    st.markdown("## 📋 识别算式编辑")
+
+    matrix = st.session_state.get("matrix", [])
+    if not matrix:
+        st.warning("⚠️ 未识别到矩阵")
+        return
+
     num_rows = len(matrix)
     num_cols = len(matrix[0]) if matrix else 0
 
-    df = pd.DataFrame(matrix,
-                      index=[f"R{i}" for i in range(num_rows)],
-                      columns=[f"C{j}" for j in range(num_cols)])
+    df = pd.DataFrame(
+        matrix,
+        index=[f"R{i}" for i in range(num_rows)],
+        columns=[f"C{j}" for j in range(num_cols)]
+    )
 
-    st.write("识别出的矩阵：")
-    edited_df = st.data_editor(df, num_rows="dynamic", hide_index=True, use_container_width=True)
+    st.markdown("👇 你可以在下方对识别结果进行修改：")
+    edited_df = st.data_editor(
+        df,
+        num_rows="dynamic",
+        hide_index=True,
+        use_container_width=True,
+    )
+
     st.session_state.matrix = edited_df.values.tolist()
 
 def create_matrix():
