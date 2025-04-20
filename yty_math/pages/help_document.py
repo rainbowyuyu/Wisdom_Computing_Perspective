@@ -19,7 +19,7 @@ device_info = streamlit_js_eval(js_expressions="window.innerWidth", key="width")
 if device_info:
     width = device_info
     if width < 768:
-        st.warning("👆 需要切换页面和其他功能设置请点击侧边导航栏按钮")
+        st.warning("👆 检测到当前为手机端，需要切换页面和其他功能设置请点击侧边导航栏按钮")
 
 st.title("📘 使用帮助文档")
 st.markdown("""
