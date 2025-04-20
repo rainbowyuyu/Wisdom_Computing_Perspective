@@ -1,8 +1,8 @@
 from streamlit_js_eval import streamlit_js_eval, get_geolocation
 import streamlit as st
-device_info = streamlit_js_eval(js_expressions="window.innerWidth", key="width")
 
 def is_computer():
+    device_info = streamlit_js_eval(js_expressions="window.innerWidth", key="width")
     if device_info:
         width = device_info
         if width < 768:
@@ -11,6 +11,7 @@ def is_computer():
             return True
 
 def mobile_or_computer_warning():
+    device_info = streamlit_js_eval(js_expressions="window.innerWidth", key="width")
     if device_info:
         width = device_info
         if width < 768:

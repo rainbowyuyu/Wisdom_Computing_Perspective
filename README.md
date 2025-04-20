@@ -18,7 +18,7 @@
 - 详细下载请参考 [texlive](https://tug.org/texlive/)
 
 2. 配置ghostscript环境
-- 如果您有ghostscript环境可跳过此步骤
+- 如果您有ghostscript环境或不需要使用tk调试界面可跳过此步骤
 - 详细下载请参考 [ghostscript](https://www.ghostscript.com/)
 
 3. 配置ffmpeg环境

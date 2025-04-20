@@ -73,11 +73,7 @@ class FinalApp:
 
             with col1:
                 self.handle_image_selection()
-                if is_computer():
-                    st.markdown(
-                        "<div style='height:100%; border-right: 2px solid #C0C0C0;'></div>",
-                        unsafe_allow_html=True
-                    )  # 添加右侧分割线
+
 
             with col2:
                 st.markdown("## 🔍 图片识别")

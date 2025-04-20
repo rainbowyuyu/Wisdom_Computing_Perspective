@@ -98,7 +98,6 @@ elif section == "常见问题（FAQ）":
         st.sidebar.success(f"已登录：{st.session_state['username']}")
 
 # === 结束语 ===
-st.markdown("---")
 st.success("🎉 感谢您的使用！如有建议或反馈，欢迎联系我们开发团队。")
 
 page_foot()
