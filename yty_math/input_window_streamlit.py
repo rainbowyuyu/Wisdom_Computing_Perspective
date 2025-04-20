@@ -3,6 +3,7 @@
 import streamlit as st
 from PIL import Image
 from streamlit_extras import let_it_rain
+from streamlit_js_eval import streamlit_js_eval, get_geolocation
 
 def add_empty_lines(n=1):
     """添加指定数量的空行"""
@@ -76,7 +77,7 @@ def index_streamlit():
             width: 100%;  /* 模拟 use_container_width */
             font-size: 4vw;  /* 根据页面宽度自动调整字体大小 */
             padding: 2vw 5vw;  /* 根据页面宽度动态调整按钮的内边距 */
-            border-radius: 12px;
+            border-radius: 10px;
             background: linear-gradient(to right, #1c83e1, #2a8ce5);
             color: white;
             border: none;
@@ -126,64 +127,83 @@ def index_streamlit():
     with col2:
         st.image(logo, use_container_width=True)
 
-    st.markdown(
-        """
-        <style>
-        .animated-text {
-            font-size: 8vw;  /* 根据页面宽度自动缩放 */
-            font-weight: bold;
-            text-align: center;
-            background: linear-gradient(to right, #4B8BBE, #306998);
-            -webkit-background-clip: text;
-            color: transparent;
-            animation: textAnimation 4s ease-in-out infinite;
-        }
-
-        @keyframes textAnimation {
-            0% {
-                transform: scale(0.8);
-                opacity: 0.8;
-            }
-            50% {
-                transform: scale(1);
-                opacity: 1;
-            }
-            100% {
-                transform: scale(0.8);
-                opacity: 0.8;
-            }
-        }
-
-        /* 限制最大字号避免太大 */
-        @media screen and (min-width: 1200px) {
+        st.markdown(
+            """
+            <style>
             .animated-text {
-                font-size: 96px;
+                font-size: 8vw;  /* 根据页面宽度自动缩放 */
+                font-weight: bold;
+                text-align: center;
+                background: linear-gradient(to right, #4B8BBE, #306998);
+                -webkit-background-clip: text;
+                color: transparent;
+                animation: textAnimation 4s ease-in-out infinite;
             }
-        }
-
-        @media screen and (max-width: 480px) {
-            .animated-text {
-                font-size: 10vw;  /* 更小屏幕下略大一点 */
+    
+            @keyframes textAnimation {
+                0% {
+                    transform: scale(0.8);
+                    opacity: 0.8;
+                }
+                50% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+                100% {
+                    transform: scale(0.8);
+                    opacity: 0.8;
+                }
             }
-        }
-        </style>
-
-        <h4 class="animated-text">让数学计算更动态、更可视化</h4>
-        """,
-        unsafe_allow_html=True
-    )
+    
+            /* 限制最大字号避免太大 */
+            @media screen and (min-width: 1200px) {
+                .animated-text {
+                    font-size: 96px;
+                }
+            }
+    
+            @media screen and (max-width: 480px) {
+                .animated-text {
+                    font-size: 10vw;  /* 更小屏幕下略大一点 */
+                }
+            }
+            </style>
+    
+            <h4 class="animated-text">让数学计算更动态、更可视化</h4>
+            """,
+            unsafe_allow_html=True
+        )
 
     add_empty_lines(2)
 
-    col1, col2, col3 = st.columns([0.1, 3, 0.1])  # 中间宽度更大
+    e1, col1, col2, col3, e2 = st.columns([0.5,1, 1, 1,0.5])  # 中间宽度更大
 
-    with col2:
+    with col1:
         st.markdown(
             """
             <div class="button-container">
                 <a href="visualize_calculation" target="_self">
                     <button class="custom-button">快速开始</button>
                 </a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col2:
+        st.markdown(
+            """
+            <div class="button-container">
+                <a href="login" target="_self">
+                    <button class="custom-button">用户登录</button>
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col3:
+        st.markdown(
+            """
+            <div class="button-container">
                 <a href="help_document" target="_self">
                     <button class="custom-button">帮助文档</button>
                 </a>
@@ -260,6 +280,8 @@ def index_streamlit():
         "<p style='text-align: center; color: gray;'>© 2025 智算视界 · Authored by RainbowYu</p>",
         unsafe_allow_html=True
     )
+    if st.session_state.get("logged_in"):
+        st.sidebar.success(f"已登录：{st.session_state['username']}")
 
 if __name__ == "__main__":
     index_streamlit()

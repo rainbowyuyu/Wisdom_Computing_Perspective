@@ -1,4 +1,4 @@
-# rainbow_yu pages.可视化计算 🐋✨
+# rainbow_yu pages.visualize_calculation 🐋✨
 
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
@@ -93,6 +93,9 @@ class FinalApp:
             st.session_state.page = action
             st.title("动画演示")
             self.animate()
+
+        if st.session_state.get("logged_in"):
+            st.sidebar.success(f"已登录：{st.session_state['username']}")
 
     def handle_image_selection(self):
         success = select_and_display_image()
@@ -413,6 +416,8 @@ def read_matrix_from_file(file_path, mode='list'):
         return np.array(matrix_data)
     else:
         return matrix_data
+
+
 
 if __name__ == "__main__":
     app = FinalApp()

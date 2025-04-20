@@ -1,3 +1,5 @@
+# rainbow_yu pages.help_document 🐋✨
+
 import streamlit as st
 from streamlit_js_eval import streamlit_js_eval, get_geolocation
 
@@ -94,6 +96,8 @@ elif section == "常见问题（FAQ）":
     for q, a in faq_data.items():
         with st.expander(f"❓ {q}"):
             st.markdown(f"**答**：{a}")
+    if st.session_state.get("logged_in"):
+        st.sidebar.success(f"已登录：{st.session_state['username']}")
 
 # === 结束语 ===
 st.markdown("---")

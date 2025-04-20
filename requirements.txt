@@ -7,3 +7,5 @@ streamlit
 streamlit-drawable-canvas
 streamlit-extras
 streamlit-js-eval
+streamlit-authenticator
+supabase
