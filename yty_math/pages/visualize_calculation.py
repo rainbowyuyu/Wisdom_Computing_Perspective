@@ -62,7 +62,9 @@ class FinalApp:
         if "page" not in st.session_state:
             st.session_state.page = "识别算式"
 
-        st.sidebar.image("logo.png", use_container_width=True)
+        if st.session_state.get("logged_in"):
+            st.sidebar.success(f"已登录：{st.session_state['username']}")
+
         st.sidebar.title("页面")
 
 
@@ -93,9 +95,6 @@ class FinalApp:
             st.session_state.page = action
             st.title("动画演示")
             self.animate()
-
-        if st.session_state.get("logged_in"):
-            st.sidebar.success(f"已登录：{st.session_state['username']}")
 
     def handle_image_selection(self):
         success = select_and_display_image()

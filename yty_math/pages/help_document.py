@@ -6,6 +6,8 @@ from streamlit_js_eval import streamlit_js_eval, get_geolocation
 st.set_page_config(page_title="帮助文档", layout="wide")
 
 # === 侧边导航栏 ===
+if st.session_state.get("logged_in"):
+    st.sidebar.success(f"已登录：{st.session_state['username']}")
 st.sidebar.title("📚 帮助文档导航")
 section = st.sidebar.radio("跳转到章节", [
     "用户功能概述",
@@ -26,6 +28,7 @@ if device_info:
         st.warning("👈 当前为电脑端，需要切换页面和其他功能设置请点击侧边导航栏按钮")
 
 st.title("📘 使用帮助文档")
+
 st.markdown("""
 欢迎使用 **智算视界·手写算式识别与分步计算可视化系统**！  
 本系统致力于通过视觉化与智能识别手段，帮助您更轻松地理解和掌握抽象的算式计算过程。
