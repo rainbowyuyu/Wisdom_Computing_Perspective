@@ -2,7 +2,7 @@
 
 import streamlit as st
 from PIL import Image
-from streamlit_extras import let_it_rain
+from streamlit_extras import let_it_rain, embed_code
 from default_streamlit_app_util import *
 
 
@@ -13,6 +13,7 @@ def add_empty_lines(n=1):
 
 def index_streamlit():
     st.set_page_config(page_title="智算视界", page_icon="pure_logo.png", layout="wide")
+
     st.markdown(
         """
         <style>
@@ -255,12 +256,14 @@ def index_streamlit():
             """
             <div class="feature-col">
                 <h5>🔍 算式识别</h5>
-                <video width="100%" autoplay muted loop>
-                <source src="cal_app.mp4" type="video/mp4">
-                </video>
                 上传图片，一键识别其中的数学表达式。
             </div>
             """, unsafe_allow_html=True)
+
+        video_file = open('cal_app.mp4', 'rb')
+        video_bytes = video_file.read()
+        st.video(video_bytes)
+
     with col2:
         st.markdown(
             """
@@ -269,6 +272,11 @@ def index_streamlit():
                 支持手写板，自由书写表达式并识别。
             </div>
             """, unsafe_allow_html=True)
+
+        video_file = open('input_app.mp4', 'rb')
+        video_bytes = video_file.read()
+        st.video(video_bytes)
+
     with col3:
         st.markdown(
             """
@@ -277,6 +285,45 @@ def index_streamlit():
                 将结果分步动态可视化，易于理解。
             </div>
             """, unsafe_allow_html=True)
+
+        video_file = open('MatrixDetShow.mp4', 'rb')
+        video_bytes = video_file.read()
+        st.video(video_bytes)
+
+
+    add_empty_lines(3)
+
+    cola, colb = st.columns(2)
+    with cola:
+        add_empty_lines(2)
+
+        st.markdown(
+            """
+            <div class="feature-col">
+                <h5>🙋 加入我们</h5>
+                加入我们，获得更多算法开发和网页编辑权限，敬请施展您的才华！
+            </div>
+            """, unsafe_allow_html=True)
+
+        add_empty_lines(1)
+
+        st.markdown(
+            """
+            <div class="button-container">
+                <a href="https://github.com/rainbowyuyu" target="_blank">
+                    <button class="custom-button">加入我们</button>
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with colb:
+        embed_code.github_gist(
+            "https://gist.github.com/rainbowyuyu/d98368dd5b1f30f9e350aec00f60b21f",
+            width=700,
+            height=400,
+        )
 
     login_config()
 
