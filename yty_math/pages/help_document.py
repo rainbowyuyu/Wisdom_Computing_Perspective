@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_js_eval import streamlit_js_eval, get_geolocation
 
 st.set_page_config(page_title="帮助文档", layout="wide")
 
@@ -13,7 +14,12 @@ section = st.sidebar.radio("跳转到章节", [
 ])
 
 # === 页面标题 ===
-st.warning("👈 需要切换页面和其他功能设置请点击侧边导航栏按钮")
+device_info = streamlit_js_eval(js_expressions="window.innerWidth", key="width")
+
+if device_info:
+    width = device_info
+    if width < 768:
+        st.warning("👆 需要切换页面和其他功能设置请点击侧边导航栏按钮")
 
 st.title("📘 使用帮助文档")
 st.markdown("""

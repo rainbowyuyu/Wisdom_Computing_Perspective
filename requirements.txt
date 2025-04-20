@@ -6,3 +6,4 @@ scikit-learn
 streamlit
 streamlit-drawable-canvas
 streamlit-extras
+streamlit-js-eval

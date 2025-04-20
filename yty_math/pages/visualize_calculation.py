@@ -2,6 +2,7 @@
 
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
+from streamlit_js_eval import streamlit_js_eval, get_geolocation
 import shutil
 from PIL import Image
 import numpy as np
@@ -33,7 +34,10 @@ class FinalApp:
     def run(self):
         st.set_page_config(page_title="智算视界·可视化计算", page_icon="pure_logo.png", layout="wide")
 
-        st.warning("👈 需要切换页面和其他功能设置请点击侧边导航栏按钮")
+        if device_info:
+            width = device_info
+            if width < 768:
+                st.warning("👆 需要切换页面和其他功能设置请点击侧边导航栏按钮")
 
         st.markdown(
             """
