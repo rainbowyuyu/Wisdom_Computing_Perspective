@@ -80,7 +80,7 @@ class FinalApp:
                     )  # 添加右侧分割线
 
             with col2:
-                st.markdown("## 🔍 图片识别与矩阵提取")
+                st.markdown("## 🔍 图片识别")
                 # 设置识别图片按钮，并使用唯一的 key
                 rec_but = st.button(
                     "识别图片",
