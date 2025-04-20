@@ -301,7 +301,7 @@ def index_streamlit():
             """
             <div class="feature-col">
                 <h5>🙋 加入我们</h5>
-                加入我们，获得更多算法开发和网页编辑权限，敬请施展您的才华！
+                加入我们，获得更多算法开发和网页编辑权限，尽情施展您的才华！
             </div>
             """, unsafe_allow_html=True)
 
