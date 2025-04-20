@@ -73,6 +73,7 @@ def index_streamlit():
             margin-top: 30px;
         }
         .custom-button {
+            width: 100%;  /* 模拟 use_container_width */
             font-size: 4vw;  /* 根据页面宽度自动调整字体大小 */
             padding: 2vw 5vw;  /* 根据页面宽度动态调整按钮的内边距 */
             border-radius: 12px;
