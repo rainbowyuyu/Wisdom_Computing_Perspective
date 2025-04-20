@@ -5,6 +5,7 @@ from PIL import Image
 from streamlit_extras import let_it_rain
 from default_streamlit_app_util import *
 
+
 def add_empty_lines(n=1):
     """添加指定数量的空行"""
     for _ in range(n):
@@ -254,6 +255,9 @@ def index_streamlit():
             """
             <div class="feature-col">
                 <h5>🔍 算式识别</h5>
+                <video width="100%" autoplay muted loop>
+                <source src="cal_app.mp4" type="video/mp4">
+                </video>
                 上传图片，一键识别其中的数学表达式。
             </div>
             """, unsafe_allow_html=True)
@@ -269,14 +273,18 @@ def index_streamlit():
         st.markdown(
             """
             <div class="feature-col">
-                <h5>🚀 高效模型</h5>
-                支持多版本模型选择，准确率高，响应快速。
+                <h5>👁️ 动态可视化</h5>
+                将结果分步动态可视化，易于理解。
             </div>
             """, unsafe_allow_html=True)
 
     login_config()
 
-    page_foot()
+    st.markdown("---")
+    st.markdown(
+        "<p style='text-align: center; color: gray;'>© 2025 智算视界 · Authored by rainbow_yu</p>",
+        unsafe_allow_html=True
+    )
 
 if __name__ == "__main__":
     index_streamlit()

@@ -1,4 +1,5 @@
 from streamlit_js_eval import streamlit_js_eval, get_geolocation
+from streamlit_extras.bottom_container import bottom
 import streamlit as st
 
 def is_computer():
@@ -28,12 +29,11 @@ def login_config():
 
 def page_foot():
     # 页脚
-    st.markdown("---")
-
-    st.markdown(
-        "<p style='text-align: center; color: gray;'>© 2025 智算视界 · Authored by rainbow_yu</p>",
-        unsafe_allow_html=True
-    )
+    with bottom():
+        st.markdown(
+            "<p style='text-align: center; color: gray;'>© 2025 智算视界 · Authored by rainbow_yu</p>",
+            unsafe_allow_html=True
+        )
 
 def add_empty_lines(n=1):
     """添加指定数量的空行"""
