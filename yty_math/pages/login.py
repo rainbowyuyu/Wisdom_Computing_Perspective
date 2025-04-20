@@ -1,3 +1,5 @@
+# rainbow_yu pages.login 🐋✨
+
 import bcrypt
 from supabase import create_client, Client
 import streamlit as st
@@ -16,9 +18,15 @@ supabase: Client = create_client(url, key)
 
 # 注册功能
 def register_user(username, password):
+    # 检查用户名和密码是否为空
+    if not username or not password:
+        st.error("用户名和密码不能为空！")
+        return False
+
     # 检查用户名是否已存在
     existing_user = supabase.table("users").select("*").eq("username", username).execute()
     if existing_user.data:
+        st.warning("用户名已存在")
         return False  # 用户已存在
 
     hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -40,8 +48,14 @@ def register_user(username, password):
 
 # 登录验证
 def login_user(username, password):
+    # 检查用户名和密码是否为空
+    if not username or not password:
+        st.error("用户名和密码不能为空！")
+        return False
+
     user = supabase.table('users').select("*").eq('username', username).execute()
     if not user.data:
+        st.error("用户不存在")
         return False  # 用户不存在
     hashed_pw = user.data[0]["hashed_password"]
 
@@ -98,19 +112,20 @@ menu = st.sidebar.radio("请选择", ["登录", "注册"])
 
 if menu == "登录":
     st.header("🔐 用户登录")
-    username = st.text_input("用户名")
-    password = st.text_input("密码", type="password")
+    if not st.session_state.get("logged_in"):
+        username = st.text_input("用户名")
+        password = st.text_input("密码", type="password")
 
-    # 登录时的提示链接
-    st.markdown("没有账号？请点击 [注册](#注册)")
+        # 登录时的提示链接（改为按钮）
+        st.warning("没有账号？ 展开左侧状态栏注册")
 
-    if st.button("登录"):
-        if login_user(username, password):
-            st.success(f"欢迎回来，{username}！")
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = username
-        else:
-            st.error("用户名或密码错误")
+        if st.button("登录"):
+            if login_user(username, password):
+                st.success(f"欢迎回来，{username}！")
+                st.session_state["logged_in"] = True
+                st.session_state["username"] = username
+            else:
+                st.error("用户名或密码错误")
 
 elif menu == "注册":
     st.header("📝 用户注册")
@@ -125,7 +140,7 @@ elif menu == "注册":
 # 登录后展示主界面
 if st.session_state.get("logged_in"):
     st.sidebar.success(f"已登录：{st.session_state['username']}")
-    st.write("登录成功 🎉")
+    st.success(f"已登录：{st.session_state['username']}")
     if st.button("登出"):
         st.session_state.clear()  # 清除 session，登出用户
         st.rerun()  # 刷新页面
