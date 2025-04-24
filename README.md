@@ -13,6 +13,8 @@
 
 
 #### 本地部署
+使用 `python 3.10`
+
 1. 配置latex环境
 - 如果您有latex环境可跳过此步骤
 - 详细下载请参考 [texlive](https://tug.org/texlive/)
