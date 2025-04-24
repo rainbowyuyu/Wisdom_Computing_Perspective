@@ -1,5 +1,5 @@
 # rainbow_yu pages.visualize_calculation 🐋✨
-
+import streamlit
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
 import shutil
@@ -14,6 +14,7 @@ from manim import config
 import cv2
 import pandas as pd
 import sys
+import re
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from default_streamlit_app_util import *
@@ -89,13 +90,23 @@ class FinalApp:
             with col3:
                 st.markdown("## 📝 算式创建")
                 # 设置创建矩阵按钮，并使用唯一的 key
-                cre_but = st.button(
-                    "创建矩阵",
-                    key="create_button",  # 这里的 key 需要确保唯一
-                    disabled="matrix" not in st.session_state  # 没有矩阵时禁用按钮
-                )
+                cola, colb= st.columns(2)
+                with cola:
+                    cre_but = st.button(
+                        "创建算式",
+                        key="create_button",  # 这里的 key 需要确保唯一
+                        disabled="matrix" not in st.session_state  # 没有矩阵时禁用按钮
+                    )
+                with colb:
+                    save_but = st.button(
+                        "保存算式",
+                        key="save_button",  # 这里的 key 需要确保唯一
+                        disabled="manim_temp" not in st.session_state
+                    )
                 if cre_but:  # 触发创建矩阵
                     create_matrix()
+                if save_but:  # 触发创建矩阵
+                    save_matrix()
 
         elif action == "手写输入":
             st.session_state.page = action
@@ -287,14 +298,11 @@ def create_matrix():
     try:
         # 渲染动画
         animation = MatrixCreation(matrix)
-
         progress_bar.progress(30, text="创建动画对象...")
         time.sleep(0.5)
-
         animation.render()
-
         progress_bar.progress(100, text="🎉 渲染完成！")
-
+        st.session_state.manim_temp = True
         st.success("✅ LaTeX 渲染完成")
     except Exception as e:
         st.error(f"渲染失败：{e}")
@@ -302,6 +310,28 @@ def create_matrix():
 
     st.image(file_operation.streamlit_manim_path, caption="生成的矩阵", use_container_width=True)
 
+def save_matrix():
+
+    st.image(file_operation.streamlit_manim_path, caption="生成的矩阵", use_container_width=True)
+
+    filename = st.text_input("请输入保存的文件名，输入后再次点击保存算式即可👆", key="filename_input")
+
+    if filename:
+        full_filename = f"{filename}.txt"
+        invalid_chars = r'[\\/:*?"<>|]'
+        if re.search(invalid_chars, filename):
+            st.error("文件名无效，不能包含以下字符：\\ / : * ? \" < > |")
+        else:
+            # 保存矩阵到文件
+            with open(os.path.join(file_operation.streamlit_save_path,full_filename), "w", encoding="utf-8") as f:
+                for row in st.session_state.matrix:
+                    f.write(" ".join(map(str, row)) + "\n")
+
+            # 图片复制
+            dst_path = os.path.join(file_operation.default_save_path, f"{filename}.png")
+            shutil.copy(file_operation.streamlit_manim_path, dst_path)
+
+            st.success(f"矩阵已成功保存为 {full_filename}")
 
 def matrix_calculator_app():
     # 初始化 session_state
@@ -334,11 +364,11 @@ def matrix_calculator_app():
             return False
 
     def select_matrix(number, image_name):
-        folder = default_save_path
+        folder = file_operation.default_save_path
         txt_path = os.path.join(folder, f"{image_name}.txt")
         if os.path.exists(txt_path):
             st.session_state.matrix_name[number] = txt_path
-            shutil.copy(txt_path, os.path.join(default_file_path, f"matrix{number}_cache.txt"))
+            shutil.copy(txt_path, os.path.join(file_operation.default_file_path, f"matrix{number}_cache.txt"))
 
     def generate_latex_result():
         # 这里应根据实际逻辑生成LaTeX图像
@@ -348,7 +378,7 @@ def matrix_calculator_app():
 
     # 图片选择区域
     st.header("选择数学算式图像")
-    folder = streamlit_save_path
+    folder = file_operation.streamlit_save_path
     images = [f for f in os.listdir(folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     image_names = [os.path.splitext(img)[0] for img in images]
 
@@ -394,8 +424,8 @@ def matrix_calculator_app():
 
         # 验证并显示结果
         if is_matrix_valid():
-            st.success("矩阵验证通过，可以进行计算。")
-            if st.button("生成 LaTeX 结果图像"):
+            st.success("算式验证通过，可以进行计算。")
+            if st.button("计算结果"):
                 generate_latex_result()
 
                 if st.session_state.latex_img_path and os.path.exists(st.session_state.latex_img_path):
@@ -404,20 +434,6 @@ def matrix_calculator_app():
                     st.warning("LaTeX 结果图像未生成，请确保路径正确。")
         else:
             st.error("矩阵维度不匹配或无效，请重新选择。")
-
-
-default_software_path = os.getcwd()
-
-default_file_path = os.path.join(default_software_path, r"math_cache")
-default_save_path = os.path.join(default_software_path, r"math_saves")
-streamlit_save_path = os.path.join(default_software_path, r"yty_math/math_saves")
-default_manim_source_code = os.path.join(default_software_path, r"manim_animation.py")
-default_manim_result_code = os.path.join(default_software_path, r"manim_result.py")
-default_manim_path = os.path.join(default_software_path, rf"media\images\manim_animation\MatrixCreation_ManimCE_v{manim.__version__}.png")
-streamlit_manim_path = os.path.join(default_software_path, rf"media/images/MatrixCreation_ManimCE_v{manim.__version__}.png")
-default_video_path = os.path.join(default_software_path, r"media\videos\manim_animation\1080p60")
-default_result_path = os.path.join(default_software_path, r"media\images\manim_result")
-default_model_path = os.path.join(default_software_path, "models")
 
 
 # 写矩阵到文件的函数
