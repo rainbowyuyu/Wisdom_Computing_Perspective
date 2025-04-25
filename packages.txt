@@ -4,4 +4,8 @@ libcairo2-dev
 libpango1.0-dev
 libpangocairo-1.0-0
 ffmpeg
-texlive-full
+texlive-latex-base
+texlive-latex-recommended
+texlive-latex-extra
+texlive-fonts-recommended
+texlive-science
