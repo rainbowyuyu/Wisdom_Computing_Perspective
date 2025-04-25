@@ -2,6 +2,7 @@ import os
 import numpy as np
 import manim
 
+
 default_software_path = os.getcwd()
 
 default_file_path = os.path.join(default_software_path, r"math_cache")
