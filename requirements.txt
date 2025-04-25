@@ -1,4 +1,4 @@
-manim == 0.19.0
+manim
 jupyter
 ultralytics
 supervision
