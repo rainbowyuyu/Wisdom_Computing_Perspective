@@ -6,13 +6,15 @@ default_software_path = os.getcwd()
 
 default_file_path = os.path.join(default_software_path, r"math_cache")
 default_save_path = os.path.join(default_software_path, r"math_saves")
-streamlit_save_path = os.path.join(default_software_path, r"math_saves")
+streamlit_save_path = os.path.join(default_software_path, r"yty_math/math_saves")
 default_manim_source_code = os.path.join(default_software_path, r"manim_animation.py")
 default_manim_result_code = os.path.join(default_software_path, r"manim_result.py")
 default_manim_path = os.path.join(default_software_path, rf"media\images\manim_animation\MatrixCreation_ManimCE_v{manim.__version__}.png")
 streamlit_manim_path = os.path.join(default_software_path, rf"media/images/MatrixCreation_ManimCE_v{manim.__version__}.png")
 default_video_path = os.path.join(default_software_path, r"media\videos\manim_animation\1080p60")
 default_result_path = os.path.join(default_software_path, r"media\images\manim_result")
+streamlit_video_path = os.path.join(default_software_path, r"media\videos\1080p60")
+streamlit_result_path = os.path.join(default_software_path, r"media\images")
 default_model_path = os.path.join(default_software_path, "models")
 
 

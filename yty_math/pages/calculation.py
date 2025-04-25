@@ -18,7 +18,8 @@ import re
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from default_streamlit_app_util import *
-from manim_animation import MatrixCreation  # 假设你在这个模块定义了 MatrixCreation 类
+from manim_animation import MatrixCreation, MatrixDetShow, MatrixAdditionShow, MatrixMulShow
+from manim_result import DetResult, AddResult, MulResult
 import picture_roi as picture_roi
 import yolo_detection as yolo_detection
 import dbscan_line as dbscan_line
@@ -287,26 +288,7 @@ def create_matrix():
 
     matrix = st.session_state.matrix
 
-    # 显示进度条
-    progress_text = "正在使用 Manim 渲染矩阵动画，请稍候..."
-    progress_bar = st.progress(0, text=progress_text)
-
-    # 模拟进度：加载阶段
-    progress_bar.progress(10, text="准备动画类和参数...")
-    time.sleep(0.5)
-
-    try:
-        # 渲染动画
-        animation = MatrixCreation(matrix)
-        progress_bar.progress(30, text="创建动画对象...")
-        time.sleep(0.5)
-        animation.render()
-        progress_bar.progress(100, text="🎉 渲染完成！")
-        st.session_state.manim_temp = True
-        st.success("✅ LaTeX 渲染完成")
-    except Exception as e:
-        st.error(f"渲染失败：{e}")
-        progress_bar.empty()
+    manin_rander(MatrixCreation,matrix)
 
     st.image(file_operation.streamlit_manim_path, caption="生成的矩阵", use_container_width=True)
 
@@ -334,7 +316,7 @@ def save_matrix():
             st.success(f"矩阵已成功保存为 {full_filename}")
 
 def matrix_calculator_app():
-    # 初始化 session_state
+    # Initialize session state variables
     if 'matrix_name' not in st.session_state:
         st.session_state.matrix_name = ["", ""]
     if 'operation' not in st.session_state:
@@ -350,16 +332,23 @@ def matrix_calculator_app():
         matrix1 = np.array(read_matrix_from_file(st.session_state.matrix_name[0]))
         matrix2 = np.array(read_matrix_from_file(st.session_state.matrix_name[1]))
 
+        if matrix1.ndim != 2 or matrix2.ndim != 2:
+            st.error("至少有一个矩阵不是二维矩阵，请检查输入。")
+            return False
+
         st.session_state.matrix1 = matrix1
         st.session_state.matrix2 = matrix2
 
         op = st.session_state.operation
-        if op == 'add' and matrix1.shape == matrix2.shape:
-            return True
-        elif op == 'mul' and matrix1.shape[1] == matrix2.shape[0]:
-            return True
-        elif op == 'det' and matrix1.shape[0] == matrix1.shape[1]:
-            return True
+        if op == 'add':
+            # 矩阵加法需要两个矩阵的形状相同
+            return matrix1.shape == matrix2.shape
+        elif op == 'mul':
+            # 矩阵乘法需要矩阵1的列数等于矩阵2的行数
+            return matrix1.shape[1] == matrix2.shape[0]
+        elif op == 'det':
+            # 行列式操作需要矩阵是方阵
+            return matrix1.shape[0] == matrix1.shape[1]
         else:
             return False
 
@@ -368,15 +357,14 @@ def matrix_calculator_app():
         txt_path = os.path.join(folder, f"{image_name}.txt")
         if os.path.exists(txt_path):
             st.session_state.matrix_name[number] = txt_path
-            shutil.copy(txt_path, os.path.join(file_operation.default_file_path, f"matrix{number}_cache.txt"))
+        else:
+            st.warning(f"矩阵文件 {txt_path} 不存在，请重新选择.")
 
     def generate_latex_result():
-        # 这里应根据实际逻辑生成LaTeX图像
-        latex_img_path = "results/result_latex.png"
+        latex_img_path = file_operation.streamlit_result_path
         st.session_state.latex_img_path = latex_img_path
 
-
-    # 图片选择区域
+    # Image selection area
     st.header("选择数学算式图像")
     folder = file_operation.streamlit_save_path
     images = [f for f in os.listdir(folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
@@ -384,13 +372,13 @@ def matrix_calculator_app():
 
     selected_image = st.selectbox("从以下图像中选择：", image_names)
 
-    # 预览图像
+    # Preview selected image
     if selected_image:
         img_path = os.path.join(folder, f"{selected_image}.png")
         if os.path.exists(img_path):
             st.image(img_path, caption=selected_image, width=300)
 
-    # 操作选择区域
+    # Operation selection area
     st.header("选择矩阵操作")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -417,18 +405,36 @@ def matrix_calculator_app():
                 if st.button("选择为矩阵2"):
                     select_matrix(1, selected_image)
 
-        # 显示选中矩阵名
+        # Display selected matrix names
         st.text(f"矩阵1: {os.path.basename(st.session_state.matrix_name[0])}")
         if st.session_state.operation != 'det':
             st.text(f"矩阵2: {os.path.basename(st.session_state.matrix_name[1])}")
 
-        # 验证并显示结果
+        # Validate and show results
         if is_matrix_valid():
             st.success("算式验证通过，可以进行计算。")
             if st.button("计算结果"):
                 generate_latex_result()
+                if st.session_state.operation == 'det':
+                    manin_rander(MatrixDetShow, st.session_state.matrix1, )
+                    manin_rander(DetResult, st.session_state.matrix1)
+                    st.session_state.latex_img_path = os.path.join(file_operation.streamlit_video_path,"MatrixDetShow.mp4.png")
+                    st.session_state.video_path = os.path.join(file_operation.streamlit_video_path, "MatrixDetShow.mp4")
+                elif st.session_state.operation == 'add':
+                    manin_rander(MatrixAdditionShow, st.session_state.matrix1, st.session_state.matrix2, text="视频")
+                    manin_rander(AddResult, st.session_state.matrix1, st.session_state.matrix2, text="结果")
+                    st.session_state.latex_img_path = os.path.join(file_operation.streamlit_video_path,"MatrixAdditionShow.mp4.png")
+                    st.session_state.video_path = os.path.join(file_operation.streamlit_video_path, "MatrixAdditionShow.mp4")
+                elif st.session_state.operation == 'mul':
+                    manin_rander(MatrixMulShow, st.session_state.matrix1, st.session_state.matrix2, text="视频")
+                    manin_rander(MulResult, st.session_state.matrix1, st.session_state.matrix2, text="结果")
+                    st.session_state.latex_img_path = os.path.join(file_operation.streamlit_video_path,"MatrixMulShow.mp4.png")
+                    st.session_state.video_path = os.path.join(file_operation.streamlit_video_path,"MatrixMulShow.mp4")
+                else:
+                    st.error("为正确选择计算方式")
 
                 if st.session_state.latex_img_path and os.path.exists(st.session_state.latex_img_path):
+                    st.video(st.session_state.video_path)
                     st.image(st.session_state.latex_img_path, caption="计算结果（LaTeX）")
                 else:
                     st.warning("LaTeX 结果图像未生成，请确保路径正确。")
@@ -436,33 +442,48 @@ def matrix_calculator_app():
             st.error("矩阵维度不匹配或无效，请重新选择。")
 
 
-# 写矩阵到文件的函数
+# Write matrix to file
 def write_matrix_to_file(file_path, matrix, name):
-    # 构造文件名
     full_file_path = os.path.join(file_path, f"{name}.txt")
-
-    # 打开文件进行写入，如果文件存在则覆盖
     with open(full_file_path, 'w') as f:
-        for i in range(len(matrix)):
-            for j in range(len(matrix[0])):
-                f.write(str(matrix[i][j]) + ' ')
-            f.write('\n')
+        for row in matrix:
+            f.write(' '.join(map(str, row)) + '\n')
 
 
-# 读取矩阵数据的函数
-def read_matrix_from_file(file_path, mode='list'):
+# Read matrix from file
+def read_matrix_from_file(file_path, mode='numpy'):
     if file_path == "":
         return None
     with open(file_path, 'r') as file:
-        matrix_data = []
-        for line in file:
-            # 将每一行的数据按空格分割并转为整数列表
-            matrix_data.append([int(x) for x in line.split()])
-    if mode == 'numpy':
-        return np.array(matrix_data)
-    else:
-        return matrix_data
+        matrix_data = [list(map(int, line.split())) for line in file]
+    return np.array(matrix_data) if mode == 'numpy' else matrix_data
 
+
+def manin_rander(
+        manin_class,
+        *args,
+        text = "LaTeX",
+):
+    # 显示进度条
+    progress_text = "正在使用 Manim 渲染矩阵动画，请稍候..."
+    progress_bar = st.progress(0, text=progress_text)
+
+    # 模拟进度：加载阶段
+    progress_bar.progress(10, text="准备动画类和参数...")
+    time.sleep(0.5)
+
+    try:
+        # 渲染动画
+        animation = manin_class(*args)
+        progress_bar.progress(30, text="创建动画对象...")
+        time.sleep(0.5)
+        animation.render()
+        progress_bar.progress(100, text="🎉 渲染完成！")
+        st.session_state.manim_temp = True
+        st.success(f"✅ {text} 渲染完成")
+    except Exception as e:
+        st.error(f"渲染失败：{e}")
+        progress_bar.empty()
 
 
 if __name__ == "__main__":
