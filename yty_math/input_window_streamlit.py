@@ -77,7 +77,7 @@ def index_streamlit():
         }
         .custom-button {
             width: 100%;  /* 模拟 use_container_width */
-            font-size: 4vw;  /* 根据页面宽度自动调整字体大小 */
+            font-size: 3vw;  /* 根据页面宽度自动调整字体大小 */
             padding: 2vw 5vw;  /* 根据页面宽度动态调整按钮的内边距 */
             border-radius: 10px;
             background: linear-gradient(to right, #1c83e1, #2a8ce5);
@@ -96,18 +96,12 @@ def index_streamlit():
         /* 针对大屏设备调整字体和内边距 */
         @media screen and (min-width: 1200px) {
             .custom-button {
-                font-size: 30px;  /* 在大屏幕设备上固定字体大小 */
-                padding: 12px 32px;  /* 固定内边距 */
+                font-size: 1.5vw;  /* 在大屏幕设备上固定字体大小 */
+                padding: 1vw 2vw;  /* 固定内边距 */
             }
         }
         
-        /* 针对小屏设备调整字体和内边距 */
-        @media screen and (max-width: 480px) {
-            .custom-button {
-                font-size: 6vw;  /* 在小屏幕设备上增大字体大小 */
-                padding: 4vw 10vw;  /* 动态调整内边距 */
-            }
-        }
+
 
         .feature-col {
             display: flex;
