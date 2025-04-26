@@ -310,7 +310,7 @@ def save_matrix():
                     f.write(" ".join(map(str, row)) + "\n")
 
             # 图片复制
-            dst_path = os.path.join(file_operation.default_save_path, f"{filename}.png")
+            dst_path = os.path.join(file_operation.streamlit_save_path, f"{filename}.png")
             shutil.copy(file_operation.streamlit_manim_path, dst_path)
 
             st.success(f"矩阵已成功保存为 {full_filename}")
@@ -353,7 +353,7 @@ def matrix_calculator_app():
             return False
 
     def select_matrix(number, image_name):
-        folder = file_operation.default_save_path
+        folder = file_operation.streamlit_save_path
         txt_path = os.path.join(folder, f"{image_name}.txt")
         if os.path.exists(txt_path):
             st.session_state.matrix_name[number] = txt_path
