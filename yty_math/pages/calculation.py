@@ -433,11 +433,11 @@ def matrix_calculator_app():
                 else:
                     st.error("为正确选择计算方式")
 
-                if st.session_state.latex_img_path and os.path.exists(st.session_state.latex_img_path):
-                    st.video(st.session_state.video_path)
+                st.video(st.session_state.video_path)
+                try:
                     st.image(st.session_state.latex_img_path, caption="计算结果（LaTeX）")
-                else:
-                    st.warning("LaTeX 结果图像未生成，请确保路径正确。")
+                except Exception as e:
+                    st.warning(f"LaTeX 结果图像未生成，请确保路径正确。{e}")
         else:
             st.error("矩阵维度不匹配或无效，请重新选择。")
 
