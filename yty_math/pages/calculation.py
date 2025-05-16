@@ -16,13 +16,13 @@ import pandas as pd
 import sys
 import re
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../yty_math')))
 from default_streamlit_app_util import *
 from manim_animation import MatrixCreation, MatrixDetShow, MatrixAdditionShow, MatrixMulShow
 from manim_result import DetResult, AddResult, MulResult
 import picture_roi as picture_roi
 import yolo_detection as yolo_detection
-import dbscan_line as dbscan_line
+import bscan_line as dbscan_line
 import get_number as get_number
 import file_operation as file_operation
 import manim_animation as manim_animation

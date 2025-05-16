@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import supervision as sv
 import os
 import numpy as np
-import file_operation
+import yty_math.file_operation
 
 # 初始化监督库的注解器
 bounding_box_annotator = sv.BoxAnnotator()
@@ -15,7 +15,7 @@ def load_model(version: str):
     :param version: YOLO 模型版本
     :return: YOLO 模型对象
     """
-    base_model_path = file_operation.default_model_path
+    base_model_path = yty_math.file_operation.default_model_path
     model_path = os.path.join(base_model_path, version, "weights", "best.pt")
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"未找到模型文件：{model_path}")

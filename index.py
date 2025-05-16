@@ -12,7 +12,7 @@ def add_empty_lines(n=1):
         st.markdown("<br>", unsafe_allow_html=True)
 
 def index_streamlit():
-    st.set_page_config(page_title="智算视界", page_icon="pure_logo.png", layout="wide")
+    st.set_page_config(page_title="智算视界", page_icon="assert/images/pure_logo.png", layout="wide")
 
     st.markdown(
         """
@@ -126,7 +126,7 @@ def index_streamlit():
     )
 
     # logo 和标题
-    logo = Image.open("logo.png")
+    logo = Image.open("assert/images/logo.png")
     col1, col2, col3 = st.columns([0.5, 2, 0.5])
     with col2:
         st.image(logo, use_container_width=True)
@@ -252,7 +252,7 @@ def index_streamlit():
     """, unsafe_allow_html=True)
 
     try:
-        video_file = open('introduction.mp4', 'rb')  # Make sure this file exists
+        video_file = open('assert/videos/introduction.mp4', 'rb')  # Make sure this file exists
         video_bytes = video_file.read()
         st.markdown('<div class="video-container">', unsafe_allow_html=True)
         st.video(video_bytes)
@@ -273,7 +273,7 @@ def index_streamlit():
             </div>
             """, unsafe_allow_html=True)
 
-        video_file = open('cal_app.mp4', 'rb')
+        video_file = open('assert/videos/cal_app.mp4', 'rb')
         video_bytes = video_file.read()
         st.video(video_bytes)
 
@@ -286,7 +286,7 @@ def index_streamlit():
             </div>
             """, unsafe_allow_html=True)
 
-        video_file = open('input_app.mp4', 'rb')
+        video_file = open('assert/videos/input_app.mp4', 'rb')
         video_bytes = video_file.read()
         st.video(video_bytes)
 
@@ -299,7 +299,7 @@ def index_streamlit():
             </div>
             """, unsafe_allow_html=True)
 
-        video_file = open('MatrixDetShow.mp4', 'rb')
+        video_file = open('assert/videos/MatrixDetShow.mp4', 'rb')
         video_bytes = video_file.read()
         st.video(video_bytes)
 

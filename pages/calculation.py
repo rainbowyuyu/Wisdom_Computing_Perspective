@@ -18,15 +18,15 @@ import re
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from default_streamlit_app_util import *
-from manim_animation import MatrixCreation, MatrixDetShow, MatrixAdditionShow, MatrixMulShow
-from manim_result import DetResult, AddResult, MulResult
-import picture_roi as picture_roi
-import yolo_detection as yolo_detection
-import dbscan_line as dbscan_line
-import get_number as get_number
-import file_operation as file_operation
-import manim_animation as manim_animation
-import file_operation
+from yty_math.manim_animation import MatrixCreation, MatrixDetShow, MatrixAdditionShow, MatrixMulShow
+from yty_math.manim_result import DetResult, AddResult, MulResult
+import yty_math.picture_roi as picture_roi
+import yty_math.yolo_detection as yolo_detection
+import yty_math.dbscan_line as dbscan_line
+import yty_math.get_number as get_number
+import yty_math.file_operation as file_operation
+import yty_math.manim_animation as manim_animation
+import yty_math.file_operation
 
 
 

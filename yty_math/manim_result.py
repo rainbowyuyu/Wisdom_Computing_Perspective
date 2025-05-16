@@ -1,5 +1,5 @@
-from matrix_yty import *
-import file_operation as fo
+from yty_math.matrix_yty import *
+import yty_math.file_operation as fo
 import os
 
 
