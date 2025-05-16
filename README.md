@@ -1,4 +1,4 @@
-![logo.png](yty_math/logo.png)
+![logo.png](assert/images/logo.png)
 
 
 ## rainbow_yu 🐋✨
