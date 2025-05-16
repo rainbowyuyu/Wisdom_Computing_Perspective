@@ -220,7 +220,7 @@ def index_streamlit():
             """
             <div class="button-container">
                 <a href="application" target="_self">
-                    <button class="custom-button">示例库</button>
+                    <button class="custom-button">教学案例</button>
                 </a>
             </div>
             """,
