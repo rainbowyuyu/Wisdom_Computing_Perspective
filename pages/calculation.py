@@ -34,6 +34,7 @@ import yty_math.file_operation
 class FinalApp:
     def __init__(self):
         self.selected_model_version = None
+        self.selected_method = "matrix"
 
     def run(self):
         st.set_page_config(page_title="智算视界 · 可视化计算", page_icon="assert/images/pure_logo.png", layout="wide")
@@ -136,6 +137,13 @@ class FinalApp:
         draw_canvas()
 
     def animate(self):
+        self.selected_method = st.sidebar.selectbox(
+            "选择解题方式",
+            ["矩阵", "二进制浮点运算", "微积分", "页面置换", "排序算法", "其他新增算法"]
+        )
+        st.sidebar.text(f"已选择解题方式: {self.selected_method}")
+        st.session_state.selected_method = self.selected_method
+
         matrix_calculator_app()
 
 def draw_canvas(
