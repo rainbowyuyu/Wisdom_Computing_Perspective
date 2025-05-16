@@ -9,7 +9,7 @@
 
 
 #### 网页访问
-- 本项目网页发布于 [智算视界](https://animatecal-aesrxwe852bslylhgvrfxx.streamlit.app/visualize_calculation)
+- 本项目网页发布于 [智算视界](https://wisdom-computing-perspective.streamlit.app/)
 
 
 #### 本地部署
@@ -44,7 +44,7 @@
 5. 运行项目
 - 本地部署localhost网页
 ```bash
-   streamlit run yty_math/input_window_streamlit.py 
+   streamlit run index.py 
 ```
 
 - 可视化调试tk界面
