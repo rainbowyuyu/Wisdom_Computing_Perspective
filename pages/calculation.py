@@ -36,7 +36,7 @@ class FinalApp:
         self.selected_model_version = None
 
     def run(self):
-        st.set_page_config(page_title="智算视界 · 可视化计算", page_icon="pure_logo.png", layout="wide")
+        st.set_page_config(page_title="智算视界 · 可视化计算", page_icon="assert/images/pure_logo.png", layout="wide")
 
         mobile_or_computer_warning()
 
@@ -127,7 +127,7 @@ class FinalApp:
 
         self.selected_model_version = st.sidebar.selectbox(
             "选择模型版本",
-            ["v4.2", "v5xp", "v5x", "v4x", "v4n", "v3.5", "v3", "v2", "v1.5", "v1", "v0", "yolo"]
+            ["v4.2", "v4n", "v3.5", "v3", "v2", "v1.5", "v1", "v0"]
         )
         st.sidebar.text(f"已选择模型版本: {self.selected_model_version}")
         st.session_state.selected_model_version = self.selected_model_version

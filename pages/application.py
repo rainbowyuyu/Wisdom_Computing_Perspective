@@ -7,7 +7,7 @@ import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from default_streamlit_app_util import *
 
-st.set_page_config(page_title="智算视界 · 帮助文档", page_icon="pure_logo.png", layout="wide")
+st.set_page_config(page_title="智算视界 · 帮助文档", page_icon="assert/images/pure_logo.png", layout="wide")
 
 # === 侧边导航栏 ===
 login_config()

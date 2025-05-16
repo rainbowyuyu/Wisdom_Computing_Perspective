@@ -187,7 +187,7 @@ def index_streamlit():
             """
             <div class="button-container">
                 <a href="calculation" target="_self">
-                    <button class="custom-button">快速开始</button>
+                    <button class="custom-button">算式识别</button>
                 </a>
             </div>
             """,

@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from default_streamlit_app_util import *
 
 # 配置页面
-st.set_page_config(page_title="智算视界 · 用户登录", page_icon="pure_logo.png", layout="wide")
+st.set_page_config(page_title="智算视界 · 用户登录", page_icon="assert/images/pure_logo.png", layout="wide")
 
 # 初始化 Supabase 客户端
 url = "https://fzmjkkiaibpjevtaeasl.supabase.co"
