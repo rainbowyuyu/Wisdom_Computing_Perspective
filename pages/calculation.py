@@ -390,15 +390,15 @@ def matrix_calculator_app():
     # Operation selection area
     st.header("选择矩阵操作")
     col1, col2, col3 = st.columns(3)
-    with col3:
-        if st.button("行列式"):
-            st.session_state.operation = 'det'
     with col1:
         if st.button("矩阵加法"):
             st.session_state.operation = 'add'
     with col2:
         if st.button("矩阵乘法"):
             st.session_state.operation = 'mul'
+    with col3:
+        if st.button("行列式"):
+            st.session_state.operation = 'det'
 
     if st.session_state.operation:
         st.subheader(f"当前操作: {st.session_state.operation}")
