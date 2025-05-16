@@ -180,7 +180,7 @@ def index_streamlit():
 
     add_empty_lines(2)
 
-    e1, col1, col2, col3, e2 = st.columns([0.5,1, 1, 1,0.5])  # 中间宽度更大
+    e1, col1, col2, col3, col4, e2 = st.columns([0.5,1, 1, 1, 1,0.5])  # 中间宽度更大
 
     with col1:
         st.markdown(
@@ -210,6 +210,17 @@ def index_streamlit():
             <div class="button-container">
                 <a href="documents" target="_self">
                     <button class="custom-button">帮助文档</button>
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col4:
+        st.markdown(
+            """
+            <div class="button-container">
+                <a href="application" target="_self">
+                    <button class="custom-button">示例库</button>
                 </a>
             </div>
             """,
