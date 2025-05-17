@@ -252,7 +252,7 @@ def index_streamlit():
     """, unsafe_allow_html=True)
 
     try:
-        video_file = open('assert/videos/introduction.mp4', 'rb')  # Make sure this file exists
+        video_file = open('assert/videos/introductionv2.mp4', 'rb')  # Make sure this file exists
         video_bytes = video_file.read()
         st.markdown('<div class="video-container">', unsafe_allow_html=True)
         st.video(video_bytes)
