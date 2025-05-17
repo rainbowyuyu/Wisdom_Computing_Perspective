@@ -252,13 +252,13 @@ def index_streamlit():
     """, unsafe_allow_html=True)
 
     try:
-        video_file = open('assert/videos/introductionv2.mp4', 'rb')  # Make sure this file exists
+        video_file = open('assert/videos/introduction v2.mp4', 'rb')  # Make sure this file exists
         video_bytes = video_file.read()
         st.markdown('<div class="video-container">', unsafe_allow_html=True)
         st.video(video_bytes)
         st.markdown('</div>', unsafe_allow_html=True)
     except FileNotFoundError:
-        st.markdown('<div class="stWarning">未找到演示视频 introduction.mp4，可将其放入项目目录以展示。</div>',
+        st.markdown('<div class="stWarning">未找到演示视频 introduction v2.mp4，可将其放入项目目录以展示。</div>',
                     unsafe_allow_html=True)
 
     add_empty_lines(3)
