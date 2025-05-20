@@ -186,7 +186,7 @@ def index_streamlit():
         st.markdown(
             """
             <div class="button-container">
-                <a href="calculation" target="_self">
+                <a href="detect" target="_self">
                     <button class="custom-button">算式识别</button>
                 </a>
             </div>
@@ -208,7 +208,7 @@ def index_streamlit():
         st.markdown(
             """
             <div class="button-container">
-                <a href="documents" target="_self">
+                <a href="help_documents" target="_self">
                     <button class="custom-button">帮助文档</button>
                 </a>
             </div>
@@ -219,7 +219,7 @@ def index_streamlit():
         st.markdown(
             """
             <div class="button-container">
-                <a href="application" target="_self">
+                <a href="examples" target="_self">
                     <button class="custom-button">教学案例</button>
                 </a>
             </div>

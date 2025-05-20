@@ -9,3 +9,4 @@ streamlit-extras
 streamlit-js-eval
 streamlit-authenticator
 supabase
+openai
