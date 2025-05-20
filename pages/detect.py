@@ -59,10 +59,6 @@ with col2:
                 base_url="https://openrouter.ai/api/v1",
                 api_key="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",
             )
-            headers = {
-                "Authorization": f"Bearer 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",
-                "HTTP-Referer": "https://wisdom-computing-perspective.streamlit.app/detect"  # 可选
-            }
             # 发起图像识别请求
             completion = client.chat.completions.create(
                 model="qwen/qwen2.5-vl-32b-instruct:free",
