@@ -63,6 +63,10 @@ with col2:
             # 发起图像识别请求
             completion = client.chat.completions.create(
                 model="qwen/qwen2.5-vl-32b-instruct:free",
+                extra_headers={
+                    "HTTP-Referer": "https://wisdom-computing-perspective.streamlit.app/detect",  # Optional. Site URL for rankings on openrouter.ai.
+                    "X-Title": "智算视界 · 可视化计算",  # Optional. Site title for rankings on openrouter.ai.
+                },
                 extra_body={},
                 messages=[
                     {
