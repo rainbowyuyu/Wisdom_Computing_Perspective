@@ -13,8 +13,8 @@ mobile_or_computer_warning()
 
 def get_openai_client():
     return OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=st.secrets["openai_api_key"]
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        api_key=st.secrets["aliyun_key"]
     )
 
 client = get_openai_client()
@@ -69,7 +69,7 @@ with col2:
 
                     # 调用模型识别
                     completion = client.chat.completions.create(
-                        model="qwen/qwen2.5-vl-32b-instruct:free",
+                        model="qwen2.5-vl-72b-instruct",
                         extra_body={},
                         messages=[
                             {
