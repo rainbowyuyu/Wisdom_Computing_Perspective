@@ -66,6 +66,10 @@ with col2:
                     # 调用模型识别
                     completion = client.chat.completions.create(
                         model="qwen/qwen2.5-vl-32b-instruct:free",
+                        extra_headers={
+                          "HTTP-Referer": "https://wisdom-computing-perspective.streamlit.app/detect",
+                          # "X-Title": "<YOUR_SITE_NAME>",
+                        },
                         extra_body={},
                         messages=[
                             {
