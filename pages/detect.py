@@ -16,7 +16,7 @@ mobile_or_computer_warning()
 def get_openai_client():
     return OpenAI(
         base_url="https://openrouter.ai/api/v1",
-        api_key="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"  # 推荐从 secrets.toml 加载，避免泄露
+        api_key=st.secrets["openai_api_key"]
     )
 
 client = get_openai_client()
