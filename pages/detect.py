@@ -8,11 +8,9 @@ import io
 from default_streamlit_app_util import *
 
 # 初始化
-st.set_page_config(page_title="智算视界 · 可视化计算", page_icon="assert/images/pure_logo.png", layout="wide")
+st.set_page_config(page_title="智算视界 · 算式检测", page_icon="assert/images/pure_logo.png", layout="wide")
 mobile_or_computer_warning()
 
-# 持久化 client 避免重复初始化
-@st.cache_resource(show_spinner=False)
 def get_openai_client():
     return OpenAI(
         base_url="https://openrouter.ai/api/v1",
@@ -33,12 +31,18 @@ with col1:
         if uploaded_file:
             st.image(uploaded_file, caption="上传的图片", use_container_width=True)
 
+
     elif input_method == "绘制图片":
         st.markdown("🖌️ 使用画板进行手绘")
+        # 添加工具选择和画笔粗细调节
+        tool = st.radio("🛠️ 选择工具", ["画笔", "橡皮"], horizontal=True)
+        stroke_width = st.slider("✏️ 调整画笔粗细", 1, 30, 3)
+        # 设置颜色：橡皮擦是白色，画笔是黑色
+        stroke_color = "#FFFFFF" if tool == "橡皮" else "#000000"
         canvas_result = st_canvas(
             fill_color="rgba(255, 255, 255, 1)",
-            stroke_width=3,
-            stroke_color="#000000",
+            stroke_width=stroke_width,
+            stroke_color=stroke_color,
             background_color="#FFFFFF",
             width=600,
             height=300,
@@ -66,10 +70,6 @@ with col2:
                     # 调用模型识别
                     completion = client.chat.completions.create(
                         model="qwen/qwen2.5-vl-32b-instruct:free",
-                        extra_headers={
-                          "HTTP-Referer": "https://wisdom-computing-perspective.streamlit.app/detect",
-                          # "X-Title": "<YOUR_SITE_NAME>",
-                        },
                         extra_body={},
                         messages=[
                             {

@@ -495,5 +495,6 @@ def manin_rander(
 
 
 if __name__ == "__main__":
-    app = FinalApp()
-    app.run()
+    # app = FinalApp()
+    # app.run()
+    st.warning("动态计算页面正在升级更新维护")
