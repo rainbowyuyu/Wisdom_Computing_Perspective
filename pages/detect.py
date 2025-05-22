@@ -21,32 +21,24 @@ def get_openai_client():
 
 client = get_openai_client()
 
-col1, col2 = st.columns(2)
+st.markdown("## 📤 识别图片或手写输入")
+input_method = st.radio("选择图像输入方式", ["上传图片", "绘制图片"], horizontal=True)
+uploaded_file = None
 
-with col1:
-    st.markdown("## 📤 识别图片或手写输入")
-    input_method = st.radio("选择图像输入方式", ["上传图片", "绘制图片"], horizontal=True)
-    uploaded_file = None
 
-    if input_method == "上传图片":
-        uploaded_file = st.file_uploader("请选择一张图片（jpg / jpeg / png）", type=["jpg", "jpeg", "png"],
-                                         label_visibility="collapsed")
-        if uploaded_file:
-            # st.image(uploaded_file, caption="上传的图片", use_container_width=True)
-            # Open the uploaded image
-            img = Image.open(uploaded_file)
+cropped_img = None
+canvas_result = None
+if input_method == "上传图片":
+    uploaded_file = st.file_uploader("请选择一张图片（jpg / jpeg / png）", type=["jpg", "jpeg", "png"],
+                                     label_visibility="collapsed")
+    if uploaded_file:
+        # st.image(uploaded_file, caption="上传的图片", use_container_width=True)
+        # Open the uploaded image
+        img = Image.open(uploaded_file)
 
-            # Using the cropper for interaction
-            cropped_img = st_cropper(img, aspect_ratio=(1.0, 1.0), box_color="#555555")
-            if cropped_img is not None:
-                st.image(cropped_img, caption="输入的图片", use_container_width=True)
-                # Save the cropped image for further use
-                buffered = io.BytesIO()
-                cropped_img.save(buffered, format="PNG")
-                buffered.seek(0)
-                uploaded_file = buffered
-
-    elif input_method == "绘制图片":
+        # Using the cropper for interaction
+        cropped_img = st_cropper(img, aspect_ratio=(2.0, 1.0), box_color="#555555")
+elif input_method == "绘制图片":
         st.markdown("🖌️ 使用画板进行手绘")
         # 添加工具选择和画笔粗细调节
         tool = st.radio("🛠️ 选择工具", ["画笔", "橡皮"], horizontal=True)
@@ -63,7 +55,21 @@ with col1:
             drawing_mode="freedraw",
             key="canvas"
         )
-        if canvas_result.image_data is not None:
+
+col1, col2 = st.columns(2)
+
+with col1:
+
+        if cropped_img is not None:
+            st.image(cropped_img, caption="输入的图片", use_container_width=True)
+            # Save the cropped image for further use
+            buffered = io.BytesIO()
+            cropped_img.save(buffered, format="PNG")
+            buffered.seek(0)
+            uploaded_file = buffered
+
+
+        if canvas_result is not None and canvas_result.image_data is not None:
             img = Image.fromarray(canvas_result.image_data.astype("uint8"))
             buffered = io.BytesIO()
             img.save(buffered, format="PNG")
