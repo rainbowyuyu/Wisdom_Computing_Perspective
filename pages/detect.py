@@ -4,18 +4,20 @@ import base64
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import io
-
 from default_streamlit_app_util import *
+from streamlit_cropper import st_cropper
 
-# 初始化
+# Initialize
 st.set_page_config(page_title="智算视界 · 算式检测", page_icon="assert/images/pure_logo.png", layout="wide")
 mobile_or_computer_warning()
+
 
 def get_openai_client():
     return OpenAI(
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         api_key=st.secrets["aliyun_key"]
     )
+
 
 client = get_openai_client()
 
@@ -27,10 +29,22 @@ with col1:
     uploaded_file = None
 
     if input_method == "上传图片":
-        uploaded_file = st.file_uploader("请选择一张图片（jpg / jpeg / png）", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+        uploaded_file = st.file_uploader("请选择一张图片（jpg / jpeg / png）", type=["jpg", "jpeg", "png"],
+                                         label_visibility="collapsed")
         if uploaded_file:
-            st.image(uploaded_file, caption="上传的图片", use_container_width=True)
+            # st.image(uploaded_file, caption="上传的图片", use_container_width=True)
+            # Open the uploaded image
+            img = Image.open(uploaded_file)
 
+            # Using the cropper for interaction
+            cropped_img = st_cropper(img, aspect_ratio=(1.0, 1.0), box_color="#555555")
+            if cropped_img is not None:
+                st.image(cropped_img, caption="输入的图片", use_container_width=True)
+                # Save the cropped image for further use
+                buffered = io.BytesIO()
+                cropped_img.save(buffered, format="PNG")
+                buffered.seek(0)
+                uploaded_file = buffered
 
     elif input_method == "绘制图片":
         st.markdown("🖌️ 使用画板进行手绘")
@@ -59,7 +73,6 @@ with col1:
 
 with col2:
     if st.button("🔍 识别公式"):
-
         if uploaded_file:
             with st.spinner("🧠 正在识别图像，请稍候..."):
 
@@ -71,15 +84,14 @@ with col2:
                     completion = client.chat.completions.create(
                         model="qwen2.5-vl-72b-instruct",
                         extra_body={},
-                        messages=[
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "text", "text": "tell me the latex formula in the picture? only return the latex code and without ```latex``` or \\[\\]"},
-                                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                                ]
-                            }
-                        ]
+                        messages=[{
+                            "role": "user",
+                            "content": [
+                                {"type": "text",
+                                 "text": "tell me the latex formula in the picture? only return the latex code and without ```latex``` or \\[\\]"},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                            ]
+                        }]
                     )
 
                     latex_res = completion.choices[0].message.content.strip()

@@ -8,5 +8,6 @@ streamlit-drawable-canvas
 streamlit-extras
 streamlit-js-eval
 streamlit-authenticator
+streamlit-cropper
 supabase
 openai
