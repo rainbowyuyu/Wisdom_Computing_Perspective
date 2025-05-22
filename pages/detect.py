@@ -5,7 +5,7 @@ from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import io
 from default_streamlit_app_util import *
-from streamlit_cropper import st_cropper
+from PIL import ImageOps
 
 # Initialize
 st.set_page_config(page_title="智算视界 · 算式检测", page_icon="assert/images/pure_logo.png", layout="wide")
@@ -21,24 +21,41 @@ def get_openai_client():
 
 client = get_openai_client()
 
-st.markdown("## 📤 识别图片或手写输入")
-input_method = st.radio("选择图像输入方式", ["上传图片", "绘制图片"], horizontal=True)
-uploaded_file = None
+col1, col2 = st.columns(2)
 
 
-cropped_img = None
-canvas_result = None
-if input_method == "上传图片":
-    uploaded_file = st.file_uploader("请选择一张图片（jpg / jpeg / png）", type=["jpg", "jpeg", "png"],
-                                     label_visibility="collapsed")
-    if uploaded_file:
-        # st.image(uploaded_file, caption="上传的图片", use_container_width=True)
-        # Open the uploaded image
-        img = Image.open(uploaded_file)
+def crop_image(image: Image):
+    st.write("✂️ 选择裁剪区域")
+    left = st.slider("左边距", 0, image.width, 0)
+    top = st.slider("上边距", 0, image.height, 0)
+    right = st.slider("右边距", left + 1, image.width, image.width)
+    bottom = st.slider("下边距", top + 1, image.height, image.height)
 
-        # Using the cropper for interaction
-        cropped_img = st_cropper(img, aspect_ratio=(2.0, 1.0), box_color="#555555")
-elif input_method == "绘制图片":
+    cropped_image = image.crop((left, top, right, bottom))
+    return cropped_image
+
+
+with col1:
+    st.markdown("## 📤 识别图片或手写输入")
+    input_method = st.radio("选择图像输入方式", ["上传图片", "绘制图片"], horizontal=True)
+    uploaded_file = None
+
+    if input_method == "上传图片":
+        uploaded_file = st.file_uploader("请选择一张图片（jpg / jpeg / png）", type=["jpg", "jpeg", "png"],
+                                         label_visibility="collapsed")
+        if uploaded_file:
+            st.image(uploaded_file, caption="上传的图片", use_container_width=True)
+            # Open the uploaded image
+            img = Image.open(uploaded_file)
+            cropped_img = crop_image(img)
+            st.image(cropped_img, caption="裁剪后的图片", use_container_width=True)
+            # Save the cropped image for further use
+            buffered = io.BytesIO()
+            cropped_img.save(buffered, format="PNG")
+            buffered.seek(0)
+            uploaded_file = buffered
+
+    elif input_method == "绘制图片":
         st.markdown("🖌️ 使用画板进行手绘")
         # 添加工具选择和画笔粗细调节
         tool = st.radio("🛠️ 选择工具", ["画笔", "橡皮"], horizontal=True)
@@ -55,26 +72,13 @@ elif input_method == "绘制图片":
             drawing_mode="freedraw",
             key="canvas"
         )
-
-col1, col2 = st.columns(2)
-
-with col1:
-
-        if cropped_img is not None:
-            st.image(cropped_img, caption="输入的图片", use_container_width=True)
-            # Save the cropped image for further use
+        if canvas_result.image_data is not None:
+            img = Image.fromarray(canvas_result.image_data.astype("uint8"))
+            cropped_img = crop_image(img)
+            st.image(cropped_img, caption="裁剪后的手绘图片", use_container_width=True)
             buffered = io.BytesIO()
             cropped_img.save(buffered, format="PNG")
             buffered.seek(0)
-            uploaded_file = buffered
-
-
-        if canvas_result is not None and canvas_result.image_data is not None:
-            img = Image.fromarray(canvas_result.image_data.astype("uint8"))
-            buffered = io.BytesIO()
-            img.save(buffered, format="PNG")
-            buffered.seek(0)
-            st.image(buffered, caption="绘制的图片", use_container_width=True)
             uploaded_file = buffered
 
 with col2:
