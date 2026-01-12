@@ -27,17 +27,24 @@ export async function processRecognition() {
     mathField.setValue(String.raw`\text{正在识别...}`);
 
     let blob;
-    const canvasEl = document.getElementById('drawing-board');
-    // 判断当前是否在画板模式（检查可见性）
-    if (canvasEl && canvasEl.offsetParent !== null) {
+
+    // 1. 检查当前处于哪个 Tab
+    const drawTab = document.querySelector('.tab-btn[onclick*="draw"]');
+    const isDrawMode = drawTab && drawTab.classList.contains('active');
+
+    if (isDrawMode) {
+        // 画板模式：获取 Canvas 数据
         blob = await getCanvasBlob();
     } else {
+        // 上传模式：获取文件输入框的文件
         const fileInput = document.getElementById('image-upload');
-        if (fileInput.files.length > 0) blob = fileInput.files[0];
+        if (fileInput.files.length > 0) {
+            blob = fileInput.files[0];
+        }
     }
 
     if (!blob) {
-        alert("请先绘制或上传图片");
+        alert(isDrawMode ? "请先绘制内容" : "请先上传图片");
         mathField.setValue(String.raw`\text{等待输入...}`);
         return;
     }
@@ -50,8 +57,9 @@ export async function processRecognition() {
         const data = await response.json();
 
         if (data.status === 'success') {
-            mathField.setValue(data.latex);
-            codeArea.value = data.latex; // 同步到底层代码框
+            // 双向更新
+            if(mathField.setValue) mathField.setValue(data.latex);
+            if(codeArea) codeArea.value = data.latex;
 
             // 成功提示效果
             const container = document.querySelector('.result-panel');
@@ -60,11 +68,11 @@ export async function processRecognition() {
                 setTimeout(() => container.style.boxShadow = "", 1000);
             }
         } else {
-            mathField.setValue(String.raw`\text{Error: }` + data.message);
+            if(mathField.setValue) mathField.setValue(String.raw`\text{Error: }` + data.message);
         }
     } catch (e) {
         console.error(e);
-        mathField.setValue(String.raw`\text{网络错误}`);
+        if(mathField.setValue) mathField.setValue(String.raw`\text{网络错误}`);
     }
 }
 

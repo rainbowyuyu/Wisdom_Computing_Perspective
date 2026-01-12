@@ -2,9 +2,7 @@
 
 let canvas, ctx;
 let isDrawing = false;
-// 使用点数组来平滑曲线
 let points = [];
-
 // 历史记录栈
 const historyStack = [];
 let historyStep = -1;
@@ -14,11 +12,11 @@ export function setupCanvas() {
     canvas = document.getElementById('drawing-board');
     if (!canvas) return;
 
-    ctx = canvas.getContext('2d', { willReadFrequently: true }); // 优化性能
+    ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    const parent = canvas.parentElement;
+    // 监听容器变化
+    const parent = canvas.parentElement; // 这里是 #canvas-container
     const observer = new ResizeObserver(() => {
-        // 使用 requestAnimationFrame 避免高频触发重绘
         requestAnimationFrame(resizeCanvas);
     });
     observer.observe(parent);
@@ -28,13 +26,51 @@ export function setupCanvas() {
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDraw);
     canvas.addEventListener('mouseout', stopDraw);
-
-    // 移动端支持 (passive: false 禁止默认滚动)
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', stopDraw);
 
-    // ... (图片上传监听代码保持不变) ...
+    // 监听模式切换
+    window.addEventListener('mode-change', (e) => {
+        const mode = e.detail;
+        const dpr = window.devicePixelRatio || 1;
+        if (mode === 'draw') {
+            // 切回手写：如果画布是空的或透明，填充白色
+            // 简单策略：总是重置为白色背景，除非有历史记录
+            // 这里为了简单，我们重新填充白色
+            ctx.globalCompositeOperation = 'destination-over'; // 在内容后面画
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+            ctx.globalCompositeOperation = 'source-over'; // 恢复默认
+        } else {
+            // 切到上传：清空画布（变透明），露出底下的 img
+            ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+        }
+    });
+
+    // 图片上传预览
+    const uploadInput = document.getElementById('image-upload');
+    if (uploadInput) {
+        uploadInput.addEventListener('change', function(e) {
+            if(e.target.files && e.target.files[0]) {
+                const file = e.target.files[0];
+
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    const preview = document.getElementById('uploaded-preview');
+                    if(preview) {
+                        preview.src = evt.target.result;
+                        preview.style.display = 'block'; // 确保显示
+
+                        // 强制 Canvas 变透明
+                        const dpr = window.devicePixelRatio || 1;
+                        ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+    }
 }
 
 export function resizeCanvas() {
@@ -46,14 +82,13 @@ export function resizeCanvas() {
     if (rect.width === 0 || rect.height === 0) return;
 
     const dpr = window.devicePixelRatio || 1;
-
-    // 强制整数像素，防止模糊
     const targetWidth = Math.floor(rect.width * dpr);
     const targetHeight = Math.floor(rect.height * dpr);
 
+    // 如果尺寸没变，不重置
     if (canvas.width === targetWidth && canvas.height === targetHeight) return;
 
-    // --- 保存内容 ---
+    // 保存内容
     let savedContent = null;
     if (canvas.width > 0 && canvas.height > 0) {
         savedContent = document.createElement('canvas');
@@ -62,39 +97,45 @@ export function resizeCanvas() {
         savedContent.getContext('2d').drawImage(canvas, 0, 0);
     }
 
-    // 设置尺寸
+    // 设置新尺寸
     canvas.width = targetWidth;
     canvas.height = targetHeight;
-    // 样式尺寸 (CSS)
     canvas.style.width = '100%';
     canvas.style.height = '100%';
 
-    // 重置 Context
+    // 重置 Context 状态
     ctx.scale(dpr, dpr);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // 恢复背景
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    // 恢复背景逻辑：检查当前模式
+    const preview = document.getElementById('uploaded-preview');
+    // 如果预览图是显示的，说明是上传模式，背景透明
+    const isUploadMode = preview && preview.style.display !== 'none' && preview.getAttribute('src');
 
-    // --- 恢复内容 ---
+    if (!isUploadMode) {
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    } else {
+        ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    }
+
+    // 恢复内容
     if (savedContent) {
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        // 使用 drawImage 的完整参数来适应新尺寸 (可选: 拉伸或居中)
-        // 这里选择居中保留原比例，或者直接铺在左上角
         ctx.drawImage(savedContent, 0, 0);
         ctx.restore();
     } else {
-        if (historyStack.length === 0) saveState();
+        if (historyStack.length === 0 && !isUploadMode) saveState();
     }
 }
 
 // 获取相对于 Canvas 的准确坐标
 function getPos(e) {
-    // 缓存 rect 减少重排 (注意：如果页面布局动态变化很大，可能需要实时获取)
     const rect = canvas.getBoundingClientRect();
+    // dpr 缩放已经在 ctx.scale 处理了，这里直接返回 CSS 像素坐标即可
+    // 不需要除以 dpr，因为 scale 会自动放大绘图操作
     return {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top
@@ -138,11 +179,9 @@ function startDraw(e) {
 
 function draw(e) {
     if (!isDrawing) return;
-
     const pos = getPos(e);
     points.push(pos);
 
-    // 至少需要3个点才能绘制二次贝塞尔曲线
     if (points.length < 3) return;
 
     const brushSize = getBrushSize();
@@ -150,41 +189,17 @@ function draw(e) {
     ctx.strokeStyle = getBrushColor();
 
     ctx.beginPath();
-
-    // 移动到倒数第三个点
-    // 我们总是绘制从 p[i-2] 到 p[i-1] 的曲线，控制点由 p[i-1] 和 p[i] 决定
     const len = points.length;
-    // 起点
+    // 使用二次贝塞尔曲线平滑绘制
     ctx.moveTo(points[len - 2].x, points[len - 2].y);
+    const midX = (points[len - 2].x + points[len - 1].x) / 2;
+    const midY = (points[len - 2].y + points[len - 1].y) / 2;
+    ctx.quadraticCurveTo(points[len - 2].x, points[len - 2].y, midX, midY); // 这里简化逻辑，直接连线其实也行
 
-    // 二次贝塞尔曲线：终点是两点中点，控制点是倒数第二个点
-    // 这种算法能画出非常平滑的曲线
-    const lastPos = points[len - 2];
-    const currPos = points[len - 1];
+    // 修正：简单连线更稳定
+    ctx.lineTo(points[len - 1].x, points[len - 1].y);
 
-    // 取中点作为曲线终点，平滑过渡
-    const midX = (lastPos.x + currPos.x) / 2;
-    const midY = (lastPos.y + currPos.y) / 2;
-
-    // 注意：这里其实是在补画上一段的尾巴
-    // 简易版：直接连线（旧逻辑），优化版如下：
-
-    // 为了极致流畅，通常我们不实时清空重绘整个路径，而是画小段
-    // 但简单的 lineTo 在转角处很生硬。
-    // 使用“中点法”：
-
-    // 清空当前点数组，只保留最后两个用于下一次计算
-    // 实际上，为了性能，我们每两点画一条直线通常足够，只要采样率够高（mousemove 频率高）
-    // 但如果鼠标移动极快，就需要插值。
-
-    // 这里采用更稳定的方案：直接画线，但在样式上优化
-    ctx.moveTo(points[len-2].x, points[len-2].y);
-    ctx.lineTo(points[len-1].x, points[len-1].y);
     ctx.stroke();
-
-    // 如果想要贝塞尔曲线效果，需要更复杂的缓冲区逻辑，
-    // 对于手写识别场景，高频直线连接其实更准确且性能更好。
-    // 关键在于 ctx.lineCap = 'round' 和 ctx.lineJoin = 'round' (在 resizeCanvas 已设置)
 }
 
 function stopDraw() {
@@ -252,8 +267,17 @@ function restoreState() {
 export function clearCanvas() {
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
+    // 同理，清空时要判断模式
+    const preview = document.getElementById('uploaded-preview');
+    const isUploadMode = preview && preview.style.display !== 'none';
+
+    if (!isUploadMode) {
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    } else {
+        ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    }
     saveState();
 }
 

@@ -21,15 +21,16 @@ export function showSection(sectionId) {
     document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active-section'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 
-    document.getElementById(sectionId).classList.add('active-section');
+    const target = document.getElementById(sectionId);
+    if(target) target.classList.add('active-section');
 
     // 高亮导航按钮
     const navBtns = document.querySelectorAll('.nav-btn');
     navBtns.forEach(btn => {
-        if(btn.innerText.includes("首页") && sectionId === 'home') btn.classList.add('active');
-        if(btn.innerText.includes("识别") && sectionId === 'detect') btn.classList.add('active');
-        if(btn.innerText.includes("计算") && sectionId === 'calculate') btn.classList.add('active');
-        if(btn.innerText.includes("案例") && sectionId === 'examples') btn.classList.add('active');
+        const onclickVal = btn.getAttribute('onclick');
+        if(onclickVal && onclickVal.includes(`'${sectionId}'`)) {
+            btn.classList.add('active');
+        }
     });
 }
 
@@ -88,18 +89,42 @@ export function switchAuthMode(mode) {
 export function switchInputMode(mode) {
     const drawTools = document.getElementById('draw-tools');
     const uploadTools = document.getElementById('upload-tools');
-    const canvasEl = document.getElementById('drawing-board');
-    const previewEl = document.getElementById('uploaded-preview');
+    const canvas = document.getElementById('drawing-board');
+    const preview = document.getElementById('uploaded-preview');
 
+    // 1. 切换 Tab 按钮高亮 (关键修复)
+    const tabs = document.querySelectorAll('.tab-btn');
+    tabs.forEach(t => {
+        const onclickVal = t.getAttribute('onclick');
+        if(onclickVal && onclickVal.includes(`'${mode}'`)) {
+            t.classList.add('active');
+        } else {
+            t.classList.remove('active');
+        }
+    });
+
+    // 2. 切换显示区域
     if(mode === 'draw') {
-        drawTools.style.display = 'block';
-        uploadTools.style.display = 'none';
-        canvasEl.style.display = 'block';
-        previewEl.style.display = 'none';
+        if(drawTools) drawTools.style.display = 'block';
+        if(uploadTools) uploadTools.style.display = 'none';
+
+        // 隐藏预览图，显示 Canvas 并恢复背景
+        if(preview) preview.style.display = 'none';
+        if(canvas) {
+            canvas.style.display = 'block';
+            window.dispatchEvent(new CustomEvent('mode-change', { detail: 'draw' }));
+        }
     } else {
-        drawTools.style.display = 'none';
-        uploadTools.style.display = 'block';
-        canvasEl.style.display = 'none';
-        previewEl.style.display = 'block';
+        if(drawTools) drawTools.style.display = 'none';
+        // 使用 flex 以保持样式 (关键修复)
+        if(uploadTools) uploadTools.style.display = 'flex';
+
+        // 显示预览图，Canvas 保持显示但变透明（用于获取位置或作为遮罩）
+        if(preview && preview.src) preview.style.display = 'block';
+
+        if(canvas) {
+            canvas.style.display = 'block';
+            window.dispatchEvent(new CustomEvent('mode-change', { detail: 'upload' }));
+        }
     }
 }

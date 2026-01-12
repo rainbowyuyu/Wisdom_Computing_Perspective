@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="智算视界 (Intelligent Computing Vision) - 基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台。">
-    <title>智算视界 · Intelligent Computing Vision</title>
+    <meta name="description" content="智算视界 (Wisdom Computing Perspective) - 基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台。">
+    <title>智算视界 · Wisdom Computing Perspective</title>
+
+    <link rel="icon" href="assets/智算视界_avatar.svg" type="image/png">
 
     <!-- 预连接字体源优化加载速度 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,7 +34,7 @@
     <!-- 导航栏 -->
     <nav class="navbar">
         <div class="logo">
-            <i class="fa-solid fa-infinity"></i> 智算视界
+            <img src="assets/智算视界_avatar.svg" alt="icon" width="80"> 智算视界
         </div>
         <div class="nav-links">
             <button class="nav-btn active" onclick="showSection('home')">首页</button>
@@ -145,9 +147,14 @@
                         </div>
                     </div>
 
-                    <div id="upload-tools" class="control-group" style="display:none;">
-                        <label>上传图片</label>
-                        <input type="file" id="image-upload" accept="image/*" class="tech-input" style="padding: 8px;">
+                    <div id="upload-tools" style="display:none;">
+                        <label for="image-upload" class="upload-label">
+                            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                            <span class="upload-text">点击或拖拽图片到此处</span>
+                            <!-- 将 input 放在 label 内部，id 必须对应 -->
+                            <input type="file" id="image-upload" accept="image/*">
+                        </label>
+                        <div id="file-name-display" class="file-name"></div>
                     </div>
 
                     <div style="margin-top: auto;">
@@ -167,6 +174,8 @@
                     <div class="canvas-wrapper">
                         <div id="canvas-container">
                             <canvas id="drawing-board"></canvas>
+
+                            <!-- 确保预览图在这里，且默认隐藏 -->
                             <img id="uploaded-preview" src="" alt="预览" style="display:none;">
                         </div>
                         <!-- 提示浮层 -->

@@ -1,51 +1,52 @@
 /* static/css/pages/workspace.css */
 
+/* --- 1. 整体布局 --- */
 .workspace {
     display: grid;
-    grid-template-columns: 320px 1fr; /* 侧边栏加宽到 320px，给公式更多空间 */
+    /* 左侧工具栏(260px)，右侧占据剩余空间 */
+    grid-template-columns: 260px 1fr;
     gap: 1.5rem;
-    /* 高度控制：确保不超过视口，防止双滚动条 */
-    height: calc(100vh - 90px);
-    min-height: 600px;
+    /* 限制总高度，防止页面滚动，减去导航栏高度 */
+    height: calc(100vh - 100px);
+    min-height: 650px;
     margin-top: 1rem;
-    overflow: hidden;
+    overflow: hidden; /* 防止网格溢出 */
 }
 
+/* 响应式：移动端改为垂直排列 */
 @media (max-width: 900px) {
     .workspace {
         grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr; /* 移动端改为上下布局 */
+        grid-template-rows: auto 1fr auto; /* 工具-画板-结果 */
         height: auto;
         overflow: visible;
     }
-    /* 移动端侧边栏高度限制 */
     .tools-panel { max-height: 400px; }
-    .canvas-area { height: 500px; }
+    .canvas-wrapper { height: 500px; min-height: 400px; }
+    .result-panel { height: auto; min-height: auto; }
 }
 
-/* 侧边栏：Flex 布局，工具在上，结果在下 */
+/* --- 2. 左侧：工具栏面板 --- */
 .tools-panel {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.2rem;
     height: 100%;
-    overflow: hidden; /* 内部滚动 */
-    padding-bottom: 1rem; /* 底部留白 */
+    overflow-y: auto; /* 允许工具栏内部滚动 */
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid #e2e8f0;
+    box-shadow: var(--shadow-sm);
 }
 
-/* 工具组（Tab + 绘图工具 + 上传） */
-#tools-group-wrapper {
-    flex: 0 0 auto; /* 不自动伸缩 */
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
+/* Tab 切换 */
 .tab-switch {
     display: flex;
     background: #f1f5f9;
     border-radius: 12px;
     padding: 4px;
+    margin-bottom: 0.5rem;
 }
 
 .tab-btn {
@@ -66,11 +67,11 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
+/* 工具组容器 */
 .control-group {
-    background: white;
-    padding: 1.2rem;
-    border-radius: var(--radius-md);
-    border: 1px solid #e2e8f0;
+    background: transparent;
+    padding: 0;
+    border: none;
 }
 
 .control-group label {
@@ -83,162 +84,46 @@
     letter-spacing: 0.05em;
 }
 
+/* 工具按钮网格 */
 .tools-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
+    justify-content: flex-start;
 }
 
 .tool-btn {
     background: white;
     border: 1px solid #e2e8f0;
     color: var(--text-secondary);
-    width: 40px; height: 40px; /* 稍微调小一点 */
+    width: 44px; height: 44px;
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1rem;
+    font-size: 1.1rem;
 }
 
-.tool-btn:hover { background: #f8fafc; color: var(--primary-color); border-color: #cbd5e1; }
-.tool-btn.active { background: #eff6ff; border-color: var(--primary-color); color: var(--primary-color); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
-
-/* --- 结果区域：占据剩余空间 --- */
-.result-area {
-    flex: 1; /* 自动占据剩余高度 */
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: var(--radius-md);
-    padding: 1.2rem;
-    display: flex;
-    flex-direction: column;
-    min-height: 200px; /* 保证最小高度 */
-    overflow: hidden; /* 防止溢出 */
-}
-
-/* MathLive 组件容器 */
-.math-field-container {
-    flex: 1;
-    overflow-y: auto; /* 允许垂直滚动 */
+.tool-btn:hover {
     background: #f8fafc;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    margin-bottom: 10px;
-    display: flex;
-    flex-direction: column;
+    color: var(--primary-color);
+    border-color: #cbd5e1;
 }
 
-math-field {
-    width: 100%;
-    background: transparent;
-    padding: 1rem;
-    font-size: 1.4rem;
-    border: none;
-    outline: none;
+.tool-btn.active {
+    background: #eff6ff;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
-/* 去掉 MathLive 默认的蓝色聚焦边框，使用我们自己的 */
-math-field::part(container) {
-    border-radius: 8px;
+/* 上传控件样式微调 */
+#upload-tools input[type="file"] {
+    font-size: 0.9rem;
+    background: #f8fafc;
 }
 
-/* 底部操作栏 (代码折叠 + 按钮) */
-.result-actions {
-    flex: 0 0 auto;
-}
-
-/* 代码折叠详情 */
-details {
-    margin-bottom: 0;
-    border: none;
-    padding: 0;
-    background: transparent;
-}
-
-details summary {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    padding: 5px 0;
-}
-
-details textarea {
-    height: 80px;
-    font-size: 0.85rem;
-    margin-top: 5px;
-}
-
-/* --- 画板区域 --- */
-.canvas-area {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-#canvas-container {
-    background: white;
-    border-radius: var(--radius-md);
-    border: 1px solid #e2e8f0;
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    box-shadow:
-        0 4px 6px -1px rgba(0, 0, 0, 0.05),
-        inset 0 0 40px rgba(0,0,0,0.01);
-    cursor: crosshair;
-}
-
-#drawing-board {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100% !important; height: 100% !important;
-    touch-action: none;
-}
-/* static/css/pages/workspace.css */
-
-.workspace {
-    display: grid;
-    /* 左侧工具栏(260px)，右侧占据剩余空间 */
-    grid-template-columns: 260px 1fr;
-    gap: 1.5rem;
-    /* 限制总高度，防止页面滚动 */
-    height: calc(100vh - 100px);
-    min-height: 650px;
-    margin-top: 1rem;
-    overflow: hidden;
-}
-
-@media (max-width: 900px) {
-    .workspace {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr auto; /* 移动端：工具-画板-结果 */
-        height: auto;
-        overflow: visible;
-    }
-    .canvas-wrapper { height: 400px; }
-}
-
-/* --- 左侧：纯工具栏 --- */
-.tools-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1.2rem;
-    height: 100%;
-    overflow-y: auto; /* 允许工具栏内部滚动 */
-    background: white;
-    padding: 1.5rem;
-    border-radius: var(--radius-md);
-    border: 1px solid #e2e8f0;
-    box-shadow: var(--shadow-sm);
-}
-
-/* 工具样式复用 */
-.tab-switch { margin-bottom: 0.5rem; }
-.control-group { border: none; padding: 0; background: transparent; }
-.tools-grid { gap: 10px; justify-content: flex-start; }
-
-/* --- 右侧：主工作区 (包含 画板 + 结果) --- */
+/* --- 3. 右侧：主工作区容器 --- */
 .workspace-main {
     display: flex;
     flex-direction: column;
@@ -247,7 +132,7 @@ details textarea {
     overflow: hidden;
 }
 
-/* 1. 画板区域 (占据剩余空间) */
+/* --- 3.1 上半部分：画板区域 --- */
 .canvas-wrapper {
     flex: 1; /* 自动占据剩余高度 */
     background: white;
@@ -257,32 +142,49 @@ details textarea {
     overflow: hidden;
     box-shadow: inset 0 0 40px rgba(0,0,0,0.015);
     cursor: crosshair;
-    min-height: 300px; /* 保证画板最小高度 */
+    min-height: 300px;
 }
 
 #canvas-container {
     width: 100%;
     height: 100%;
     position: relative;
+    background: white; /* 默认背景白 */
 }
 
+/* 画板本体：绝对定位，层级最高，背景透明 */
 #drawing-board {
     position: absolute;
     top: 0; left: 0;
     width: 100% !important; height: 100% !important;
-    touch-action: none;
+    touch-action: none; /* 禁止触摸滚动 */
+    z-index: 10;
+    background: transparent; /* 关键：允许透视到底下的预览图 */
 }
 
-/* 2. 结果区域 (固定在底部，突出显示) */
+/* 上传预览图：居中显示，层级较低 */
+#uploaded-preview {
+    max-width: 90%;
+    max-height: 90%;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none; /* 让鼠标事件穿透图片到画板 */
+    z-index: 5;
+    object-fit: contain;
+    display: block; /* 默认block，通过内联style控制显隐 */
+}
+
+/* --- 3.2 下半部分：识别结果面板 --- */
 .result-panel {
-    flex: 0 0 auto; /* 不自动伸缩，由内容或固定高度决定 */
-    height: 50%; /* 占比约 30% */
+    flex: 0 0 auto; /* 不自动伸缩，高度由内容或固定值决定 */
+    height: 50%; /* 占比约 35% */
     min-height: 300px;
     max-height: 500px;
     background: white;
     border-radius: var(--radius-md);
     border: 1px solid #e2e8f0;
-    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.05); /* 向上投射阴影，体现悬浮感 */
+    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.05); /* 向上投射阴影 */
     padding: 1.5rem 2rem;
     display: flex;
     flex-direction: column;
@@ -291,7 +193,7 @@ details textarea {
     transition: all 0.3s ease;
 }
 
-/* 结果区域标题栏 */
+/* 标题栏 */
 .result-header {
     display: flex;
     justify-content: space-between;
@@ -310,28 +212,34 @@ details textarea {
 
 .result-title i { color: var(--primary-color); }
 
-/* MathLive 编辑器样式优化 */
+/* MathLive 组件容器 */
 .math-field-container {
     flex: 1;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 2rem;
+    padding: 1rem;
     overflow-y: auto;
     display: flex;
-    align-items: center; /* 垂直居中 */
+    align-items: center; /* 垂直居中内容 */
+    justify-content: center; /* 水平居中 */
 }
 
 math-field {
     width: 100%;
     background: transparent;
-    padding: 1rem;
-    font-size: 1.8rem; /* 大字体 */
+    padding: 0.5rem;
+    font-size: 1.8rem; /* 大字体显示公式 */
     border: none;
     outline: none;
 }
 
-/* 操作栏 */
+/* 去掉 MathLive 默认聚焦边框，使用我们自己的 */
+math-field::part(container) {
+    border-radius: 8px;
+}
+
+/* 底部操作栏 */
 .result-actions {
     margin-top: 1rem;
     display: flex;
@@ -339,7 +247,41 @@ math-field {
     align-items: center;
 }
 
-/* 右下角的主按钮 */
+/* 代码折叠详情 */
+details {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+details summary {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    padding: 5px 0;
+    cursor: pointer;
+    list-style: none; /* 移除默认三角 */
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* 自定义折叠弹出层 */
+details[open] div {
+    animation: fadeIn 0.2s ease-out;
+}
+
+details textarea {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    resize: none;
+    border: none;
+    background: #f8fafc;
+}
+
+/* 生成动画按钮 */
 .btn-calc-go {
     background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
     color: white;
@@ -353,9 +295,75 @@ math-field {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-size: 1rem;
 }
 
 .btn-calc-go:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+/* static/css/pages/workspace.css */
+
+/* ... (前面的样式保持不变) ... */
+
+/* 上传工具区域优化 */
+#upload-tools {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 2rem 1rem;
+    transition: all 0.3s ease;
+    background: #f8fafc;
+    text-align: center;
+    min-height: 150px;
+}
+
+#upload-tools:hover {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+}
+
+/* 隐藏原生 Input */
+#image-upload {
+    display: none;
+}
+
+/* 自定义上传按钮 (Label) */
+.upload-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+}
+
+.upload-icon {
+    font-size: 2.5rem;
+    color: var(--text-secondary);
+    transition: color 0.3s;
+}
+
+#upload-tools:hover .upload-icon {
+    color: var(--primary-color);
+}
+
+.upload-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* 显示已选文件名 */
+.file-name {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    font-weight: 600;
+    word-break: break-all;
 }
