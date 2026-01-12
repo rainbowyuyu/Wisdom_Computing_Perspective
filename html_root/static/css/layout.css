@@ -2,11 +2,15 @@
 
 /* --- 容器 --- */
 .container {
-    flex: 1;
+    flex: 1; /* 自动撑开高度 */
     padding: 0 5%;
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
+
+    /* 核心修改：增加底部间距 */
+    /* 无论内容多少，这都会在内容和页脚之间强制留出一段距离，避免拥挤 */
+    margin-bottom: 8rem;
 }
 
 /* --- 导航栏 --- */
@@ -90,20 +94,112 @@
     gap: 15px;
 }
 
-/* --- Footer --- */
+/* --- Footer (紧凑且美观版) --- */
 footer {
-    border-top: 1px solid #e2e8f0;
-    color: var(--text-secondary);
-    background: white;
-    margin-top: 4rem;
-    text-align: center;
-    padding: 2rem;
+    background: #0f172a;
+    color: #94a3b8;
+    padding: 2.5rem 5% 1.5rem; /* 紧凑内边距 */
+    margin-top: auto; /* 关键：自动推到底部 */
+    font-size: 0.9rem;
+    border-top: 1px solid #1e293b;
 }
 
-/* --- 响应式 --- */
+.footer-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #1e293b;
+}
+
+/* 品牌区 */
+.footer-brand h3 {
+    color: white;
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.footer-brand p {
+    line-height: 1.5;
+    margin-bottom: 1rem;
+    max-width: 300px;
+    font-size: 0.85rem;
+}
+
+.social-links {
+    display: flex;
+    gap: 12px;
+}
+
+.social-link {
+    color: #94a3b8;
+    font-size: 1.1rem;
+    transition: color 0.3s;
+}
+
+.social-link:hover { color: white; }
+
+/* 链接列 */
+.footer-column h4 {
+    color: white;
+    margin-bottom: 0.8rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.footer-column ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-column li { margin-bottom: 0.4rem; }
+
+.footer-column a {
+    color: #94a3b8;
+    text-decoration: none;
+    transition: color 0.2s;
+    font-size: 0.85rem;
+}
+
+.footer-column a:hover { color: var(--primary-color); }
+
+/* 版权行 */
+.footer-bottom {
+    max-width: 1200px;
+    margin: 1.5rem auto 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* 响应式 */
 @media (max-width: 768px) {
     .navbar { padding: 1rem; }
     .nav-links { display: none; }
     .hero { padding: 3rem 0; }
     .animate-text { font-size: 2.5rem; }
+
+    /* Footer 移动端适配 */
+    .footer-content {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        text-align: center;
+    }
+    .footer-brand p { margin: 0 auto 1rem; }
+    .social-links { justify-content: center; }
+    .footer-bottom {
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
 }

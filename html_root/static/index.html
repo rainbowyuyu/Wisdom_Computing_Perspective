@@ -390,13 +390,28 @@
         </div>
     </div>
 
-    <!-- 设置模态框 -->
+    <!-- index.html Settings Modal 部分 -->
+
     <div id="settings-modal" class="modal">
         <div class="modal-content glass-panel" style="width: 500px;">
             <span class="close-modal" onclick="closeSettings()">&times;</span>
             <h3 style="padding: 1.5rem 2rem 0; color: var(--text-main);">系统设置</h3>
 
             <div style="padding: 2rem;">
+
+                <!-- 新增：基本信息 -->
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">基本信息</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-main); font-size: 0.95rem;">
+                        <span>当前版本</span>
+                        <span id="version-display" style="font-family: 'JetBrains Mono', monospace; background: #eff6ff; color: var(--primary-color); padding: 2px 8px; border-radius: 4px;">Loading...</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-main); font-size: 0.95rem; margin-top: 10px;">
+                        <span>开发者</span>
+                        <span>rainbow_yu</span>
+                    </div>
+                </div>
+
                 <div style="margin-bottom: 2rem;">
                     <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">快捷键设置</h4>
 
@@ -421,8 +436,65 @@
         </div>
     </div>
 
+    <!-- index.html -->
+
     <footer>
-        <p>© 2026 智算视界 (Visdom Computing Perspective) · rainbow_yu | 沪ICP备2025156088号-2 </p>
+        <div class="footer-content">
+            <!-- 品牌介绍 -->
+            <div class="footer-brand">
+                <h3>
+                    <img src="assets/智算视界_avatar.svg" alt="Logo" width="32" style="filter: brightness(100);">
+                    智算视界
+                </h3>
+                <p>基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台。致力于降低数学学习门槛，让抽象公式触手可及。</p>
+                <div class="social-links">
+                    <a href="https://github.com/rainbowyuyu/animate_cal" target="_blank" class="social-link" title="GitHub"><i class="fa-brands fa-github"></i></a>
+                    <a href="https://www.bilibili.com/video/BV1n3dGYJEEJ/" target="_blank" class="social-link" title="Bilibili"><i class="fa-brands fa-bilibili"></i></a>
+                    <a href="#" class="social-link" title="Email"><i class="fa-solid fa-envelope"></i></a>
+                </div>
+            </div>
+
+            <!-- 链接列 1 -->
+            <div class="footer-column">
+                <h4>产品功能</h4>
+                <ul>
+                    <li><a href="#" onclick="showSection('detect')">智能识别</a></li>
+                    <li><a href="#" onclick="showSection('calculate')">动态计算</a></li>
+                    <li><a href="#" onclick="showSection('examples')">教学案例库</a></li>
+                    <li><a href="#" onclick="startTutorial()">新手引导</a></li>
+                </ul>
+            </div>
+
+            <!-- 链接列 2 -->
+            <div class="footer-column">
+                <h4>资源支持</h4>
+                <ul>
+                    <li><a href="#" onclick="showSection('help')">使用文档</a></li>
+                    <li><a href="#">API 文档</a></li>
+                    <li><a href="#">开源协议</a></li>
+                    <li><a href="#">更新日志</a></li>
+                </ul>
+            </div>
+
+            <!-- 链接列 3 -->
+            <div class="footer-column">
+                <h4>关于我们</h4>
+                <ul>
+                    <li><a href="#">项目背景</a></li>
+                    <li><a href="#">加入我们</a></li>
+                    <li><a href="#">联系合作</a></li>
+                    <li><a href="#">隐私政策</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>© 2026 智算视界 (Visdom Computing Perspective) · All rights reserved.</p>
+            <p>
+                Author: <span style="color:white;">rainbow_yu</span> |
+                <a href="#" style="color:#94a3b8; text-decoration:none;">沪ICP备2025156088号-2</a>
+            </p>
+        </div>
     </footer>
 
     <!-- 模块化 JS 入口 -->
