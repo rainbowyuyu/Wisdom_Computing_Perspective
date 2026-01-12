@@ -1,0 +1,151 @@
+/* static/css/pages/help.css */
+
+.help-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+details {
+    background: white;
+    margin-bottom: 1rem;
+    border-radius: 12px;
+    padding: 1.2rem 1.5rem;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+details[open] {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+    box-shadow: var(--shadow-md);
+}
+
+summary {
+    font-weight: 600;
+    color: var(--text-main);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.1rem;
+}
+
+/* 自定义展开图标 */
+summary::after {
+    content: '+';
+    font-size: 1.5rem;
+    color: var(--primary-color);
+    font-weight: 300;
+    transition: transform 0.3s;
+}
+
+details[open] summary::after {
+    transform: rotate(45deg); /* 旋转变成 x */
+}
+
+details p {
+    margin-top: 1.2rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(0,0,0,0.05); /* 分割线 */
+}
+
+details p {
+    margin-top: 1.2rem;
+    color: var(--text-secondary);
+    line-height: 1.8; /* 增加行高，阅读更舒适 */
+    padding-top: 1rem;
+    border-top: 1px solid rgba(0,0,0,0.05);
+    font-size: 0.95rem; /*稍微调小字号，显得精致 */
+}
+
+/* 强调文字样式 */
+details p b {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+/* static/css/pages/help.css */
+
+/* ... 原有样式 ... */
+
+/* 新增 Banner 样式 */
+.tutorial-banner {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); /* 浅蓝色渐变 */
+    border: 1px solid #bfdbfe;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);
+}
+
+.tutorial-banner:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2);
+    border-color: var(--primary-color);
+}
+
+.banner-icon {
+    width: 56px;
+    height: 56px;
+    background: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-color);
+    font-size: 1.8rem;
+    flex-shrink: 0;
+}
+
+.banner-content {
+    flex: 1;
+}
+
+.banner-content h3 {
+    margin: 0 0 0.4rem;
+    font-size: 1.1rem;
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.banner-content p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    border: none; /* 覆盖 details p 的样式 */
+    padding: 0;
+}
+
+.banner-action {
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 适配移动端 */
+@media (max-width: 600px) {
+    .tutorial-banner {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    .banner-action {
+        width: 100%;
+        justify-content: center;
+        background: white;
+        padding: 0.8rem;
+        border-radius: 8px;
+    }
+}

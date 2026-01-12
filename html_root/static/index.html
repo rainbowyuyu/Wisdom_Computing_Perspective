@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="智算视界 (Intelligent Computing Vision) - 基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台。">
+    <title>智算视界 · Intelligent Computing Vision</title>
+
+    <!-- 预连接字体源优化加载速度 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- 字体与图标 -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 第三方库 -->
+    <!-- MathJax (用于静态公式渲染) -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <!-- Driver.js (用于新手引导) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <!-- MathLive (用于可视化公式编辑) -->
+    <script defer src="//unpkg.com/mathlive"></script>
+
+    <!-- 核心样式 -->
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-infinity"></i> 智算视界
+        </div>
+        <div class="nav-links">
+            <button class="nav-btn active" onclick="showSection('home')">首页</button>
+            <button class="nav-btn" onclick="showSection('detect')">智能识别</button>
+            <button class="nav-btn" onclick="showSection('calculate')">动态计算</button>
+            <button class="nav-btn" onclick="showSection('examples')">教学案例</button>
+            <button class="nav-btn" onclick="showSection('help')">帮助</button>
+            <button class="nav-btn" onclick="openSettings()" title="系统设置"><i class="fa-solid fa-gear"></i></button>
+        </div>
+        <div class="auth-buttons">
+            <button class="login-btn" onclick="toggleAuthModal(true)">登录 / 注册</button>
+            <span id="user-display" style="display:none; color:var(--text-main); font-weight:600;">
+                <i class="fa-regular fa-user-circle"></i> <span id="username-span"></span>
+                <i class="fa-solid fa-arrow-right-from-bracket" style="cursor:pointer; margin-left:10px; color:var(--text-secondary);" onclick="logout()" title="退出"></i>
+            </span>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <main class="container">
+
+        <!-- 1. 首页 Section -->
+        <section id="home" class="section active-section">
+            <!-- 背景装饰 (流光效果) -->
+            <div class="hero-decoration">
+                <div class="blob blob-1"></div>
+                <div class="blob blob-2"></div>
+            </div>
+
+            <div class="hero">
+
+                <h1 class="animate-text">
+                    让数学计算<br>
+                    <span class="text-gradient">看得见、摸得着</span>
+                </h1>
+
+                <p class="subtitle">
+                    融合 <b>OCR</b> 手写识别 <b>Manim</b> 动态引擎。<br>
+                    将枯燥的公式转化为直观的视觉语言，专为新一代学习者打造。
+                </p>
+
+                <div class="hero-btns">
+                    <button class="cta-btn primary" onclick="showSection('detect')">
+                        立即体验 <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    <button class="cta-btn secondary" onclick="showSection('examples')">
+                        <i class="fa-solid fa-play"></i> 观看演示
+                    </button>
+                </div>
+
+                <!-- 新手引导入口 -->
+                <div class="tutorial-link" onclick="startTutorial()">
+                    <i class="fa-regular fa-circle-question"></i>
+                    <span>不知道怎么用？查看 1 分钟教程</span>
+                </div>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon-box">
+                        <i class="fa-solid fa-eye"></i>
+                    </div>
+                    <h3>视觉识别</h3>
+                    <p>支持手写公式与图片上传，毫秒级精准转换 LaTeX 代码，复杂矩阵也能一键提取。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon-box">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                    <h3>动态推演</h3>
+                    <p>拒绝死板的答案。基于 Python Manim 引擎，实时渲染矩阵变换、行列式展开过程。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon-box">
+                        <i class="fa-solid fa-laptop-code"></i>
+                    </div>
+                    <h3>交互学习</h3>
+                    <p>不仅仅是计算器。支持实时修改公式参数，通过可视化过程深入理解底层数学逻辑。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 识别与画板 Section (重构版布局) -->
+        <section id="detect" class="section">
+            <h2 class="section-title" style="margin: 1.5rem 0 1rem; font-size:1.8rem;">智能算式识别</h2>
+
+            <div class="workspace">
+
+                <!-- 1. 左侧：纯工具栏 -->
+                <div class="tools-panel">
+                    <div class="tab-switch">
+                        <button class="tab-btn active" onclick="switchInputMode('draw')">✍️ 手写</button>
+                        <button class="tab-btn" onclick="switchInputMode('upload')">📤 上传</button>
+                    </div>
+
+                    <div id="draw-tools">
+                        <div class="control-group">
+                            <label>绘图工具</label>
+                            <div class="tools-grid">
+                                <button class="tool-btn active" onclick="setTool('pen')" title="画笔"><i class="fa-solid fa-pen"></i></button>
+                                <button class="tool-btn" onclick="setTool('eraser')" title="橡皮擦"><i class="fa-solid fa-eraser"></i></button>
+                                <button class="tool-btn" onclick="undo()" title="撤销 (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+                                <button class="tool-btn" onclick="redo()" title="重做 (Ctrl+Shift+Z)"><i class="fa-solid fa-rotate-right"></i></button>
+                                <button class="tool-btn" onclick="clearCanvas()" title="清空" style="color:#ef4444;"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px;">
+                                <label style="margin:0; min-width:40px; font-size:0.8rem;">粗细</label>
+                                <input type="range" id="brush-size" min="1" max="20" value="3" style="flex:1;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="upload-tools" class="control-group" style="display:none;">
+                        <label>上传图片</label>
+                        <input type="file" id="image-upload" accept="image/*" class="tech-input" style="padding: 8px;">
+                    </div>
+
+                    <div style="margin-top: auto;">
+                        <button class="action-btn full-width" onclick="processRecognition()" style="height: 50px; font-size: 1.1rem;">
+                            <i class="fa-solid fa-magnifying-glass"></i> 立即识别
+                        </button>
+                        <p style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 10px;">
+                            识别结果将显示在右侧底部
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 2. 右侧：主工作区 (Canvas + Result) -->
+                <div class="workspace-main">
+
+                    <!-- 上半部分：画板 -->
+                    <div class="canvas-wrapper">
+                        <div id="canvas-container">
+                            <canvas id="drawing-board"></canvas>
+                            <img id="uploaded-preview" src="" alt="预览" style="display:none;">
+                        </div>
+                        <!-- 提示浮层 -->
+                        <div style="position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 6px 16px; border-radius: 20px; color: var(--text-secondary); font-size: 0.85rem; pointer-events: none; border: 1px solid #e2e8f0; box-shadow: var(--shadow-sm);">
+                            <i class="fa-solid fa-info-circle"></i> 在此区域绘制公式
+                        </div>
+                    </div>
+
+                    <!-- 下半部分：识别结果 (独立面板) -->
+                    <div class="result-panel">
+                        <div class="result-header">
+                            <div class="result-title">
+                                <i class="fa-solid fa-code"></i> 识别结果
+                            </div>
+                            <!-- 高级选项：代码折叠 -->
+                            <details style="position: relative;">
+                                <summary style="font-size:0.85rem; color:var(--text-secondary); cursor:pointer;">
+                                    <i class="fa-solid fa-terminal"></i> 查看源码
+                                </summary>
+                                <div style="position: absolute; bottom: 100%; right: 0; width: 300px; background: white; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: var(--shadow-lg); z-index: 20;">
+                                    <textarea id="latex-code-detect" placeholder="LaTeX 代码..." style="width:100%; height:100px; font-family:monospace;"></textarea>
+                                </div>
+                            </details>
+                        </div>
+
+                        <div class="math-field-container">
+                            <!-- MathLive 组件 -->
+                            <math-field id="latex-output" virtual-keyboard-mode="manual">
+                                \text{等待识别...}
+                            </math-field>
+                        </div>
+
+                        <div class="result-actions">
+                            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                <i class="fa-regular fa-keyboard"></i> 点击公式可直接修改
+                            </div>
+                            <button class="btn-calc-go" onclick="copyToCalc()">
+                                生成动画 <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. 动态计算 Section -->
+        <section id="calculate" class="section">
+            <h2 class="section-title">数学运算可视化</h2>
+            <div class="calc-layout">
+                <div class="calc-sidebar glass-panel">
+                    <h3>参数配置</h3>
+                    <div style="margin-top:1.5rem;">
+                        <label style="font-weight:600; display:block; margin-bottom:0.5rem;">运算类型</label>
+                        <select id="calc-method" class="tech-select">
+                            <option value="other">公式展示 (通用)</option>
+                            <option value="add">矩阵加法 (A + B)</option>
+                            <option value="mul">矩阵乘法 (A × B)</option>
+                            <option value="det">行列式计算 (|A|)</option>
+                        </select>
+                    </div>
+
+                    <div class="matrix-input-group">
+                        <label>公式 A (LaTeX)</label>
+                        <textarea id="latex-code-a" class="tech-input" placeholder="输入公式，例如 \int x dx"></textarea>
+                    </div>
+
+                    <div class="matrix-input-group">
+                        <label>公式 B (可选)</label>
+                        <textarea id="latex-code-b" class="tech-input" placeholder="第二个参数（如积分区间或运算对象）"></textarea>
+                    </div>
+
+                    <button class="action-btn full-width" onclick="startAnimation()">
+                        <i class="fa-solid fa-film"></i> 生成可视化动画
+                    </button>
+                </div>
+
+                <div class="calc-display glass-panel">
+                    <div class="video-placeholder" id="video-container">
+                        <div class="placeholder-content">
+                            <i class="fa-solid fa-cube" style="color: #334155;"></i>
+                            <p>准备就绪</p>
+                            <span style="font-size:0.9rem; opacity:0.7">点击左侧生成按钮开始渲染</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 教学案例 Section -->
+        <section id="examples" class="section">
+            <h2 class="section-title">精选案例</h2>
+            <div class="video-grid">
+                <div class="video-card">
+                    <div class="thumbnail" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);">
+                        <i class="fa-solid fa-play" style="color:var(--primary-color); font-size:2rem;"></i>
+                    </div>
+                    <div class="info">
+                        <h4>IEEE 754 浮点数</h4>
+                        <p>深入底层，可视化二进制存储机制。</p>
+                    </div>
+                </div>
+                <div class="video-card">
+                    <div class="thumbnail" style="background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);">
+                        <i class="fa-solid fa-play" style="color:var(--secondary-color); font-size:2rem;"></i>
+                    </div>
+                    <div class="info">
+                        <h4>黎曼积分可视化</h4>
+                        <p>通过动态矩形分割理解积分本质。</p>
+                    </div>
+                </div>
+                <div class="video-card">
+                    <div class="thumbnail" style="background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%);">
+                        <i class="fa-solid fa-play" style="color:var(--accent-color); font-size:2rem;"></i>
+                    </div>
+                    <div class="info">
+                        <h4>线性变换与基</h4>
+                        <p>3Blue1Brown 风格的线性代数演示。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. 帮助 Section -->
+        <section id="help" class="section">
+            <h2 class="section-title">常见问题与指南</h2>
+            <div class="help-container" style="max-width:800px; margin:0 auto;">
+
+                <!-- 新增：再次观看教程的入口 Banner -->
+                <div class="tutorial-banner" onclick="startTutorial()">
+                    <div class="banner-icon">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+                    <div class="banner-content">
+                        <h3>新手入门指南</h3>
+                        <p>错过引导了？点击这里重新开启交互式教学，30秒掌握所有核心功能。</p>
+                    </div>
+                    <div class="banner-action">
+                        <i class="fa-solid fa-circle-play"></i> 观看
+                    </div>
+                </div>
+
+                <!-- 常见问题列表 -->
+                <details open>
+                    <summary>系统支持哪些手写格式？</summary>
+                    <p>目前系统针对线性代数进行了深度优化，完美支持<b>矩阵（方阵、列向量）、行列式、以及基础代数公式</b>。建议书写时保持字符间距，尽量使用黑色或深蓝色墨水在白纸上书写。</p>
+                </details>
+
+                <details>
+                    <summary>识别结果不准确怎么办？</summary>
+                    <p>AI 识别可能受光线或字迹潦草影响。我们提供了<b>实时编辑功能</b>：您可以在“识别结果”区域直接点击公式进行修改，或展开右上角的“查看源码”修改 LaTeX 代码。</p>
+                </details>
+
+                <details>
+                    <summary>渲染动画需要多久？</summary>
+                    <p>简单的矩阵加减法通常在 <b>3-5 秒</b>内完成。复杂的 4x4 矩阵乘法、求逆或行列式展开可能需要 <b>10-15 秒</b>。所有计算均在云端高性能服务器上完成。</p>
+                </details>
+
+                <details>
+                    <summary>是免费的吗？</summary>
+                    <p>是的，作为开源教育驱动的项目，<b>基础功能对所有用户永久免费</b>。</p>
+                </details>
+
+                <!-- 底部联系方式 -->
+                <div style="margin-top: 3rem; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                    <p>没找到您需要的答案？</p>
+                    <p>欢迎发送邮件至 <a href="mailto:support@visdom.edu" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">support@visdom.edu</a> 联系技术团队。</p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 登录/注册 模态框 -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="toggleAuthModal(false)">&times;</span>
+
+            <div class="auth-tabs">
+                <div class="auth-tab active" onclick="switchAuthMode('login')">登录</div>
+                <div class="auth-tab" onclick="switchAuthMode('register')">注册</div>
+            </div>
+
+            <div class="auth-body">
+                <!-- 登录表单 -->
+                <form id="login-form">
+                    <input type="text" placeholder="用户名" class="tech-input" id="login-user">
+                    <input type="password" placeholder="密码" class="tech-input" id="login-pass">
+
+                    <div class="captcha-row">
+                        <input type="text" placeholder="验证码" class="tech-input" id="login-captcha">
+                        <img id="captcha-img-login" src="" alt="点击刷新" class="captcha-img" onclick="refreshCaptcha('login')" title="点击刷新验证码">
+                    </div>
+
+                    <button type="button" id="btn-login-submit" class="action-btn full-width" onclick="handleLogin()">立即登录</button>
+                </form>
+
+                <!-- 注册表单 -->
+                <form id="register-form" style="display:none;">
+                    <input type="text" placeholder="设置用户名" class="tech-input" id="reg-user">
+                    <input type="password" placeholder="设置密码" class="tech-input" id="reg-pass">
+
+                    <div class="captcha-row">
+                        <input type="text" placeholder="验证码" class="tech-input" id="reg-captcha">
+                        <img id="captcha-img-reg" src="" alt="点击刷新" class="captcha-img" onclick="refreshCaptcha('register')" title="点击刷新验证码">
+                    </div>
+
+                    <button type="button" id="btn-reg-submit" class="action-btn full-width" onclick="handleRegister()">注册账户</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content glass-panel" style="width: 500px;">
+            <span class="close-modal" onclick="closeSettings()">&times;</span>
+            <h3 style="padding: 1.5rem 2rem 0; color: var(--text-main);">系统设置</h3>
+
+            <div style="padding: 2rem;">
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">快捷键设置</h4>
+
+                    <div style="display: flex; align-items: center; margin-bottom: 1rem; gap: 10px;">
+                        <label style="width: 80px; font-weight: 600;">撤销</label>
+                        <input type="text" id="shortcut-undo-display" class="tech-input" readonly style="margin:0; text-align: center;">
+                        <button id="btn-record-undo" class="action-btn secondary" style="padding: 0.5rem 1rem;" onclick="startRecording('undo')">修改</button>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="width: 80px; font-weight: 600;">重做</label>
+                        <input type="text" id="shortcut-redo-display" class="tech-input" readonly style="margin:0; text-align: center;">
+                        <button id="btn-record-redo" class="action-btn secondary" style="padding: 0.5rem 1rem;" onclick="startRecording('redo')">修改</button>
+                    </div>
+                </div>
+
+                <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1.5rem;">
+                    <button class="action-btn" onclick="resetDefaults()" style="background: #ef4444; border:none; color:white; font-size:0.9rem;">恢复默认设置</button>
+                    <button class="action-btn" onclick="closeSettings()" style="margin-left: 10px;">完成</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2026 智算视界 (Visdom Computing Perspective) · rainbow_yu | 沪ICP备2025156088号-2 </p>
+    </footer>
+
+    <!-- 模块化 JS 入口 -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

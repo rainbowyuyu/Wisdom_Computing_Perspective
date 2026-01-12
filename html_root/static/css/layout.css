@@ -1,0 +1,109 @@
+/* static/css/layout.css */
+
+/* --- 容器 --- */
+.container {
+    flex: 1;
+    padding: 0 5%;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* --- 导航栏 --- */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 5%;
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    transition: var(--transition);
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-links {
+    display: flex;
+    gap: 8px;
+    background: rgba(0,0,0,0.03);
+    padding: 5px;
+    border-radius: 99px;
+}
+
+/* --- Hero Section (首页) --- */
+.hero {
+    text-align: center;
+    padding: 6rem 0 4rem;
+    position: relative;
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(37,99,235,0.1) 0%, rgba(255,255,255,0) 70%);
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: -1;
+}
+
+.animate-text {
+    font-size: 4rem;
+    font-weight: 800;
+    line-height: 1.2;
+    background: linear-gradient(to right, var(--text-main) 20%, var(--primary-color) 80%);
+    -webkit-background-clip: text;
+    color: transparent;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    margin-bottom: 3rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+}
+
+.hero-btns {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+/* --- Footer --- */
+footer {
+    border-top: 1px solid #e2e8f0;
+    color: var(--text-secondary);
+    background: white;
+    margin-top: 4rem;
+    text-align: center;
+    padding: 2rem;
+}
+
+/* --- 响应式 --- */
+@media (max-width: 768px) {
+    .navbar { padding: 1rem; }
+    .nav-links { display: none; }
+    .hero { padding: 3rem 0; }
+    .animate-text { font-size: 2.5rem; }
+}

@@ -1,0 +1,135 @@
+/* static/css/pages/home.css */
+
+/* --- Hero Section --- */
+/* (Hero 基础布局已在 layout.css 中定义，这里补充细节) */
+
+/* 增强 Hero 背景光晕 */
+.hero::before {
+    background: radial-gradient(circle at center, rgba(37, 99, 235, 0.15) 0%, rgba(255, 255, 255, 0) 60%);
+    width: 800px; /* 加大光晕 */
+    height: 800px;
+    top: -30%;
+    filter: blur(60px); /* 增加模糊让光晕更柔和 */
+}
+
+/* --- Features Grid --- */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2.5rem; /* 增加间距 */
+    margin-top: 6rem;
+}
+
+.feature-card {
+    background: var(--bg-surface);
+    border: 1px solid #f1f5f9;
+    padding: 2.5rem;
+    border-radius: var(--radius-md);
+    text-align: left;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* 更弹性的动画 */
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 卡片悬停效果增强 */
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-color);
+}
+
+.feature-icon-box {
+    width: 64px;
+    height: 64px;
+    background: #eff6ff;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.feature-card:hover .feature-icon-box {
+    transform: scale(1.1) rotate(5deg); /* 图标微动 */
+    background: var(--primary-color);
+}
+
+.feature-card:hover .feature-icon-box i {
+    color: white; /* 悬停时图标变白 */
+}
+
+.feature-icon-box i {
+    font-size: 1.8rem;
+    color: var(--primary-color);
+    transition: color 0.3s ease;
+}
+
+.feature-card h3 {
+    margin-bottom: 0.8rem;
+    color: var(--text-main);
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.feature-card p {
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+/* ... 前面的样式保持不变 ... */
+
+/* --- 新手引导入口按钮优化 --- */
+.tutorial-link {
+    /* 布局 */
+    margin-top: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+
+    /* 形状与尺寸 */
+    padding: 10px 24px;
+    border-radius: 99px; /* 胶囊形状 */
+
+    /* 玻璃拟态风格 (与卡片呼应，但更轻薄) */
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+
+    /* 文字样式 */
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+
+    /* 交互 */
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+    /* 入场动画 */
+    animation: fadeInUp 0.8s ease-out 0.8s backwards;
+}
+
+/* 悬停效果 */
+.tutorial-link:hover {
+    background: rgba(255, 255, 255, 0.9); /* 变实 */
+    color: var(--primary-color); /* 文字变蓝 */
+    border-color: rgba(37, 99, 235, 0.2);
+    transform: translateY(-3px); /* 微微上浮 */
+    box-shadow:
+        0 10px 20px -5px rgba(37, 99, 235, 0.15), /* 柔和阴影 */
+        0 0 0 4px rgba(37, 99, 235, 0.05); /* 外发光环 */
+}
+
+/* 图标微交互 */
+.tutorial-link i {
+    font-size: 1.1rem;
+    transition: transform 0.3s ease;
+    color: var(--primary-color);
+}
+
+/* 悬停时图标晃动，增加趣味性 */
+.tutorial-link:hover i {
+    transform: rotate(15deg) scale(1.1);
+}

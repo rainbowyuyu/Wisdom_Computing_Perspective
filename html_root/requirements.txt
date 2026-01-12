@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-dotenv
+openai
+pydantic
+manim
+numpy
+python-multipart
+supabase
+bcrypt
+Pillow

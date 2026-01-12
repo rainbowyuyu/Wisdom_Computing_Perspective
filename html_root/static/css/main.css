@@ -1,0 +1,22 @@
+/* static/css/main.css */
+
+@import url('base.css');
+@import url('layout.css');
+@import url('components.css');
+
+/* Pages */
+@import url('pages/home.css');
+@import url('pages/workspace.css');
+@import url('pages/calculate.css');
+@import url('pages/examples.css');
+@import url('pages/help.css');
+
+/* 通用 section 控制 (这部分必须保留在 main.css 或 layout.css 中) */
+.section {
+    display: none;
+    animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.section.active-section {
+    display: block;
+}
