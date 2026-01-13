@@ -94,14 +94,15 @@
     gap: 15px;
 }
 
-/* --- Footer (紧凑且美观版) --- */
+/* --- Footer (浅色渐变风格) --- */
 footer {
-    background: #0f172a;
-    color: #94a3b8;
-    padding: 2.5rem 5% 1.5rem; /* 紧凑内边距 */
-    margin-top: auto; /* 关键：自动推到底部 */
+    /* 核心修改：渐变背景 */
+    background: linear-gradient(to bottom, var(--bg-body) 0%, #f1f5f9 100%);
+    color: var(--text-secondary);
+    padding: 3rem 5% 2rem;
+    margin-top: auto;
     font-size: 0.9rem;
-    border-top: 1px solid #1e293b;
+    border-top: 1px solid rgba(0,0,0,0.05); /* 极淡的边框 */
 }
 
 .footer-content {
@@ -110,25 +111,33 @@ footer {
     gap: 2rem;
     max-width: 1200px;
     margin: 0 auto;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid #1e293b;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid rgba(0,0,0,0.05); /* 极淡的分割线 */
 }
 
 /* 品牌区 */
 .footer-brand h3 {
-    color: white;
+    color: var(--text-main); /* 改为深色文字 */
     font-size: 1.3rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.8rem;
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
+/* 适配 Logo 在浅色背景下的显示 (如果你的 logo 本身是白色的需要反转) */
+/* 假设你的 logo 是彩色的或者深色的，这里不需要 filter */
+/* 如果之前为了深色背景加了 filter: brightness(100)，现在可能需要调整 */
+.footer-brand h3 img {
+    /* filter: none; 视情况而定 */
+}
+
 .footer-brand p {
-    line-height: 1.5;
-    margin-bottom: 1rem;
-    max-width: 300px;
-    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-bottom: 1.2rem;
+    max-width: 320px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
 }
 
 .social-links {
@@ -137,19 +146,28 @@ footer {
 }
 
 .social-link {
-    color: #94a3b8;
-    font-size: 1.1rem;
-    transition: color 0.3s;
+    color: var(--text-secondary); /* 默认深灰 */
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: white; /* 小圆底 */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
-.social-link:hover { color: white; }
+.social-link:hover {
+    color: white;
+    background: var(--primary-color);
+    transform: translateY(-2px);
+}
 
 /* 链接列 */
 .footer-column h4 {
-    color: white;
-    margin-bottom: 0.8rem;
+    color: var(--text-main); /* 深色标题 */
+    margin-bottom: 1rem;
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -160,16 +178,18 @@ footer {
     margin: 0;
 }
 
-.footer-column li { margin-bottom: 0.4rem; }
+.footer-column li { margin-bottom: 0.6rem; }
 
 .footer-column a {
-    color: #94a3b8;
+    color: var(--text-secondary);
     text-decoration: none;
     transition: color 0.2s;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
 }
 
-.footer-column a:hover { color: var(--primary-color); }
+.footer-column a:hover {
+    color: var(--primary-color);
+}
 
 /* 版权行 */
 .footer-bottom {
@@ -178,9 +198,17 @@ footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.8rem;
-    opacity: 0.8;
+    font-size: 0.85rem;
+    color: #94a3b8; /* 更淡一点的灰色 */
 }
+
+.footer-bottom a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-bottom a:hover { color: var(--primary-color); }
 
 /* 响应式 */
 @media (max-width: 768px) {
