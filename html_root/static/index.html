@@ -472,6 +472,50 @@
         </div>
     </div>
 
+    <!-- 编辑算式 Modal -->
+    <!-- index.html (找到 id="edit-formula-modal" 的部分并替换) -->
+
+    <!-- 编辑算式 Modal -->
+    <div id="edit-formula-modal" class="modal">
+        <div class="modal-content glass-panel" style="width: 600px;"> <!-- 加宽一点 -->
+            <span class="close-modal" onclick="closeEditModal()">&times;</span>
+            <h3 style="padding: 1.5rem 2rem 0; color: var(--text-main);">编辑算式</h3>
+
+            <div style="padding: 2rem;">
+                <input type="hidden" id="edit-formula-id">
+
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; color:var(--text-main); font-size:0.9rem;">备注名称</label>
+                    <input type="text" id="edit-formula-note" class="tech-input" placeholder="例如：矩阵A">
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; color:var(--text-main); font-size:0.9rem;">公式内容</label>
+
+                    <!-- 可视化编辑器 -->
+                    <div class="math-field-container" style="border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; padding: 0.5rem; margin-bottom: 10px;">
+                        <math-field id="edit-formula-mathlive" virtual-keyboard-mode="manual" style="width: 100%; font-size: 1.4rem; padding: 0.5rem; background: transparent; border: none; outline: none;">
+                            <!-- 动态填充 -->
+                        </math-field>
+                    </div>
+
+                    <!-- 代码编辑器 (折叠) -->
+                    <details>
+                        <summary style="font-size:0.85rem; color:var(--text-secondary); cursor:pointer;">
+                            <i class="fa-solid fa-code"></i> 编辑 LaTeX 源代码
+                        </summary>
+                        <textarea id="edit-formula-latex" class="tech-input" style="height:80px; font-family:monospace; margin-top:5px;"></textarea>
+                    </details>
+                </div>
+
+                <div style="text-align: right;">
+                    <button class="action-btn secondary" onclick="closeEditModal()" style="margin-right: 10px;">取消</button>
+                    <button class="action-btn" onclick="submitFormulaEdit()">保存修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- index.html -->
 
     <footer>

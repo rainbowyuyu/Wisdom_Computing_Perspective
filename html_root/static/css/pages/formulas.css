@@ -123,3 +123,31 @@
     font-size: 1.1rem;
     margin-bottom: 1.5rem;
 }
+
+.btn-icon {
+    /* ... */
+}
+.btn-icon:hover {
+    background: #eff6ff;
+    color: var(--primary-color);
+}
+
+/* static/css/pages/formulas.css */
+
+/* ... */
+
+.add-new-card {
+    background-color: #f8fafc;
+    transition: all 0.3s ease;
+}
+
+.add-new-card:hover {
+    background-color: #eff6ff;
+    border-color: var(--primary-color);
+    transform: translateY(-5px);
+}
+
+.add-new-card:hover i {
+    transform: scale(1.1);
+    transition: transform 0.3s;
+}

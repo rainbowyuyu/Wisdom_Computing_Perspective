@@ -1,6 +1,8 @@
 // static/js/auth.js
 
 import { toggleAuthModal } from './ui.js';
+import * as Formulas from "./formulas.js";
+import {loadMyFormulas} from "./formulas.js";
 
 let currentCaptchaId = '';
 
@@ -73,6 +75,7 @@ export async function handleLogin() {
             document.querySelector('.login-btn').style.display = 'none';
             document.getElementById('user-display').style.display = 'inline-block';
             document.getElementById('username-span').innerText = data.username;
+            Formulas.loadMyFormulas()
             alert("登录成功！");
         } else {
             alert(data.message || "登录失败");

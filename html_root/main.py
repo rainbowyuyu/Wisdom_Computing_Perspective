@@ -90,6 +90,12 @@ class FormulaModel(BaseModel):
     latex: str
     note: str = ""
 
+class FormulaUpdateModel(BaseModel):
+    id: int
+    username: str
+    latex: str
+    note: str
+
 
 # --- 辅助函数：数据库操作 ---
 def get_db_connection():
@@ -265,6 +271,32 @@ async def delete_formula(id: int, username: str):
         cursor.execute("DELETE FROM formulas WHERE id = %s AND user_id = %s", (id, username))
         conn.commit()
         return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+@app.put("/api/formulas/update")
+async def update_formula(data: FormulaUpdateModel):
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 更新逻辑：必须同时匹配 id 和 username，防止越权修改
+        cursor.execute(
+            "UPDATE formulas SET latex = %s, note = %s WHERE id = %s AND user_id = %s",
+            (data.latex, data.note, data.id, data.username)
+        )
+        conn.commit()
+
+        if cursor.rowcount == 0:
+            return JSONResponse(status_code=404, content={"status": "error", "message": "未找到算式或无权修改"})
+
+        return {"status": "success", "message": "更新成功"}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:

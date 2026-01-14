@@ -74,3 +74,8 @@ window.closeSettings = () => UI.toggleModal('settings-modal', false);
 window.startRecording = Settings.startRecording;
 window.resetDefaults = Settings.resetDefaults;
 window.startTutorial = Tutorial.startTutorial;
+
+// 新增挂载
+window.openEditModal = Formulas.openEditModal;
+window.closeEditModal = Formulas.closeEditModal;
+window.submitFormulaEdit = Formulas.submitFormulaEdit;
