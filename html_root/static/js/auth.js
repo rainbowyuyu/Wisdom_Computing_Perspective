@@ -23,7 +23,8 @@ export async function refreshCaptcha(type) {
     try {
         const res = await fetch('/api/captcha');
         // 获取 Header 中的 ID
-        currentCaptchaId = res.headers.get('X-Captcha-ID');
+        const newId = res.headers.get('X-Captcha-ID');
+        if (newId) currentCaptchaId = newId;
 
         // 获取图片 Blob
         const blob = await res.blob();
@@ -78,6 +79,7 @@ export async function handleLogin() {
             refreshCaptcha('login'); // 失败刷新验证码
         }
     } catch(e) {
+        console.error(e);
         alert("网络错误");
     } finally {
         btn.innerText = originalText;
@@ -117,13 +119,14 @@ export async function handleRegister() {
 
         if(data.status === 'success') {
             alert("注册成功，请登录");
-            // 切换到登录 Tab
-            window.switchAuthMode('login');
+            // 切换到登录 Tab (需要 ui.js 暴露 switchAuthMode)
+            if(window.switchAuthMode) window.switchAuthMode('login');
         } else {
             alert(data.message || "注册失败");
             refreshCaptcha('register');
         }
     } catch(e) {
+        console.error(e);
         alert("网络错误");
     } finally {
         btn.innerText = originalText;

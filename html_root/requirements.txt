@@ -6,6 +6,6 @@ pydantic
 manim
 numpy
 python-multipart
-supabase
 bcrypt
 Pillow
+mysql-connector-python

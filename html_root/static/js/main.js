@@ -4,37 +4,27 @@ import * as Canvas from './canvas.js';
 import * as Detect from './detect.js';
 import * as Calculate from './calculate.js';
 import * as Auth from './auth.js';
-import * as Settings from './settings.js'; // 引入设置
+import * as Settings from './settings.js';
 import * as Tutorial from './tutorial.js';
+import * as Formulas from './formulas.js'; // 确保引入
 
 document.addEventListener('DOMContentLoaded', () => {
     Canvas.setupCanvas();
     UI.showSection('home');
     Auth.initAuth();
-    Settings.initSettings(); // 初始化设置
+    Settings.initSettings();
     Detect.initDetectListeners();
+    Tutorial.checkAutoPlay();
 
-    // --- 全局热键监听 ---
+    // 全局快捷键
     document.addEventListener('keydown', (e) => {
-        // 如果焦点在输入框内，不触发快捷键
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
         const shortcuts = Settings.getShortcuts();
-
-        // 检查是否匹配 Undo
-        if (isMatch(e, shortcuts.undo)) {
-            e.preventDefault();
-            Canvas.undo();
-        }
-        // 检查是否匹配 Redo
-        else if (isMatch(e, shortcuts.redo)) {
-            e.preventDefault();
-            Canvas.redo();
-        }
+        if (isMatch(e, shortcuts.undo)) { e.preventDefault(); Canvas.undo(); }
+        else if (isMatch(e, shortcuts.redo)) { e.preventDefault(); Canvas.redo(); }
     });
 });
 
-// 辅助函数：判断事件是否匹配配置
 function isMatch(e, config) {
     return e.key.toLowerCase() === config.key &&
            e.ctrlKey === config.ctrl &&
@@ -43,23 +33,24 @@ function isMatch(e, config) {
            e.metaKey === config.meta;
 }
 
-// --- 挂载 Settings 相关函数 ---
-window.openSettings = Settings.openSettings;
-window.closeSettings = () => UI.toggleModal('settings-modal', false);
-window.startRecording = Settings.startRecording;
-window.resetDefaults = Settings.resetDefaults;
+// --- 核心挂载：将 Formulas 中的函数暴露给 HTML ---
+window.saveCurrentFormula = Formulas.saveCurrentFormula;
+window.saveAndShowFormula = Formulas.saveAndShowFormula; // 关键修复：这就是报错的那个函数
+window.loadMyFormulas = Formulas.loadMyFormulas;         // 关键修复
+window.useFormula = Formulas.useFormula;
+window.deleteFormula = Formulas.deleteFormula;
 
-// ... (其他原有挂载代码保持不变) ...
+// --- 其他挂载 ---
 window.showSection = (sectionId) => {
     UI.showSection(sectionId);
     if (sectionId === 'detect') setTimeout(() => Canvas.resizeCanvas(), 50);
+    // 切换到我的算式页时自动加载
+    if (sectionId === 'my-formulas') Formulas.loadMyFormulas();
 };
+
 window.toggleAuthModal = UI.toggleAuthModal;
 window.switchInputMode = UI.switchInputMode;
-window.switchAuthMode = (mode) => {
-    UI.switchAuthMode(mode);
-    Auth.refreshCaptcha(mode);
-};
+window.switchAuthMode = (mode) => { UI.switchAuthMode(mode); Auth.refreshCaptcha(mode); };
 window.clearCanvas = Canvas.clearCanvas;
 window.undo = Canvas.undo;
 window.redo = Canvas.redo;
@@ -67,8 +58,8 @@ window.setTool = (tool) => {
     Canvas.setTool(tool);
     document.querySelectorAll('.tool-btn').forEach(btn => {
         const val = btn.getAttribute('onclick');
-        if(val && val.includes(`'${tool}'`)) btn.classList.add('active');
-        else if(val && (val.includes('pen') || val.includes('eraser'))) btn.classList.remove('active');
+        if (val && val.includes(`'${tool}'`)) btn.classList.add('active');
+        else if (val && (val.includes('pen') || val.includes('eraser'))) btn.classList.remove('active');
     });
 };
 window.processRecognition = Detect.processRecognition;
@@ -78,15 +69,8 @@ window.handleLogin = Auth.handleLogin;
 window.handleRegister = Auth.handleRegister;
 window.refreshCaptcha = Auth.refreshCaptcha;
 window.logout = () => location.reload();
-
-document.addEventListener('DOMContentLoaded', () => {
-    // ... 原有初始化 ...
-    Canvas.setupCanvas();
-    UI.showSection('home');
-
-    // 检查并自动播放教程
-    Tutorial.checkAutoPlay();
-});
-
-// 挂载到 window，以便手动触发
+window.openSettings = Settings.openSettings;
+window.closeSettings = () => UI.toggleModal('settings-modal', false);
+window.startRecording = Settings.startRecording;
+window.resetDefaults = Settings.resetDefaults;
 window.startTutorial = Tutorial.startTutorial;
