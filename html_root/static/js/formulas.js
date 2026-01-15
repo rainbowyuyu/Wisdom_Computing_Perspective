@@ -28,7 +28,7 @@ async function performSave(user, latex, note) {
 }
 
 // --- 新增：LaTeX 规范化函数 ---
-function normalizeLatex(latex) {
+export function normalizeLatex(latex) {
     if (!latex) return "";
     let clean = latex.trim();
 

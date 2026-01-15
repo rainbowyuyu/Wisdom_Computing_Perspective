@@ -268,20 +268,42 @@
                         <label style="font-weight:600; display:block; margin-bottom:0.5rem;">运算类型</label>
                         <select id="calc-method" class="tech-select">
                             <option value="other">公式展示 (通用)</option>
-                            <option value="add">矩阵加法 (A + B)</option>
-                            <option value="mul">矩阵乘法 (A × B)</option>
-                            <option value="det">行列式计算 (|A|)</option>
+                            <option value="build" disabled>其他功能正在部署马上建设完成</option>
                         </select>
                     </div>
 
+                    <!-- 矩阵 A 输入区 -->
                     <div class="matrix-input-group">
-                        <label>公式 A (LaTeX)</label>
-                        <textarea id="latex-code-a" class="tech-input" placeholder="输入公式，例如 \int x dx"></textarea>
+                        <!-- 关键：Flex 容器 -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; width:100%;">
+                            <label style="margin:0;">公式 A</label>
+                            <button class="btn-icon" title="从公式库导入" onclick="openFormulaSelector('A')" style="background:#eff6ff; color:var(--primary-color);">
+                                <i class="fa-solid fa-folder-open"></i> 导入
+                            </button>
+                        </div>
+                        <div class="math-field-container" style="padding:0.5rem; background:#fff; border:1px solid #cbd5e1;">
+                            <math-field id="math-field-a" virtual-keyboard-mode="manual" style="width:100%; font-size:1.2rem; outline:none; border:none;">
+                                \begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}
+                            </math-field>
+                        </div>
+                        <textarea id="latex-code-a" style="display:none;"></textarea>
                     </div>
 
+                    <!-- 矩阵 B 输入区 -->
                     <div class="matrix-input-group">
-                        <label>公式 B (可选)</label>
-                        <textarea id="latex-code-b" class="tech-input" placeholder="第二个参数（如积分区间或运算对象）"></textarea>
+                        <!-- 关键：Flex 容器 -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; width:100%;">
+                            <label style="margin:0;">公式 B (可选)</label>
+                            <button class="btn-icon" title="从公式库导入" onclick="openFormulaSelector('B')" style="background:#eff6ff; color:var(--primary-color);">
+                                <i class="fa-solid fa-folder-open"></i> 导入
+                            </button>
+                        </div>
+                        <div class="math-field-container" style="padding:0.5rem; background:#fff; border:1px solid #cbd5e1;">
+                            <math-field id="math-field-b" virtual-keyboard-mode="manual" style="width:100%; font-size:1.2rem; outline:none; border:none;">
+                                \begin{bmatrix} 5 & 0 \\ 0 & 5 \end{bmatrix}
+                            </math-field>
+                        </div>
+                        <textarea id="latex-code-b" style="display:none;"></textarea>
                     </div>
 
                     <button class="action-btn full-width" onclick="startAnimation()">
@@ -512,6 +534,20 @@
                     <button class="action-btn secondary" onclick="closeEditModal()" style="margin-right: 10px;">取消</button>
                     <button class="action-btn" onclick="submitFormulaEdit()">保存修改</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="select-formula-modal" class="modal">
+        <div class="modal-content glass-panel" style="width: 600px; max-height: 80vh; display:flex; flex-direction:column;">
+            <div style="padding: 1.5rem 2rem; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; color: var(--text-main);">选择公式</h3>
+                <span class="close-modal" onclick="closeFormulaSelector()" style="position:static;">&times;</span>
+            </div>
+
+            <div id="selector-list" style="padding: 2rem; overflow-y:auto; flex:1; background:#f8fafc;">
+                <!-- 动态填充 -->
+                <div style="text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i> 加载中...</div>
             </div>
         </div>
     </div>

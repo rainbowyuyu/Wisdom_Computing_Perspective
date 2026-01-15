@@ -79,3 +79,30 @@ window.startTutorial = Tutorial.startTutorial;
 window.openEditModal = Formulas.openEditModal;
 window.closeEditModal = Formulas.closeEditModal;
 window.submitFormulaEdit = Formulas.submitFormulaEdit;
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (其他初始化)
+    Calculate.initCalculateListeners(); // 初始化 MathLive 监听
+});
+
+// ... (其他挂载)
+
+// 挂载 Calculate 新增函数
+window.startAnimation = Calculate.startAnimation;
+window.openFormulaSelector = Calculate.openFormulaSelector;
+window.closeFormulaSelector = Calculate.closeFormulaSelector;
+
+// 更新 useFormula (从 formulas.js 跳转过来的逻辑)
+// 我们需要它填充 MathLive 组件而不是 textarea
+// 在 main.js 中重写或更新 formulas.js 中的 useFormula
+window.useFormula = (latexEncoded) => {
+    const latex = decodeURIComponent(latexEncoded);
+    // 切换到计算页
+    window.showSection('calculate');
+    // 延时填充，确保页面可见
+    setTimeout(() => {
+        const fieldA = document.getElementById('math-field-a');
+        if(fieldA) fieldA.setValue(latex);
+    }, 100);
+};

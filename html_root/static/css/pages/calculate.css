@@ -75,3 +75,52 @@
     margin-bottom: 1.2rem;
     opacity: 0.8;
 }
+
+/* static/css/pages/calculate.css */
+
+/* ... */
+
+/* 覆盖 MathLive 默认样式 */
+math-field {
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 0.5rem;
+}
+
+math-field::part(container) {
+    /* 去掉默认蓝框，由外层 div 控制 */
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* 选中状态由外层容器控制 */
+.math-field-container:focus-within {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* 覆盖 .btn-icon，使其成为一个更宽的标签按钮 */
+.matrix-input-group .btn-icon {
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eff6ff;
+    color: var(--primary-color);
+    transition: all 0.2s;
+    min-width: 80px;
+    justify-content: center;
+    white-space: nowrap; /* 关键：禁止文字换行 */
+    flex-shrink: 0; /* 关键：防止按钮被压缩 */
+}
+
+.matrix-input-group .btn-icon:hover {
+    background: #dbeafe;
+    transform: translateY(-1px);
+}
