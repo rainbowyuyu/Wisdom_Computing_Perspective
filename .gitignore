@@ -13,3 +13,4 @@ yty_math/__pycache__/manim_result.cpython-310.pyc
 /.streamlit/
 *.pyc
 /venv
+/html_root/static/videos/

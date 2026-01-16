@@ -1,7 +1,7 @@
 // static/js/calculate.js
 
-import { toggleModal, showSection, toggleAuthModal } from './ui.js'; // 引入更多 UI 函数
-import { loadMyFormulas, normalizeLatex } from './formulas.js'; // 我们需要复用加载逻辑，但渲染逻辑不同
+import { toggleModal, showSection, toggleAuthModal } from './ui.js';
+import { loadMyFormulas, normalizeLatex } from './formulas.js';
 
 // 初始化计算页面的监听器
 export function initCalculateListeners() {
@@ -12,7 +12,6 @@ export function initCalculateListeners() {
 
     // 双向绑定 A
     if (fieldA && codeA) {
-        // 初始化值
         codeA.value = fieldA.getValue();
         fieldA.addEventListener('input', (e) => { codeA.value = e.target.value; });
     }
@@ -23,48 +22,183 @@ export function initCalculateListeners() {
     }
 }
 
-// 开始动画 (修改为从 math-field 获取值)
+// 核心：开始生成动画 (SSE 流式 - 增强版)
 export async function startAnimation() {
     const container = document.getElementById('video-container');
     const method = document.getElementById('calc-method').value;
-
-    // 直接从 MathLive 组件获取值，更准确
     const matA = document.getElementById('math-field-a').getValue();
     const matB = document.getElementById('math-field-b').getValue();
 
+    // 1. 初始化 UI：显示进度条和日志
     container.innerHTML = `
-        <div class="placeholder-content" style="color:var(--secondary-color)">
-            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 3rem;"></i>
-            <p style="margin-top:1rem;">Manim 渲染中 (约需5-10秒)...</p>
+        <div style="width: 100%; height: 100%; display: flex; flex-direction: column; padding: 20px; background: #0f172a; color: #cbd5e1; font-family: 'JetBrains Mono', monospace;">
+            <!-- 进度条区域 -->
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; color: #60a5fa;">
+                    <span id="gen-status">准备就绪...</span>
+                    <span id="gen-percent">0%</span>
+                </div>
+                <div style="height: 6px; background: #334155; border-radius: 3px; overflow: hidden;">
+                    <div id="gen-progress" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.3s;"></div>
+                </div>
+            </div>
+
+            <!-- 日志与代码输出区域 -->
+            <div id="gen-log" style="flex: 1; overflow-y: auto; font-size: 0.85rem; background: #1e293b; padding: 15px; border-radius: 8px; border: 1px solid #334155;">
+                <div class="log-entry" style="color: #94a3b8;">> 系统初始化...</div>
+            </div>
         </div>
     `;
 
+    const logBox = document.getElementById('gen-log');
+    const progBar = document.getElementById('gen-progress');
+    const statusText = document.getElementById('gen-status');
+    const percentText = document.getElementById('gen-percent');
+
+    // 辅助：解析 Markdown 并高亮
+    function renderMarkdown(text) {
+        if (!text) return "";
+        // 使用 marked 解析 (前提是 index.html 已引入 marked.js)
+        if (window.marked) {
+            return window.marked.parse(text);
+        }
+        return text;
+    }
+
+    function addLog(msg, color = "#cbd5e1") {
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+        div.style.color = color;
+        div.style.marginBottom = '6px';
+        div.style.lineHeight = '1.5';
+
+        // 解析 Markdown，但保留前面的 "> "
+        const html = renderMarkdown(msg);
+        div.innerHTML = `<span style="opacity:0.6; margin-right:5px;">></span> ${html}`;
+
+        // 样式微调：移除 marked 生成的 margin
+        const p = div.querySelector('p');
+        if(p) p.style.margin = '0';
+
+        logBox.appendChild(div);
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    // 专门用于显示生成的代码块 (带高亮)
+    function addCodeBlock(code) {
+        // 创建 pre code 结构，适配 highlight.js
+        const pre = document.createElement('pre');
+        pre.style.margin = "10px 0";
+        pre.style.borderRadius = "8px";
+        pre.style.background = "#282c34"; // One Dark 背景
+        pre.style.padding = "10px";
+        pre.style.overflowX = "auto";
+
+        const codeEl = document.createElement('code');
+        codeEl.className = "language-python"; // 指定语言
+        codeEl.textContent = code; // 此时还是纯文本
+
+        pre.appendChild(codeEl);
+        logBox.appendChild(pre);
+
+        // 触发高亮
+        if (window.hljs) {
+            window.hljs.highlightElement(codeEl);
+        }
+
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
     try {
-        const response = await fetch('/api/animate', {
+        const response = await fetch('/api/animate/stream', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 matrixA: matA,
                 matrixB: matB,
                 operation: method
             })
         });
-        const data = await response.json();
 
-        if (data.status === 'success') {
-            const videoSrc = `${data.video_url}?t=${new Date().getTime()}`;
-            container.innerHTML = `
-                <video controls autoplay style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-                    <source src="${videoSrc}" type="video/mp4">
-                    您的浏览器不支持视频标签。
-                </video>
-            `;
-        } else {
-            container.innerHTML = `<p style="color:red; text-align:center;">生成失败: ${data.message || 'Unknown error'}</p>`;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop(); // 保留未完整的块
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const jsonStr = line.replace('data: ', '');
+                    try {
+                        const data = JSON.parse(jsonStr);
+
+                        // 更新进度
+                        if (data.progress) {
+                            progBar.style.width = data.progress + '%';
+                            percentText.innerText = data.progress + '%';
+                        }
+
+                        // 处理不同步骤的消息
+                        if (data.step === 'generating_code') {
+                            statusText.innerText = "AI 思考中...";
+                            addLog("正在请求大模型生成 Manim 代码...", "#fbbf24");
+                        }
+                        else if (data.step === 'code_generated') {
+                            addLog("**代码生成完毕**，正在准备渲染环境...", "#34d399"); // 支持 Markdown 加粗
+                            if (data.code) {
+                                // 这里显示高亮代码块
+                                addLog("Python 脚本预览：", "#94a3b8");
+                                addCodeBlock(data.code);
+                            }
+                        }
+                        else if (data.step === 'rendering') {
+                            statusText.innerText = "渲染视频中...";
+                            // 过滤掉频繁的进度更新日志，只显示重要信息
+                            if (data.message && !data.message.includes("渲染帧")) {
+                                addLog(data.message);
+                            }
+                        }
+                        else if (data.step === 'complete') {
+                            statusText.innerText = "任务完成";
+                            addLog("渲染成功！正在加载视频播放器...", "#a78bfa"); // 紫色
+                            progBar.style.background = "#34d399"; // 进度条变绿
+
+                            // 延迟展示视频，让用户看一眼完成日志
+                            setTimeout(() => {
+                                const videoSrc = `${data.video_url}?t=${new Date().getTime()}`;
+                                container.innerHTML = `
+                                    <video controls autoplay style="width: 100%; height: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                                        <source src="${videoSrc}" type="video/mp4">
+                                        您的浏览器不支持视频标签。
+                                    </video>
+                                `;
+                            }, 1500);
+                            return; // 结束循环
+                        }
+                        else if (data.step === 'error') {
+                            statusText.innerText = "发生错误";
+                            statusText.style.color = "#ef4444";
+                            progBar.style.background = "#ef4444";
+                            addLog("❌ 错误: " + data.message, "#ef4444");
+                            return;
+                        }
+
+                    } catch (e) {
+                        console.warn("Skipping incomplete JSON chunk");
+                    }
+                }
+            }
         }
+
     } catch (e) {
         console.error(e);
-        container.innerHTML = `<p style="color:red; text-align:center;">服务器连接错误</p>`;
+        addLog("网络连接中断", "#ef4444");
     }
 }
 
@@ -95,7 +229,6 @@ async function loadFormulaSelectorList() {
         container.innerHTML = `
             <div style="text-align:center; padding: 2rem;">
                 <p style="color:var(--text-secondary); margin-bottom: 1rem;">请先登录以查看您的公式库</p>
-                <!-- 核心修改：先调用 closeFormulaSelector() 关闭当前模态框，再打开登录模态框 -->
                 <button class="action-btn" onclick="closeFormulaSelector(); toggleAuthModal(true);">
                     立即登录
                 </button>
@@ -114,19 +247,16 @@ async function loadFormulaSelectorList() {
                 container.innerHTML = `
                     <div style="text-align:center; padding: 2rem; color:#94a3b8;">
                         <p>暂无公式</p>
-                        <!-- 未有公式时，跳转到公式库也会先关闭模态框 -->
                         <button class="action-btn secondary" onclick="goToMyFormulas()">去添加</button>
                     </div>`;
             } else {
                 // 渲染列表
                 const listHtml = data.data.map(f => {
-                    // 核心修改：使用 normalizeLatex 处理显示的公式
                     const displayLatex = normalizeLatex(f.latex);
-
                     return `
                     <div class="formula-card" onclick="selectFormula('${encodeURIComponent(f.latex)}')" style="cursor:pointer; margin-bottom:1rem; border:1px solid #e2e8f0; padding:1rem; border-radius:8px; transition:0.2s;">
                         <div style="font-size:1.2rem; margin-bottom:0.5rem; overflow-x:auto; padding:5px;">
-                            \\[ ${displayLatex} \\] <!-- 这里使用处理过的公式 -->
+                            \\[ ${displayLatex} \\]
                         </div>
                         <div style="font-size:0.85rem; color:#64748b; display:flex; justify-content:space-between;">
                             <span>${f.note || "未命名"}</span>

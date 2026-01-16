@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="智算视界 (Wisdom Computing Perspective) - 基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台。">
-    <title>智算视界 · Wisdom Computing Perspective</title>
+    <meta name="description" content="智算视界 (Visdom) - 基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台。">
+    <title>智算视界 · Visdom</title>
 
     <link rel="icon" href="assets/智算视界_avatar.svg" type="image/png">
 
@@ -141,6 +141,8 @@
                                 <button class="tool-btn" onclick="redo()" title="重做 (Ctrl+Shift+Z)"><i class="fa-solid fa-rotate-right"></i></button>
                                 <button class="tool-btn" onclick="clearCanvas()" title="清空" style="color:#ef4444;"><i class="fa-solid fa-trash"></i></button>
                             </div>
+
+                            <button class="tutorial-link" onclick="openSettings()" title="画板快捷键设置">想要更高效率？点击设置快捷键</button>
                             <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px;">
                                 <label style="margin:0; min-width:40px; font-size:0.8rem;">粗细</label>
                                 <input type="range" id="brush-size" min="1" max="20" value="3" style="flex:1;">
@@ -376,25 +378,61 @@
                     </div>
                 </div>
 
-                <!-- 常见问题列表 -->
+
+                <!-- 1. 识别与输入 -->
                 <details open>
-                    <summary>系统支持哪些手写格式？</summary>
-                    <p>目前系统针对线性代数进行了深度优化，完美支持<b>矩阵（方阵、列向量）、行列式、以及基础代数公式</b>。建议书写时保持字符间距，尽量使用黑色或深蓝色墨水在白纸上书写。</p>
+                    <summary>系统支持哪些手写格式和数学内容？</summary>
+                    <p>目前系统针对<b>线性代数</b>进行了深度优化。
+                    <br>✅ <b>完美支持：</b> 矩阵（方阵、列向量、稀疏矩阵）、行列式、基础代数运算（加减乘除）。
+                    <br>⚠️ <b>正在训练：</b> 复杂的微积分符号（积分、极限）目前仅支持识别，暂不支持动画生成。
+                    <br>💡 <b>建议：</b> 书写时请尽量保持字符间距，避免连笔；使用黑色或深蓝色墨水在白纸上书写效果最佳。</p>
                 </details>
 
                 <details>
                     <summary>识别结果不准确怎么办？</summary>
-                    <p>AI 识别可能受光线或字迹潦草影响。我们提供了<b>实时编辑功能</b>：您可以在“识别结果”区域直接点击公式进行修改，或展开右上角的“查看源码”修改 LaTeX 代码。</p>
+                    <p>AI 识别可能受光线、角度或字迹潦草程度影响。如果识别有误，您无需重新上传，可以直接使用我们内置的<b>双向编辑功能</b>：
+                    <br>1. <b>可视化修改：</b> 直接点击“识别结果”区域的公式，像在 Word 中一样修改数字。
+                    <br>2. <b>代码修改：</b> 点击右上角的“查看源码”，直接修改 LaTeX 代码，结果会实时同步。</p>
                 </details>
 
                 <details>
-                    <summary>渲染动画需要多久？</summary>
-                    <p>简单的矩阵加减法通常在 <b>3-5 秒</b>内完成。复杂的 4x4 矩阵乘法、求逆或行列式展开可能需要 <b>10-15 秒</b>。所有计算均在云端高性能服务器上完成。</p>
+                    <summary>上传图片有什么要求？</summary>
+                    <p>支持 JPG, PNG 格式。建议图片清晰、光线均匀、无阴影遮挡。尽量让公式位于图片中心，且背景干净（避免复杂的格纹或背景图案干扰 AI 识别）。</p>
+                </details>
+
+                <!-- 2. 计算与动画 -->
+                <details>
+                    <summary>为什么生成的动画报错或无法播放？</summary>
+                    <p>通常是因为数学逻辑错误导致的。请检查：
+                    <br>1. <b>矩阵维度：</b> 进行矩阵乘法 (A × B) 时，A 的列数必须等于 B 的行数。
+                    <br>2. <b>行列式：</b> 只有方阵（行数=列数）才能计算行列式。
+                    <br>3. <b>语法错误：</b> 如果是手动输入的 LaTeX，请确保语法闭合（如 `\begin{bmatrix}` 必须有 `\end{bmatrix}`）。</p>
                 </details>
 
                 <details>
-                    <summary>是免费的吗？</summary>
-                    <p>是的，作为开源教育驱动的项目，<b>基础功能对所有用户永久免费</b>。</p>
+                    <summary>渲染动画需要多久？生成的视频可以下载吗？</summary>
+                    <p>简单的矩阵加减法通常在 <b>3-5 秒</b>内完成。复杂的 4x4 矩阵乘法、求逆或行列式展开可能需要 <b>10-15 秒</b>。
+                    <br>动画生成后，您可以点击视频播放器右下角的“三个点”图标选择<b>“下载”</b>，或右键点击视频选择“视频另存为”，将其保存到本地用于PPT演示或教学。</p>
+                </details>
+
+                <!-- 3. 功能与账号 -->
+                <details>
+                    <summary>“我的算式”功能怎么用？</summary>
+                    <p>这是您的云端笔记本。
+                    <br>1. <b>保存：</b> 在识别或编辑完公式后，点击“保存并查看”，该公式就会存入云端。
+                    <br>2. <b>复用：</b> 在“动态计算”页面，点击输入框上方的<b>“导入”</b>按钮，可以直接从库中选择公式填入，无需重复输入。</p>
+                </details>
+
+                <details>
+                    <summary>关于数据隐私与安全</summary>
+                    <p>我们非常重视您的隐私。
+                    <br>1. 您上传的用于识别的图片<b>不会</b>被永久存储，处理完成后会定期清除。
+                    <br>2. 您保存到“我的算式”中的公式数据存储在加密数据库中，仅您自己可见。</p>
+                </details>
+
+                <details>
+                    <summary>是否收费？</summary>
+                    <p><b>智算视界 (Visdom)</b> 目前是一个开源教育驱动的项目。基础功能（OCR 识别、标准清晰度 Manim 渲染、云端存储）对所有注册用户目前是<b>免费</b>的。</p>
                 </details>
 
                 <!-- 底部联系方式 -->
@@ -402,8 +440,6 @@
                     <p>没找到您需要的答案？</p>
                     <p>欢迎发送邮件至 <a href="mailto:support@visdom.edu" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">support@visdom.edu</a> 联系技术团队。</p>
                 </div>
-
-            </div>
         </section>
 
     </main>
@@ -471,7 +507,7 @@
                 </div>
 
                 <div style="margin-bottom: 2rem;">
-                    <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">快捷键设置</h4>
+                    <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">快捷键设置（画板）</h4>
 
                     <div style="display: flex; align-items: center; margin-bottom: 1rem; gap: 10px;">
                         <label style="width: 80px; font-weight: 600;">撤销</label>
@@ -605,7 +641,7 @@
         </div>
 
         <div class="footer-bottom">
-            <p>© 2026 智算视界 (Visdom Computing Perspective) · All rights reserved.</p>
+            <p>© 2026 智算视界 (Visdom) · All rights reserved.</p>
             <p>
                 Author: rainbow_yu |
                 <a href="#" style="color:#94a3b8; text-decoration:none;">沪ICP备2025156088号-2</a>

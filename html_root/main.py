@@ -7,6 +7,10 @@ import random
 import string
 import hashlib
 import bcrypt
+import json
+import asyncio
+import sys
+import subprocess  # 引入 subprocess 用于同步调用
 from io import BytesIO
 from fastapi import FastAPI, UploadFile, File, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +22,7 @@ import uvicorn
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import mysql.connector
 from mysql.connector import pooling
+import traceback
 
 # 引入生成器
 from logic.manim_generator import render_matrix_animation
@@ -32,10 +37,10 @@ app = FastAPI()
 
 # --- 配置部分 ---
 
-# MySQL 配置 (建议从环境变量读取)
+# MySQL 配置
 MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
 MYSQL_USER = os.getenv("MYSQL_USER", "root")
-MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "password")  # 请修改为你的密码
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "password")
 MYSQL_DB = os.getenv("MYSQL_DB", "visdom_db")
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
 
@@ -53,15 +58,14 @@ try:
     logger.info("MySQL connection pool created successfully")
 except Exception as e:
     logger.error(f"Error creating MySQL pool: {e}")
-    # 不中断程序，允许静态文件服务运行，但数据库功能会报错
     db_pool = None
 
 # 简单内存存储验证码
 CAPTCHA_STORE = {}
 
-# 1. 挂载静态文件
+# 1. 挂载静态文件目录
 os.makedirs("static/videos", exist_ok=True)
-app.mount("/videos", StaticFiles(directory="static/videos"), name="videos")
+# 这里先不挂载 /videos，放在最后统一处理，避免路由冲突
 
 # 2. 阿里云/OpenAI 客户端
 api_key = os.getenv("ALIYUN_KEY")
@@ -104,7 +108,7 @@ def get_db_connection():
     return db_pool.get_connection()
 
 
-# --- 辅助函数：生成验证码 (保持不变) ---
+# --- 辅助函数：生成验证码  ---
 def generate_captcha_image_bytes():
     chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
     text = ''.join(random.choices(chars, k=4))
@@ -130,7 +134,7 @@ def generate_captcha_image_bytes():
     return text, buf
 
 
-# --- API 路由 ---
+# --- API 路由 (Auth & CRUD) ---
 
 @app.get("/api/captcha")
 async def get_captcha():
@@ -206,7 +210,6 @@ async def login(data: AuthModel):
             return {"status": "success", "username": user["username"]}
         else:
             return JSONResponse(status_code=401, content={"status": "error", "message": "密码错误"})
-
     except Exception as e:
         logger.error(f"Login Error: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -292,10 +295,8 @@ async def update_formula(data: FormulaUpdateModel):
             (data.latex, data.note, data.id, data.username)
         )
         conn.commit()
-
-        if cursor.rowcount == 0:
-            return JSONResponse(status_code=404, content={"status": "error", "message": "未找到算式或无权修改"})
-
+        if cursor.rowcount == 0: return JSONResponse(status_code=404,
+                                                     content={"status": "error", "message": "未找到算式或无权修改"})
         return {"status": "success", "message": "更新成功"}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -306,14 +307,10 @@ async def update_formula(data: FormulaUpdateModel):
 
 @app.post("/api/detect")
 async def detect_image(file: UploadFile = File(...)):
-    # ... (保持不变) ...
     try:
         image_content = await file.read()
         base64_image = base64.b64encode(image_content).decode("utf-8")
-
-        if not api_key:
-            return {"status": "success", "latex": r"E = mc^2"}
-
+        if not api_key: return {"status": "success", "latex": r"E = mc^2"}
         completion = client.chat.completions.create(
             model="qwen-vl-max",
             messages=[{
@@ -333,7 +330,6 @@ async def detect_image(file: UploadFile = File(...)):
 
 @app.post("/api/animate")
 async def generate_animation(data: CalcModel):
-    # ... (保持不变) ...
     try:
         task_id = str(uuid.uuid4())
         video_path = render_matrix_animation(data.matrixA, data.matrixB, data.operation, task_id)
@@ -345,25 +341,155 @@ async def generate_animation(data: CalcModel):
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-# ... (前面的 API 定义保持不变) ...
+# --- SSE Stream ---
+def generate_manim_prompt(latex_a, latex_b, operation):
+    op_desc = {"add": "矩阵加法", "mul": "矩阵乘法", "det": "行列式计算", "other": "公式展示"}.get(operation,
+                                                                                                   "数学展示")
+    return f"""
+你是一个精通 Manim Community Edition (v0.17+) 的 Python 专家。
+请编写一个完整的 Python 脚本，使用 Manim 渲染以下数学过程：
+操作类型：{op_desc}
+输入公式 A: {latex_a}
+输入公式 B (可选): {latex_b}
+要求：
+1. 必须导入 `from manim import *`。
+2. 定义一个继承自 `Scene` 的类，类名必须是 `GenScene`。
+3. 在 `construct` 方法中实现动画。
+4. 使用 `MathTex` 渲染公式，必须使用原始字符串 r"..." 包裹 LaTeX。
+5. 动画步骤：先展示输入公式，计算过程，最后展示结果。
+6. 保持背景为黑色。
+7. 不要输出任何 Markdown 标记。
+"""
 
-# 1. 显式挂载静态资源目录
-# 这样 /css/main.css, /js/main.js 等请求会直接被这里处理
+
+@app.post("/api/animate/stream")
+async def generate_animation_stream(data: CalcModel):
+    async def event_generator():
+        task_id = str(uuid.uuid4())
+        yield f"data: {json.dumps({'step': 'generating_code', 'message': 'AI 正在构思 Manim 代码...', 'progress': 10})}\n\n"
+
+        prompt = generate_manim_prompt(data.matrixA, data.matrixB, data.operation)
+        code = ""
+        try:
+            completion = client.chat.completions.create(
+                model="qwen-plus",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            code = completion.choices[0].message.content.strip()
+            code = code.replace("```python", "").replace("```", "").strip()
+            yield f"data: {json.dumps({'step': 'code_generated', 'message': '代码生成完毕，准备渲染...', 'code': code, 'progress': 30})}\n\n"
+        except Exception as e:
+            logger.error(f"LLM Error: {e}")
+            yield f"data: {json.dumps({'step': 'error', 'message': f'AI 生成失败: {str(e)}'})}\n\n"
+            return
+
+        py_filename = f"gen_{task_id}.py"
+        py_path = os.path.join("static/videos", py_filename)
+        os.makedirs("static/videos", exist_ok=True)
+        try:
+            with open(py_path, "w", encoding="utf-8") as f:
+                f.write(code)
+        except Exception as e:
+            logger.error(f"File Write Error: {e}")
+            yield f"data: {json.dumps({'step': 'error', 'message': '写入代码文件失败'})}\n\n"
+            return
+
+        media_dir = os.path.abspath("static/videos")
+        output_file = f"{task_id}.mp4"
+        py_abs_path = os.path.abspath(py_path)
+
+        # Manim 命令
+        cmd = [sys.executable, "-m", "manim", "-ql", "--media_dir", media_dir, "-o", output_file, py_abs_path,
+               "GenScene"]
+        logger.info(f"Executing command: {' '.join(cmd)}")
+        yield f"data: {json.dumps({'step': 'rendering', 'message': 'Manim 引擎启动中(同步模式)...', 'progress': 40})}\n\n"
+
+        # --- 核心：同步执行函数 ---
+        def run_manim_sync():
+            try:
+                # capture_output=True 捕获输出，text=True 返回字符串
+                # Windows 下这个同步调用是最稳定的
+                return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=60)
+            except subprocess.TimeoutExpired:
+                return None
+            except Exception as ex:
+                logger.error(f"Subprocess Error: {ex}")
+                return None
+
+        # --- 核心：在线程池中执行 ---
+        loop = asyncio.get_running_loop()
+        # run_in_executor(None, func) 使用默认线程池
+        # 这里会等待直到渲染完成，期间不会阻塞主线程（其他 API 可用）
+        # 但流式进度条会停留在 40%，直到这一行执行完毕
+        result = await loop.run_in_executor(None, run_manim_sync)
+
+        # 渲染结束后手动更新进度
+        if result and result.returncode == 0:
+            yield f"data: {json.dumps({'step': 'rendering', 'message': '渲染完成，处理文件中...', 'progress': 90})}\n\n"
+
+            # 文件检查逻辑
+            base_search_path = os.path.join(media_dir, "videos", py_filename.replace(".py", ""), "480p15")
+            expected_file = os.path.join(base_search_path, output_file)
+
+            # 兼容性搜索：如果 -o 参数生效位置不同，尝试直接找输出文件
+            if not os.path.exists(expected_file):
+                # 尝试在 media_dir 根目录找
+                if os.path.exists(os.path.join(media_dir, output_file)):
+                    expected_file = os.path.join(media_dir, output_file)
+                # 尝试遍历
+                else:
+                    target_dir = os.path.join(media_dir, "videos", py_filename.replace(".py", ""), "480p15")
+                    if os.path.exists(target_dir):
+                        for f in os.listdir(target_dir):
+                            if f.endswith(".mp4"):
+                                expected_file = os.path.join(target_dir, f)
+                                break
+
+            if os.path.exists(expected_file):
+                final_path = os.path.join("static/videos", output_file)
+                import shutil
+                shutil.move(expected_file, final_path)
+                final_url = f"/videos/{output_file}"
+                try:
+                    os.remove(py_path)
+                except:
+                    pass
+                yield f"data: {json.dumps({'step': 'complete', 'message': '渲染完成！', 'video_url': final_url, 'progress': 100})}\n\n"
+            else:
+                logger.error("Video file not found.")
+                yield f"data: {json.dumps({'step': 'error', 'message': '渲染成功但未找到视频文件，请检查日志。'})}\n\n"
+        else:
+            err_msg = result.stderr if result else "Unknown Error or Timeout"
+            logger.error(f"Manim Error: {err_msg}")
+            # 截取部分错误信息展示
+            short_err = err_msg.split('\n')[-5:] if result else ["Timeout"]
+            error_msg = "渲染失败:\n" + "\n".join(short_err)
+
+            payload = {
+                "step": "error",
+                "message": error_msg
+            }
+
+            yield "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# --- 静态资源与路由 ---
 app.mount("/css", StaticFiles(directory="static/css"), name="css")
 app.mount("/js", StaticFiles(directory="static/js"), name="js")
 app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
-# 如果还有其他静态文件在 static 根目录下 (比如 update.md)，可以单独处理或移入子目录
-# 这里为了兼容 update.md
+# /videos 单独挂载
+app.mount("/videos", StaticFiles(directory="static/videos"), name="videos")
+# 根静态
 app.mount("/static", StaticFiles(directory="static"), name="static_root")
 
 
-# 2. 首页路由
 @app.get("/")
 async def read_index():
     return FileResponse("static/index.html")
 
 
-# 3. 处理 update.md (前端 settings.js 请求的是 /update.md)
 @app.get("/update.md")
 async def read_update_log():
     if os.path.exists("static/update.md"):
@@ -373,22 +499,14 @@ async def read_update_log():
     raise HTTPException(status_code=404)
 
 
-# 4. Catch-all (用于前端路由刷新)
-# 把它放在最后，作为兜底
 @app.exception_handler(404)
 async def not_found_exception_handler(request, exc):
-    # 如果请求的是 API 或 静态资源，返回 404
     path = request.url.path
     if path.startswith("/api/") or "." in path.split("/")[-1]:
         return JSONResponse(status_code=404, content={"message": "Not Found"})
-
-    # 否则返回 index.html (支持 SPA 前端路由)
     return FileResponse("static/index.html")
 
 
-# 移除原来的 app.mount("/", ...)
-# 因为它会接管所有请求，导致上面的逻辑失效。
-# 我们已经显式挂载了 /css, /js, /videos 等，主页由 @app.get("/") 处理。
-
 if __name__ == "__main__":
+    # Windows 平台不需要额外策略设置了，因为我们使用了同步 run_in_executor
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
