@@ -1,4 +1,4 @@
-# Visdom API Reference
+# WisComPer API Reference
 
 Base URL: `http://<your-domain>/api`
 

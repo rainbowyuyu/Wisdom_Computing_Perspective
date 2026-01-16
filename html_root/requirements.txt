@@ -1,5 +1,5 @@
 
-fastapi>=0.104.0
+fastapi
 uvicorn[standard]>=0.23.0
 python-dotenv>=1.0.0
 
@@ -11,7 +11,7 @@ Pillow>=9.5.0
 
 mysql-connector-python>=8.0.33
 
-bcrypt>=4.0.1
+bcrypt
 
 manim>=0.18.0
 
