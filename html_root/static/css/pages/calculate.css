@@ -76,10 +76,6 @@
     opacity: 0.8;
 }
 
-/* static/css/pages/calculate.css */
-
-/* ... */
-
 /* 覆盖 MathLive 默认样式 */
 math-field {
     background: transparent;
@@ -123,4 +119,176 @@ math-field::part(container) {
 .matrix-input-group .btn-icon:hover {
     background: #dbeafe;
     transform: translateY(-1px);
+}
+
+/* --- Python 代码高亮样式 (Atom One Dark 风格) --- */
+/* 这些样式会作用于 highlight.js 生成的 .hljs-* 类 */
+
+/* 代码块容器滚动条美化 */
+#gen-log pre::-webkit-scrollbar {
+    height: 8px;
+}
+#gen-log pre::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+}
+#gen-log pre::-webkit-scrollbar-track {
+    background: #1e293b;
+}
+
+/* 基础文本颜色 */
+.hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 0.5em;
+    color: #abb2bf;
+    background: #282c34;
+}
+
+/* 关键字 (import, from, class, def, return) - 紫色 */
+.hljs-keyword,
+.hljs-operator,
+.hljs-selector-tag {
+    color: #c678dd;
+}
+
+/* 函数名、类名 - 蓝色 */
+.hljs-function,
+.hljs-title,
+.hljs-section {
+    color: #61afef;
+}
+
+/* 字符串 - 绿色 */
+.hljs-string,
+.hljs-doctag {
+    color: #98c379;
+}
+
+/* 数字、布尔值 - 橙色 */
+.hljs-number,
+.hljs-literal,
+.hljs-attr {
+    color: #d19a66;
+}
+
+/* 注释 - 灰色斜体 */
+.hljs-comment,
+.hljs-quote {
+    color: #5c6370;
+    font-style: italic;
+}
+
+/* 装饰器、变量 - 红色/粉色 */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name {
+    color: #e06c75;
+}
+
+/* 内置对象 (self, print, range) - 黄色 */
+.hljs-type,
+.hljs-built_in,
+.hljs-builtin-name {
+    color: #e5c07b;
+}
+
+/* 标点符号 */
+.hljs-punctuation {
+    color: #abb2bf;
+}
+
+/* static/css/pages/calculate.css */
+
+/* ... (保留原有的 layout, input, video-placeholder 等样式) ... */
+.calc-layout {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 2.5rem;
+}
+/* ... */
+/* 视频区域 */
+.video-placeholder {
+    /* ... 保持不变 */
+    background: #0f172a; /* 确保背景够深 */
+}
+/* ... */
+
+/* --- Python 代码高亮样式 (Atom One Dark 风格) --- */
+/* 这些样式将作用于 highlight.js 生成的 .hljs-* 类 */
+
+/* 代码块容器滚动条美化 */
+#gen-log pre::-webkit-scrollbar {
+    height: 8px;
+}
+#gen-log pre::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+}
+#gen-log pre::-webkit-scrollbar-track {
+    background: #1e293b;
+}
+
+/* 基础文本颜色 */
+.hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 0.5em;
+    color: #abb2bf;
+    background: #282c34;
+}
+
+/* 关键字 (import, from, class, def, return) - 紫色 */
+.hljs-keyword,
+.hljs-operator,
+.hljs-selector-tag {
+    color: #c678dd;
+}
+
+/* 函数名、类名 - 蓝色 */
+.hljs-function,
+.hljs-title,
+.hljs-section {
+    color: #61afef;
+}
+
+/* 字符串 - 绿色 */
+.hljs-string,
+.hljs-doctag {
+    color: #98c379;
+}
+
+/* 数字、布尔值 - 橙色 */
+.hljs-number,
+.hljs-literal,
+.hljs-attr {
+    color: #d19a66;
+}
+
+/* 注释 - 灰色斜体 */
+.hljs-comment,
+.hljs-quote {
+    color: #5c6370;
+    font-style: italic;
+}
+
+/* 装饰器、变量 - 红色/粉色 */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name {
+    color: #e06c75;
+}
+
+/* 内置对象 (self, print, range) - 黄色 */
+.hljs-type,
+.hljs-built_in,
+.hljs-builtin-name {
+    color: #e5c07b;
+}
+
+/* 标点符号 */
+.hljs-punctuation {
+    color: #abb2bf;
 }

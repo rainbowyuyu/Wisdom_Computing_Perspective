@@ -1,8 +1,8 @@
-SmartCalcSystem/
+Visdom System/
 ├── static/                # 存放前端资源
 │   ├── index.html         # (保持上一步的代码)
-│   ├── style.css          # (保持上一步的代码)
-│   ├── main.js          # (需要更新，见下文)
+│   ├── css                # 样式库
+│   ├── js                 # 脚本库
 │   └── videos/            # 存放生成的视频
 ├── logic/                 # 存放业务逻辑
 │   ├── __init__.py

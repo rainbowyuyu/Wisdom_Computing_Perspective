@@ -25,6 +25,11 @@
     <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
     <!-- MathLive (用于可视化公式编辑) -->
     <script defer src="//unpkg.com/mathlive"></script>
+    <!-- Marked (Markdown 解析) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Highlight.js (代码高亮) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
     <!-- 核心样式 -->
     <link rel="stylesheet" href="css/main.css">
@@ -89,7 +94,7 @@
                 <!-- 新手引导入口 -->
                 <div class="tutorial-link" onclick="startTutorial()">
                     <i class="fa-regular fa-circle-question"></i>
-                    <span>不知道怎么用？查看 1 分钟教程</span>
+                    <span>不知道怎么用？查看 30 秒教程</span>
                 </div>
             </div>
 
@@ -285,7 +290,7 @@
                         </div>
                         <div class="math-field-container" style="padding:0.5rem; background:#fff; border:1px solid #cbd5e1;">
                             <math-field id="math-field-a" virtual-keyboard-mode="manual" style="width:100%; font-size:1.2rem; outline:none; border:none;">
-                                \begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}
+                                \int_{0}^{1} x^2 + 3x + 1 \, dx
                             </math-field>
                         </div>
                         <textarea id="latex-code-a" style="display:none;"></textarea>
@@ -302,7 +307,7 @@
                         </div>
                         <div class="math-field-container" style="padding:0.5rem; background:#fff; border:1px solid #cbd5e1;">
                             <math-field id="math-field-b" virtual-keyboard-mode="manual" style="width:100%; font-size:1.2rem; outline:none; border:none;">
-                                \begin{bmatrix} 5 & 0 \\ 0 & 5 \end{bmatrix}
+
                             </math-field>
                         </div>
                         <textarea id="latex-code-b" style="display:none;"></textarea>
@@ -327,37 +332,13 @@
 
         <!-- 4. 教学案例 Section -->
         <section id="examples" class="section">
-            <h2 class="section-title">精选案例</h2>
-            <div class="video-grid">
-                <div class="video-card">
-                    <div class="thumbnail" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);">
-                        <i class="fa-solid fa-play" style="color:var(--primary-color); font-size:2rem;"></i>
-                    </div>
-                    <div class="info">
-                        <h4>IEEE 754 浮点数</h4>
-                        <p>深入底层，可视化二进制存储机制。</p>
-                    </div>
-                </div>
-                <div class="video-card">
-                    <div class="thumbnail" style="background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);">
-                        <i class="fa-solid fa-play" style="color:var(--secondary-color); font-size:2rem;"></i>
-                    </div>
-                    <div class="info">
-                        <h4>黎曼积分可视化</h4>
-                        <p>通过动态矩形分割理解积分本质。</p>
-                    </div>
-                </div>
-                <div class="video-card">
-                    <div class="thumbnail" style="background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%);">
-                        <i class="fa-solid fa-play" style="color:var(--accent-color); font-size:2rem;"></i>
-                    </div>
-                    <div class="info">
-                        <h4>线性变换与基</h4>
-                        <p>3Blue1Brown 风格的线性代数演示。</p>
-                    </div>
-                </div>
+            <h2 class="section-title">精选教学案例</h2>
+            <!-- ID 改为 examples-grid -->
+            <div id="examples-grid" class="video-grid">
+                <!-- JS 动态加载 -->
             </div>
         </section>
+
 
         <!-- 5. 帮助 Section -->
         <section id="help" class="section">
@@ -377,6 +358,7 @@
                         <i class="fa-solid fa-circle-play"></i> 观看
                     </div>
                 </div>
+
 
 
                 <!-- 1. 识别与输入 -->
@@ -438,8 +420,9 @@
                 <!-- 底部联系方式 -->
                 <div style="margin-top: 3rem; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
                     <p>没找到您需要的答案？</p>
-                    <p>欢迎发送邮件至 <a href="mailto:support@visdom.edu" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">support@visdom.edu</a> 联系技术团队。</p>
+                    <p>欢迎发送邮件至 <a href="mailto:rainbowyu619@gmail.com" target="_blank" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">rainbowyu619@gmail.com</a> 联系技术团队。</p>
                 </div>
+            </div>
         </section>
 
     </main>
@@ -498,7 +481,22 @@
                     <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">基本信息</h4>
                     <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-main); font-size: 0.95rem;">
                         <span>当前版本</span>
-                        <span id="version-display" style="font-family: 'JetBrains Mono', monospace; background: #eff6ff; color: var(--primary-color); padding: 2px 8px; border-radius: 4px;">Loading...</span>
+                        <span
+                          id="version-display"
+                          onclick="openDoc('update.md', '更新日志')"
+                          title="点击查看更新日志"
+                          style="
+                            font-family: 'JetBrains Mono', monospace;
+                            background: #eff6ff;
+                            color: var(--primary-color);
+                            padding: 2px 8px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            user-select: none;
+                          ">
+                          Loading...
+                        </span>
+
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-main); font-size: 0.95rem; margin-top: 10px;">
                         <span>开发者</span>
@@ -588,6 +586,29 @@
         </div>
     </div>
 
+    <div id="docs-modal" class="modal">
+        <div class="modal-content glass-panel" style="width: 800px; max-height: 85vh; padding: 0; display: flex; flex-direction: column;">
+
+            <!-- 头部：标题与关闭 -->
+            <div style="padding: 1.5rem 2rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: white; border-radius: 20px 20px 0 0;">
+                <h3 id="docs-title" style="margin: 0; font-size: 1.4rem; color: var(--text-main);">文档标题</h3>
+                <span class="close-modal" onclick="closeDocsModal()" style="position: static;">&times;</span>
+            </div>
+
+            <!-- 内容区域：可滚动 -->
+            <div id="docs-content" class="markdown-body" style="padding: 2rem; overflow-y: auto; flex: 1; background: #fff;">
+                <div style="text-align: center; color: var(--text-secondary);">
+                    <i class="fa-solid fa-spinner fa-spin"></i> 加载中...
+                </div>
+            </div>
+
+            <!-- 底部：操作栏 -->
+            <div style="padding: 1rem 2rem; border-top: 1px solid #e2e8f0; text-align: right; background: #f8fafc; border-radius: 0 0 20px 20px;">
+                <button class="action-btn" onclick="closeDocsModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <!-- index.html -->
 
     <footer>
@@ -621,10 +642,10 @@
             <div class="footer-column">
                 <h4>资源支持</h4>
                 <ul>
-                    <li><a href="#" onclick="showSection('help')">使用文档</a></li>
-                    <li><a href="#">API 文档</a></li>
-                    <li><a href="#">开源协议</a></li>
-                    <li><a href="#">更新日志</a></li>
+                    <li><a href="javascript:void(0)" onclick="showSection('help')">使用文档</a></li>
+                    <li><a href="javascript:void(0)" onclick="openDoc('api_doc.md', 'API 文档')">API 文档</a></li>
+                    <li><a href="javascript:void(0)" onclick="openDoc('terms.md', '服务协议')">服务协议</a></li>
+                    <li><a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志')">更新日志</a></li>
                 </ul>
             </div>
 
@@ -632,10 +653,10 @@
             <div class="footer-column">
                 <h4>关于我们</h4>
                 <ul>
-                    <li><a href="#">项目背景</a></li>
-                    <li><a href="#">加入我们</a></li>
-                    <li><a href="#">联系合作</a></li>
-                    <li><a href="#">隐私政策</a></li>
+                    <li><a href="https://github.com/rainbowyuyu/animate_cal" target="_blank">项目背景</a></li>
+                    <li><a href="https://github.com/rainbowyuyu/animate_cal" target="_blank">加入我们</a></li>
+                    <li><a href="https://github.com/rainbowyuyu/animate_cal" target="_blank">联系合作</a></li>
+                    <li><a href="javascript:void(0)" onclick="openDoc('privacy.md', '隐私政策')">隐私政策</a></li>
                 </ul>
             </div>
         </div>
@@ -644,7 +665,7 @@
             <p>© 2026 智算视界 (Visdom) · All rights reserved.</p>
             <p>
                 Author: rainbow_yu |
-                <a href="#" style="color:#94a3b8; text-decoration:none;">沪ICP备2025156088号-2</a>
+                <a href="https://beian.miit.gov.cn/" target="_blank" style="color:#94a3b8; text-decoration:none;">沪ICP备2025156088号-2</a>
             </p>
         </div>
     </footer>

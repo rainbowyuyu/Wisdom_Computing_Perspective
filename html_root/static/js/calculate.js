@@ -58,7 +58,6 @@ export async function startAnimation() {
     // 辅助：解析 Markdown 并高亮
     function renderMarkdown(text) {
         if (!text) return "";
-        // 使用 marked 解析 (前提是 index.html 已引入 marked.js)
         if (window.marked) {
             return window.marked.parse(text);
         }
@@ -72,11 +71,9 @@ export async function startAnimation() {
         div.style.marginBottom = '6px';
         div.style.lineHeight = '1.5';
 
-        // 解析 Markdown，但保留前面的 "> "
         const html = renderMarkdown(msg);
         div.innerHTML = `<span style="opacity:0.6; margin-right:5px;">></span> ${html}`;
 
-        // 样式微调：移除 marked 生成的 margin
         const p = div.querySelector('p');
         if(p) p.style.margin = '0';
 
@@ -84,29 +81,62 @@ export async function startAnimation() {
         logBox.scrollTop = logBox.scrollHeight;
     }
 
-    // 专门用于显示生成的代码块 (带高亮)
-    function addCodeBlock(code) {
-        // 创建 pre code 结构，适配 highlight.js
+    // --- 核心修改：流式打字机效果显示代码 ---
+    async function streamCodeBlock(fullCode) {
+        // 创建 pre code 结构
         const pre = document.createElement('pre');
         pre.style.margin = "10px 0";
         pre.style.borderRadius = "8px";
-        pre.style.background = "#282c34"; // One Dark 背景
+        pre.style.background = "#282c34";
         pre.style.padding = "10px";
         pre.style.overflowX = "auto";
+        pre.style.border = "1px solid #475569";
 
         const codeEl = document.createElement('code');
-        codeEl.className = "language-python"; // 指定语言
-        codeEl.textContent = code; // 此时还是纯文本
+        pre.className = "hljs"; // 添加 hljs 类
+        codeEl.textContent = ""; // 初始为空
 
         pre.appendChild(codeEl);
         logBox.appendChild(pre);
 
-        // 触发高亮
-        if (window.hljs) {
-            window.hljs.highlightElement(codeEl);
-        }
+        // 模拟打字机
+        const chars = fullCode.split('');
+        let currentText = "";
 
-        logBox.scrollTop = logBox.scrollHeight;
+        // 使用 Promise 包装，以便可以使用 await 等待打字完成
+        return new Promise((resolve) => {
+            let i = 0;
+            // 速度：每帧打多少个字。代码通常比较长，需要快一点
+            // 假设 60fps，每帧打 5 个字，每秒就是 300 字
+            const speed = 3;
+
+            function type() {
+                if (i < chars.length) {
+                    // 每次追加一小段
+                    const chunk = chars.slice(i, i + speed).join('');
+                    currentText += chunk;
+                    codeEl.textContent = currentText;
+
+                    // 实时高亮 (Highlight.js 的 highlightElement 会重置 DOM，所以我们需要 carefully)
+                    // highlight.js 直接操作 innerHTML，这在流式追加时可能会有冲突。
+                    // 更好的做法是：只在最后高亮，或者使用 highlight.js 的 highlightAuto 返回 HTML
+
+                    // 只有当打字完成或者每隔一定字符数才高亮一次，避免闪烁
+                    // 这里为了性能，我们只在最后高亮。中间过程保持纯文本。
+
+                    logBox.scrollTop = logBox.scrollHeight;
+                    i += speed;
+                    requestAnimationFrame(type);
+                } else {
+                    // 打字完成，执行最终高亮
+                    if (window.hljs) {
+                        window.hljs.highlightElement(codeEl);
+                    }
+                    resolve();
+                }
+            }
+            requestAnimationFrame(type);
+        });
     }
 
     try {
@@ -130,7 +160,7 @@ export async function startAnimation() {
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n\n');
-            buffer = lines.pop(); // 保留未完整的块
+            buffer = lines.pop();
 
             for (const line of lines) {
                 if (line.startsWith('data: ')) {
@@ -144,32 +174,31 @@ export async function startAnimation() {
                             percentText.innerText = data.progress + '%';
                         }
 
-                        // 处理不同步骤的消息
+                        // 处理消息
                         if (data.step === 'generating_code') {
-                            statusText.innerText = "AI 思考中...";
-                            addLog("正在请求大模型生成 Manim 代码...", "#fbbf24");
+                            statusText.innerText = "思考中...";
+                            addLog("正在请求 Manim 代码...", "#fbbf24");
                         }
                         else if (data.step === 'code_generated') {
-                            addLog("**代码生成完毕**，正在准备渲染环境...", "#34d399"); // 支持 Markdown 加粗
+                            addLog("代码生成完毕，正在准备渲染环境...", "#34d399");
                             if (data.code) {
-                                // 这里显示高亮代码块
-                                addLog("Python 脚本预览：", "#94a3b8");
-                                addCodeBlock(data.code);
+                                addLog("Python 脚本预览 (实时生成中)：", "#94a3b8");
+                                // 关键：使用 await 等待打字机效果完成，再处理后续消息
+                                // 注意：这里会阻塞后续日志的显示，这正是我们想要的（先看完代码再看渲染日志）
+                                await streamCodeBlock(data.code);
                             }
                         }
                         else if (data.step === 'rendering') {
                             statusText.innerText = "渲染视频中...";
-                            // 过滤掉频繁的进度更新日志，只显示重要信息
                             if (data.message && !data.message.includes("渲染帧")) {
                                 addLog(data.message);
                             }
                         }
                         else if (data.step === 'complete') {
                             statusText.innerText = "任务完成";
-                            addLog("渲染成功！正在加载视频播放器...", "#a78bfa"); // 紫色
-                            progBar.style.background = "#34d399"; // 进度条变绿
+                            addLog("渲染成功！正在加载视频播放器...", "#a78bfa");
+                            progBar.style.background = "#34d399";
 
-                            // 延迟展示视频，让用户看一眼完成日志
                             setTimeout(() => {
                                 const videoSrc = `${data.video_url}?t=${new Date().getTime()}`;
                                 container.innerHTML = `
@@ -179,7 +208,7 @@ export async function startAnimation() {
                                     </video>
                                 `;
                             }, 1500);
-                            return; // 结束循环
+                            return;
                         }
                         else if (data.step === 'error') {
                             statusText.innerText = "发生错误";
@@ -202,6 +231,7 @@ export async function startAnimation() {
     }
 }
 
+
 // --- 公式选择器逻辑 ---
 let currentTargetField = null; // 'A' or 'B'
 
@@ -221,8 +251,6 @@ async function loadFormulaSelectorList() {
     const container = document.getElementById('selector-list');
     const userSpan = document.getElementById('username-span');
     const userDisplay = document.getElementById('user-display');
-
-    // 检查登录状态
     const user = (userDisplay && userDisplay.style.display !== 'none' && userSpan) ? userSpan.innerText : null;
 
     if (!user) {
@@ -288,8 +316,8 @@ async function loadFormulaSelectorList() {
 
 // 辅助跳转函数 (需要挂载到 window)
 window.goToMyFormulas = function() {
-    closeFormulaSelector(); // 关闭模态框
-    showSection('my-formulas'); // 跳转页面
+    closeFormulaSelector();
+    showSection('my-formulas');
 }
 
 // 选中公式

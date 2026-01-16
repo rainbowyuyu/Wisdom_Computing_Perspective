@@ -65,3 +65,89 @@
     color: var(--text-secondary);
     line-height: 1.6;
 }
+
+/* static/css/pages/examples.css */
+
+/* ... (原有样式保持不变) ... */
+
+/* 视频播放模态框样式优化 */
+#video-modal .modal-content {
+    background: black;
+    width: 800px;
+    max-width: 95%;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#video-modal video {
+    width: 100%;
+    max-height: 80vh;
+    display: block;
+}
+
+#video-modal .modal-header {
+    padding: 1rem;
+    background: #1e293b;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#video-modal h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+#video-modal .close-modal {
+    position: static; /* 重置绝对定位 */
+    color: white;
+    width: auto;
+    height: auto;
+    font-size: 1.5rem;
+}
+
+/* static/css/pages/examples.css */
+
+/* ... (保留 video-grid 等布局样式) ... */
+
+/* 缩略图容器 */
+.video-preview-container {
+    height: 180px;
+    background: #000;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 覆盖层：存放播放图标和渐变 */
+.play-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s;
+    pointer-events: none; /* 让鼠标事件穿透到 video */
+}
+
+.play-overlay i {
+    font-size: 3.5rem;
+    color: rgba(255,255,255,0.9);
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+    transition: transform 0.3s;
+}
+
+/* 悬停时隐藏遮罩，让视频清晰显示 */
+.video-card:hover .play-overlay {
+    opacity: 0;
+}
+/* 或者保留图标但变大 */
+/* .video-card:hover .play-overlay i { transform: scale(1.1); } */
+
+/* ... (modal 样式保持不变) ... */

@@ -6,7 +6,9 @@ import * as Calculate from './calculate.js';
 import * as Auth from './auth.js';
 import * as Settings from './settings.js';
 import * as Tutorial from './tutorial.js';
-import * as Formulas from './formulas.js'; // 确保引入
+import * as Formulas from './formulas.js';
+import * as Examples from './examples.js';
+import * as Docs from './docs.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     Canvas.setupCanvas();
@@ -15,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Settings.initSettings();
     Detect.initDetectListeners();
     Tutorial.checkAutoPlay();
+    Examples.loadExamples(); // 加载案例
 
     // 全局快捷键
     document.addEventListener('keydown', (e) => {
@@ -106,3 +109,12 @@ window.useFormula = (latexEncoded) => {
         if(fieldA) fieldA.setValue(latex);
     }, 100);
 };
+
+
+// 挂载 Examples 函数
+window.playExample = Examples.playExample;
+window.closeVideoModal = Examples.closeVideoModal;
+
+// --- Docs 挂载 ---
+window.openDoc = Docs.openDoc;
+window.closeDocsModal = Docs.closeDocsModal;

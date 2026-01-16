@@ -3,6 +3,7 @@
 @import url('base.css');
 @import url('layout.css');
 @import url('components.css');
+@import url('markdown.css');
 
 /* Pages */
 @import url('pages/home.css');

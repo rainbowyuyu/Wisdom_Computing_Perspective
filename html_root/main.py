@@ -4,15 +4,13 @@ import uuid
 import base64
 import logging
 import random
-import string
-import hashlib
 import bcrypt
 import json
 import asyncio
 import sys
 import subprocess  # 引入 subprocess 用于同步调用
 from io import BytesIO
-from fastapi import FastAPI, UploadFile, File, HTTPException, Response
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -21,8 +19,8 @@ from openai import OpenAI
 import uvicorn
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import mysql.connector
-from mysql.connector import pooling
-import traceback
+import json # 确保引入
+from typing import List
 
 # 引入生成器
 from logic.manim_generator import render_matrix_animation
@@ -99,6 +97,56 @@ class FormulaUpdateModel(BaseModel):
     username: str
     latex: str
     note: str
+
+
+# 定义响应模型
+class ExampleVideo(BaseModel):
+    filename: str
+    title: str
+    description: str
+    url: str
+    poster: str = ""  # 可选
+
+
+@app.get("/api/examples")
+async def get_examples():
+    storage_dir = "static/assets/storage"
+    metadata_path = os.path.join(storage_dir, "metadata.json")
+
+    videos = []
+
+    # 读取配置文件
+    meta_dict = {}
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                meta_list = json.load(f)
+                # 转为字典方便查找
+                for item in meta_list:
+                    meta_dict[item["filename"]] = item
+        except Exception as e:
+            logger.error(f"Metadata load error: {e}")
+
+    # 扫描目录下所有 mp4 文件
+    if os.path.exists(storage_dir):
+        for file in os.listdir(storage_dir):
+            if file.endswith(".mp4"):
+                # 如果有元数据就用，没有就用默认值
+                meta = meta_dict.get(file, {
+                    "title": file,
+                    "description": "暂无简介",
+                    "poster": ""
+                })
+
+                videos.append({
+                    "filename": file,
+                    "title": meta.get("title", file),
+                    "description": meta.get("description", "暂无简介"),
+                    "url": f"/assets/storage/{file}",
+                    "poster": meta.get("poster", "")  # 封面图路径，如果为空，前端处理
+                })
+
+    return {"status": "success", "data": videos}
 
 
 # --- 辅助函数：数据库操作 ---
@@ -342,24 +390,12 @@ async def generate_animation(data: CalcModel):
 
 
 # --- SSE Stream ---
+
+from logic.prompt import return_prompt
+
 def generate_manim_prompt(latex_a, latex_b, operation):
-    op_desc = {"add": "矩阵加法", "mul": "矩阵乘法", "det": "行列式计算", "other": "公式展示"}.get(operation,
-                                                                                                   "数学展示")
-    return f"""
-你是一个精通 Manim Community Edition (v0.17+) 的 Python 专家。
-请编写一个完整的 Python 脚本，使用 Manim 渲染以下数学过程：
-操作类型：{op_desc}
-输入公式 A: {latex_a}
-输入公式 B (可选): {latex_b}
-要求：
-1. 必须导入 `from manim import *`。
-2. 定义一个继承自 `Scene` 的类，类名必须是 `GenScene`。
-3. 在 `construct` 方法中实现动画。
-4. 使用 `MathTex` 渲染公式，必须使用原始字符串 r"..." 包裹 LaTeX。
-5. 动画步骤：先展示输入公式，计算过程，最后展示结果。
-6. 保持背景为黑色。
-7. 不要输出任何 Markdown 标记。
-"""
+    op_desc = {"add": "矩阵加法", "mul": "矩阵乘法", "det": "行列式计算", "other": "公式展示"}.get(operation,"数学展示")
+    return return_prompt(op_desc, latex_a, latex_b)
 
 
 @app.post("/api/animate/stream")
@@ -479,6 +515,7 @@ async def generate_animation_stream(data: CalcModel):
 app.mount("/css", StaticFiles(directory="static/css"), name="css")
 app.mount("/js", StaticFiles(directory="static/js"), name="js")
 app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
+app.mount("/docs", StaticFiles(directory="static/docs"), name="docs")
 # /videos 单独挂载
 app.mount("/videos", StaticFiles(directory="static/videos"), name="videos")
 # 根静态
@@ -492,8 +529,8 @@ async def read_index():
 
 @app.get("/update.md")
 async def read_update_log():
-    if os.path.exists("static/update.md"):
-        return FileResponse("static/update.md")
+    if os.path.exists("static/docs/update.md"):
+        return FileResponse("static/docs/update.md")
     if os.path.exists("update.md"):
         return FileResponse("update.md")
     raise HTTPException(status_code=404)

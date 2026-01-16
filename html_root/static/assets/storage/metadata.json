@@ -1,0 +1,62 @@
+[
+  {
+    "filename": "AStarVisualization2.mp4",
+    "title": "A* 搜索算法可视化",
+    "description": "通过动态图展示 A* 算法在图或网格中的路径搜索过程，直观理解启发函数如何引导最优路径选择。",
+    "poster": ""
+  },
+  {
+    "filename": "Bb_an.mp4",
+    "title": "冒泡排序算法演示",
+    "description": "以逐步动画形式展示冒泡排序的比较与交换过程，帮助理解其基本思想与时间复杂度特性。",
+    "poster": ""
+  },
+  {
+    "filename": "Booth.mp4",
+    "title": "Booth 比较法动态演示",
+    "description": "可视化 Booth 算法在字符串或编码比较中的执行流程，清晰呈现状态转移与判断逻辑。",
+    "poster": ""
+  },
+  {
+    "filename": "Dec2BinAxeRe.mp4",
+    "title": "十进制到二进制转换可视化",
+    "description": "通过动画分步展示十进制数向二进制转换的过程，直观理解除 2 取余与位权表示。",
+    "poster": ""
+  },
+  {
+    "filename": "gradient_descent.mp4",
+    "title": "梯度下降算法可视化",
+    "description": "在函数曲线上动态展示梯度下降的迭代过程，帮助理解学习率、收敛速度与最优解搜索。",
+    "poster": ""
+  },
+  {
+    "filename": "IntegralVisualization.mp4",
+    "title": "微积分分步计算演示",
+    "description": "通过动画逐步呈现积分或相关微积分计算过程，将抽象公式转化为直观的几何与代数理解。",
+    "poster": ""
+  },
+  {
+    "filename": "MatrixAdditionShow.mp4",
+    "title": "矩阵加法分步演示",
+    "description": "以动态方式展示矩阵对应元素相加的过程，帮助初学者掌握矩阵运算的基本规则。",
+    "poster": ""
+  },
+  {
+    "filename": "PageTest.mp4",
+    "title": "页面置换算法动态演示",
+    "description": "通过可视化动画展示操作系统中页面置换算法的执行过程，直观理解缺页中断与策略差异。",
+    "poster": ""
+  },
+  {
+    "filename": "PolygonOnAxes.mp4",
+    "title": "cos(x) 的泰勒展开可视化",
+    "description": "在坐标轴上逐项叠加 cos(x) 在 0 点处的泰勒展开，多项式逼近过程一目了然。",
+    "poster": ""
+  },
+  {
+    "filename": "SigmoidFunctionPlot.mp4",
+    "title": "Sigmoid 函数可视化",
+    "description": "通过平滑曲线动画展示 Sigmoid 函数的形状与性质，理解其在机器学习中的作用。",
+    "poster": ""
+  }
+]
