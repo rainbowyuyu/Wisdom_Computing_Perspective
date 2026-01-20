@@ -5,20 +5,14 @@ import { loadMyFormulas, normalizeLatex } from './formulas.js';
 
 // 初始化计算页面的监听器
 export function initCalculateListeners() {
-    const fieldA = document.getElementById('math-field-a');
-    const codeA = document.getElementById('latex-code-a');
-    const fieldB = document.getElementById('math-field-b');
-    const codeB = document.getElementById('latex-code-b');
+    const field = document.getElementById('math-field-main');
+    const code = document.getElementById('latex-code-main');
 
-    // 双向绑定 A
-    if (fieldA && codeA) {
-        codeA.value = fieldA.getValue();
-        fieldA.addEventListener('input', (e) => { codeA.value = e.target.value; });
-    }
-    // 双向绑定 B
-    if (fieldB && codeB) {
-        codeB.value = fieldB.getValue();
-        fieldB.addEventListener('input', (e) => { codeB.value = e.target.value; });
+    if (field && code) {
+        // 双向绑定
+        code.value = field.getValue();
+        field.addEventListener('input', (e) => { code.value = e.target.value; });
+        code.addEventListener('input', (e) => { field.setValue(e.target.value); });
     }
 }
 
@@ -26,8 +20,7 @@ export function initCalculateListeners() {
 export async function startAnimation() {
     const container = document.getElementById('video-container');
     const method = document.getElementById('calc-method').value;
-    const matA = document.getElementById('math-field-a').getValue();
-    const matB = document.getElementById('math-field-b').getValue();
+    const formula = document.getElementById('math-field-main').getValue();
 
     // 1. 初始化 UI：显示进度条和日志
     container.innerHTML = `
@@ -144,8 +137,8 @@ export async function startAnimation() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                matrixA: matA,
-                matrixB: matB,
+                matrixA: formula, // 将公式传给 A
+                matrixB: "",      // B 为空
                 operation: method
             })
         });
@@ -180,9 +173,9 @@ export async function startAnimation() {
                             addLog("正在请求 Manim 代码...", "#fbbf24");
                         }
                         else if (data.step === 'code_generated') {
-                            addLog("代码生成完毕，正在准备渲染环境...", "#34d399");
+                            addLog("代码重写完毕，正在准备渲染环境...", "#34d399");
                             if (data.code) {
-                                addLog("Python 脚本预览 (实时生成中)：", "#94a3b8");
+                                addLog("Python 脚本预览 (实时重写中)：", "#94a3b8");
                                 // 关键：使用 await 等待打字机效果完成，再处理后续消息
                                 // 注意：这里会阻塞后续日志的显示，这正是我们想要的（先看完代码再看渲染日志）
                                 await streamCodeBlock(data.code);
@@ -320,15 +313,18 @@ window.goToMyFormulas = function() {
     showSection('my-formulas');
 }
 
-// 选中公式
+// 清空输入
+export function clearCalcInput() {
+    const field = document.getElementById('math-field-main');
+    const code = document.getElementById('latex-code-main');
+    if(field) field.setValue("");
+    if(code) code.value = "";
+}
+
+// 选中公式 (回调)
 window.selectFormula = function(encodedLatex) {
     const latex = decodeURIComponent(encodedLatex);
-    if (currentTargetField === 'A') {
-        const field = document.getElementById('math-field-a');
-        if(field) field.setValue(latex);
-    } else if (currentTargetField === 'B') {
-        const field = document.getElementById('math-field-b');
-        if(field) field.setValue(latex);
-    }
+    const field = document.getElementById('math-field-main');
+    if(field) field.setValue(latex);
     closeFormulaSelector();
 };

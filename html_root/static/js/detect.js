@@ -76,15 +76,39 @@ export async function processRecognition() {
     }
 }
 
+// 导出到计算页面
 export function copyToCalc() {
+    // 从 MathLive 组件获取值
     const mathField = document.getElementById('latex-output');
-    // 获取当前公式
-    const detected = mathField ? mathField.getValue() : "";
+    // 兼容普通 Textarea (如果降级)
+    const codeArea = document.getElementById('latex-code-detect');
+
+    let detected = "";
+    if (mathField && mathField.getValue) {
+        detected = mathField.getValue();
+    } else if (codeArea) {
+        detected = codeArea.value;
+    }
 
     if(detected && !detected.includes("等待") && !detected.includes("Error")) {
-        const target = document.getElementById('latex-code-a');
-        if(target) target.value = detected;
+        // 跳转到计算页面
         showSection('calculate');
+
+        // 延时一点点以确保 DOM 可见，然后填充
+        setTimeout(() => {
+            // 填充到计算页面的矩阵 A (MathLive 组件)
+            const targetField = document.getElementById('math-field-a');
+            if (targetField && targetField.setValue) {
+                targetField.setValue(detected);
+            }
+
+            // 同时更新隐藏的 textarea，保持数据同步
+            const targetCode = document.getElementById('latex-code-a');
+            if(targetCode) {
+                targetCode.value = detected;
+            }
+        }, 100);
+
     } else {
         alert("请先进行识别或输入有效公式");
     }

@@ -147,7 +147,125 @@
 .video-card:hover .play-overlay {
     opacity: 0;
 }
-/* 或者保留图标但变大 */
-/* .video-card:hover .play-overlay i { transform: scale(1.1); } */
 
-/* ... (modal 样式保持不变) ... */
+/* ... (Grid 和 Card 样式保持不变) ... */
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2.5rem;
+}
+
+/* ... (Card, Thumbnail, Hover 样式保持不变) ... */
+.video-card {
+    background: white;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid #f1f5f9;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+}
+/* ... */
+
+/* --- 沉浸式视频播放器 (Immersive Modal) --- */
+#video-modal {
+    background-color: rgba(0, 0, 0, 0.95); /* 深黑背景 */
+    backdrop-filter: blur(20px);
+    z-index: 9999; /* 最高层级 */
+}
+
+#video-modal .modal-content {
+    background: transparent;
+    box-shadow: none;
+    width: 90%;
+    max-width: 1200px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    padding: 0;
+    overflow: visible; /* 允许关闭按钮溢出 */
+}
+
+/* 视频容器 */
+.video-player-wrapper {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: black;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    position: relative;
+}
+
+#video-modal video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* 顶部信息栏 */
+.video-modal-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    color: white;
+}
+
+.video-info h3 {
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 700;
+}
+
+.video-info p {
+    color: #94a3b8;
+    margin: 5px 0 0;
+    font-size: 1rem;
+}
+
+/* 关闭按钮优化 */
+#video-modal .close-modal {
+    position: static;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 2.5rem;
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#video-modal .close-modal:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    #video-modal .modal-content {
+        width: 100%;
+        height: 100%;
+        justify-content: flex-start;
+        padding-top: 2rem;
+    }
+    .video-player-wrapper {
+        border-radius: 0;
+        aspect-ratio: auto;
+        height: auto;
+    }
+    .video-modal-header {
+        padding: 1rem;
+    }
+}

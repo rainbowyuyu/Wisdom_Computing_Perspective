@@ -24,9 +24,6 @@ def return_prompt(
 【输入公式 A（LaTeX）】
 {latex_a}
 
-【输入公式 B（LaTeX，可选）】
-{latex_b}
-
 ---
 
 ## 二、硬性技术约束（必须 100% 严格遵守）
@@ -79,8 +76,7 @@ def return_prompt(
 
 ### 3️⃣ 布局规则
 - 输入公式：
-  - 公式 A：`to_edge(UL)`
-  - 公式 B（若存在）：`to_edge(UR)`
+  - 公式 ：`to_edge(UL)`
 - 推导过程：
   - 自上而下排列
   - 使用 `next_to(prev, DOWN)`
@@ -140,7 +136,7 @@ self.play(Create(box))
 ## 六、最终自检（生成前必须满足）
 
 - 代码可直接运行，无语法错误
-- Manim API 使用符合 v0.17+
+- Manim API 使用符合 v0.18+
 - 无中文出现在 MathTex 中
 - 未输出任何非代码内容
 """

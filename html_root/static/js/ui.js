@@ -82,6 +82,9 @@ export function switchAuthMode(mode) {
         regForm.style.display = 'block';
         tabs[1].classList.add('active'); // 假设第二个是注册
     }
+    if (window.refreshCaptcha) {
+        window.refreshCaptcha(mode);
+    }
 }
 // ...
 

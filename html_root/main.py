@@ -3,13 +3,11 @@ import os
 import uuid
 import base64
 import logging
-import random
 import bcrypt
 import json
 import asyncio
 import sys
 import subprocess  # 引入 subprocess 用于同步调用
-from io import BytesIO
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
@@ -17,7 +15,6 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from openai import OpenAI
 import uvicorn
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import mysql.connector
 import json # 确保引入
 from typing import List
@@ -157,30 +154,7 @@ def get_db_connection():
 
 
 # --- 辅助函数：生成验证码  ---
-def generate_captcha_image_bytes():
-    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    text = ''.join(random.choices(chars, k=4))
-    width, height = 120, 40
-    image = Image.new('RGB', (width, height), color=(255, 255, 255))
-    draw = ImageDraw.Draw(image)
-    try:
-        font = ImageFont.truetype("arial.ttf", 24)
-    except:
-        font = ImageFont.load_default()
-    for i, char in enumerate(text):
-        x = 10 + i * 25 + random.randint(-2, 2)
-        y = 5 + random.randint(-2, 2)
-        draw.text((x, y), char, font=font, fill=(0, 0, 0))
-    for _ in range(3):
-        x1, y1 = random.randint(0, width), random.randint(0, height)
-        x2, y2 = random.randint(0, width), random.randint(0, height)
-        draw.line([(x1, y1), (x2, y2)], fill=(150, 150, 150), width=1)
-    image = image.filter(ImageFilter.GaussianBlur(0.5))
-    buf = BytesIO()
-    image.save(buf, format="PNG")
-    buf.seek(0)
-    return text, buf
-
+from logic.captcha import generate_captcha_image_bytes
 
 # --- API 路由 (Auth & CRUD) ---
 
@@ -189,6 +163,13 @@ async def get_captcha():
     text, img_buf = generate_captcha_image_bytes()
     captcha_id = str(uuid.uuid4())
     CAPTCHA_STORE[captcha_id] = text.upper()
+
+    # 清理过期验证码 (简单实现：如果太多就清空一半)
+    if len(CAPTCHA_STORE) > 1000:
+        keys = list(CAPTCHA_STORE.keys())
+        for k in keys[:500]:
+            del CAPTCHA_STORE[k]
+
     return StreamingResponse(img_buf, media_type="image/png", headers={"X-Captcha-ID": captcha_id})
 
 
@@ -196,8 +177,13 @@ async def get_captcha():
 async def register(data: AuthModel):
     # 1. 验证码校验
     stored_code = CAPTCHA_STORE.get(data.captcha_id)
-    if not stored_code or stored_code != data.captcha.upper():
-        return JSONResponse(status_code=400, content={"status": "error", "message": "验证码错误或已过期"})
+    if not stored_code:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "验证码已过期，请刷新"})
+
+    if stored_code != data.captcha.upper():
+        return JSONResponse(status_code=400, content={"status": "error", "message": "验证码错误"})
+
+    # 验证通过后删除
     del CAPTCHA_STORE[data.captcha_id]
 
     # 2. 数据库操作
@@ -236,8 +222,13 @@ async def register(data: AuthModel):
 async def login(data: AuthModel):
     # 1. 验证码校验
     stored_code = CAPTCHA_STORE.get(data.captcha_id)
-    if not stored_code or stored_code != data.captcha.upper():
+    if not stored_code:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "验证码已过期，请刷新"})
+
+    if stored_code != data.captcha.upper():
         return JSONResponse(status_code=400, content={"status": "error", "message": "验证码错误"})
+
+    # 验证通过后删除
     del CAPTCHA_STORE[data.captcha_id]
 
     conn = None

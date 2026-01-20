@@ -18,7 +18,7 @@
 
 ## ✨ 核心功能
 
-- **👁️ 智能识别 (OCR)**：集成 Qwen-VL 多模态大模型，精准识别手写矩阵、积分及复杂代数公式。
+- **👁️ 智能识别 (OCR)**：集成 Qwen-VL 多模态大模型， 以及OCR技术，精准识别手写矩阵、积分及复杂代数公式。
 - **🎬 动态推演**: 基于 Python Manim 引擎，实时生成数学运算的可视化视频（MP4）。
 - **💾 云端算式库**: 支持用户注册/登录，将常用公式保存至 MySQL 数据库，随时复用。
 - **✏️ 交互式画板**: 内置 HTML5 画板与 MathLive 编辑器，支持手写输入与所见即所得的公式修改。
@@ -31,6 +31,7 @@
 - **后端**: Python, FastAPI, Uvicorn
 - **前端**: HTML5, CSS3, JavaScript (原生模块化开发), MathLive, Driver.js
 - **AI 模型**: 阿里云 Qwen-VL / OpenAI 兼容接口
+- **视觉模型**: Mamba-YOLOv11模型
 - **渲染引擎**: Manim Community Edition
 - **数据库**: MySQL
 - **工具**: FFmpeg, LaTeX (TeXLive/MiKTeX)

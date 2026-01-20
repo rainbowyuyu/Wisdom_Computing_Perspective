@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.startAnimation = Calculate.startAnimation;
 window.openFormulaSelector = Calculate.openFormulaSelector;
 window.closeFormulaSelector = Calculate.closeFormulaSelector;
+window.clearCalcInput = Calculate.clearCalcInput; // 新增
 
 // 更新 useFormula (从 formulas.js 跳转过来的逻辑)
 // 我们需要它填充 MathLive 组件而不是 textarea
@@ -105,8 +106,9 @@ window.useFormula = (latexEncoded) => {
     window.showSection('calculate');
     // 延时填充，确保页面可见
     setTimeout(() => {
-        const fieldA = document.getElementById('math-field-a');
-        if(fieldA) fieldA.setValue(latex);
+        // 改为填充新的主输入框
+        const field = document.getElementById('math-field-main');
+        if(field) field.setValue(latex);
     }, 100);
 };
 

@@ -30,26 +30,19 @@ function renderExampleCards(videos) {
     }
 
     grid.innerHTML = videos.map(v => `
-        <div class="video-card" onclick="playExample('${v.url}', '${v.title}')">
+        <div class="video-card" onclick="playExample('${v.url}', '${v.title}', '${v.description}')">
             <div class="thumbnail video-preview-container">
-                <!-- 
-                    使用 video 标签作为封面 
-                    muted: 静音 (浏览器策略要求自动播放必须静音)
-                    loop: 循环
-                    playsinline: 移动端内联播放
-                -->
+                <!-- 鼠标悬停预览 (静音) -->
                 <video 
-                    src="${v.url}#t=1" 
+                    src="${v.url}#t=0.5" 
                     muted 
                     loop 
                     playsinline 
                     preload="metadata"
                     onmouseover="this.play()" 
-                    onmouseout="this.pause();"
+                    onmouseout="this.pause(); this.currentTime=0.5;"
                     style="width:100%; height:100%; object-fit:cover;"
                 ></video>
-                
-                <!-- 播放图标覆盖层 -->
                 <div class="play-overlay">
                     <i class="fa-solid fa-play-circle"></i>
                 </div>
@@ -62,9 +55,10 @@ function renderExampleCards(videos) {
     `).join('');
 }
 
-export function playExample(videoSrc, title) {
+export function playExample(videoSrc, title, desc) {
     const player = document.getElementById('example-video-player');
     const titleEl = document.getElementById('video-modal-title');
+    const descEl = document.getElementById('video-modal-desc'); // 新增
 
     if (player) {
         player.src = videoSrc;
@@ -72,9 +66,8 @@ export function playExample(videoSrc, title) {
         player.play().catch(e => console.log("Autoplay blocked"));
     }
 
-    if (titleEl) {
-        titleEl.innerText = title;
-    }
+    if (titleEl) titleEl.innerText = title;
+    if (descEl) descEl.innerText = desc || "暂无简介";
 
     toggleModal('video-modal', true);
 }

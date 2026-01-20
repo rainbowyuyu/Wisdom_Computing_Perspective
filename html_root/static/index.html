@@ -60,9 +60,10 @@
 
         <div class="auth-buttons desktop-auth">
             <button class="login-btn" onclick="toggleAuthModal(true)">登录 / 注册</button>
+            <!-- 关键修复：确保这里有 id="username-span" -->
             <span id="user-display" style="display:none; color:var(--text-main); font-weight:600;">
-                <i class="fa-regular fa-user-circle"></i>
-                <!-- 移动端可以简化显示，甚至隐藏登出按钮放入菜单 -->
+                <i class="fa-regular fa-user-circle"></i> <span id="username-span"></span>
+                <i class="fa-solid fa-arrow-right-from-bracket" style="cursor:pointer; margin-left:10px; color:var(--text-secondary);" onclick="logout()" title="退出"></i>
             </span>
         </div>
     </nav>
@@ -301,60 +302,68 @@
             <h2 class="section-title">数学运算可视化</h2>
             <div class="calc-layout">
                 <div class="calc-sidebar glass-panel">
-                    <h3>参数配置</h3>
-                    <div style="margin-top:1.5rem;">
-                        <label style="font-weight:600; display:block; margin-bottom:0.5rem;">运算类型</label>
+
+                    <!-- 顶部：运算模式选择 -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="font-weight:700; display:block; margin-bottom:0.8rem; color:var(--text-main); font-size:0.95rem;">
+                            <i class="fa-solid fa-layer-group" style="color:var(--primary-color); margin-right:5px;"></i>
+                            演示模式
+                        </label>
                         <select id="calc-method" class="tech-select">
-                            <option value="other">公式展示 (通用)</option>
-                            <option value="build" disabled>其他功能正在部署马上建设完成</option>
+                            <option value="other">通用公式推演 (推荐)</option>
+                            <option value="det">行列式计算 (Determinant)</option>
+                            <option value="solve">方程求解 (Solve)</option>
                         </select>
+                        <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:5px;">
+                            * "通用模式"下，将自动分析您输入的算式并生成对应动画。
+                        </p>
                     </div>
 
-                    <!-- 矩阵 A 输入区 -->
-                    <div class="matrix-input-group">
-                        <!-- 关键：Flex 容器 -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; width:100%;">
-                            <label style="margin:0;">公式 A</label>
-                            <button class="btn-icon" title="从公式库导入" onclick="openFormulaSelector('A')" style="background:#eff6ff; color:var(--primary-color);">
-                                <i class="fa-solid fa-folder-open"></i> 导入
-                            </button>
+                    <!-- 核心：单一大公式输入区 -->
+                    <div class="formula-input-wrapper">
+                        <div class="input-header">
+                            <label><i class="fa-solid fa-calculator"></i> 数学表达式</label>
+                            <div class="header-actions">
+                                <button class="btn-import" onclick="openFormulaSelector('A')" title="从库中导入">
+                                    <i class="fa-solid fa-book-bookmark"></i> 导入
+                                </button>
+                                <button class="btn-import" onclick="clearCalcInput()" title="清空" style="color:#ef4444; border-color:#fee2e2;">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div class="math-field-container" style="padding:0.5rem; background:#fff; border:1px solid #cbd5e1;">
-                            <math-field id="math-field-a" virtual-keyboard-mode="manual" style="width:100%; font-size:1.2rem; outline:none; border:none;">
+
+                        <!-- MathLive 可视化编辑 -->
+                        <div class="math-field-container main-input">
+                            <math-field id="math-field-main" virtual-keyboard-mode="manual" placeholder="在此输入公式，例如 \int x^2 dx">
                                 \int_{0}^{1} x^2 + 3x + 1 \, dx
                             </math-field>
                         </div>
-                        <textarea id="latex-code-a" style="display:none;"></textarea>
+
+                        <!-- 代码折叠区 -->
+                        <details class="code-details">
+                            <summary>
+                                <span><i class="fa-solid fa-code"></i> 编辑 LaTeX 源码</span>
+                            </summary>
+                            <textarea id="latex-code-main" placeholder="\int_{0}^{1} ..."></textarea>
+                        </details>
                     </div>
 
-                    <!-- 矩阵 B 输入区 -->
-                    <div class="matrix-input-group">
-                        <!-- 关键：Flex 容器 -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; width:100%;">
-                            <label style="margin:0;">公式 B (可选)</label>
-                            <button class="btn-icon" title="从公式库导入" onclick="openFormulaSelector('B')" style="background:#eff6ff; color:var(--primary-color);">
-                                <i class="fa-solid fa-folder-open"></i> 导入
-                            </button>
-                        </div>
-                        <div class="math-field-container" style="padding:0.5rem; background:#fff; border:1px solid #cbd5e1;">
-                            <math-field id="math-field-b" virtual-keyboard-mode="manual" style="width:100%; font-size:1.2rem; outline:none; border:none;">
-
-                            </math-field>
-                        </div>
-                        <textarea id="latex-code-b" style="display:none;"></textarea>
+                    <!-- 底部操作按钮 -->
+                    <div style="margin-top: auto; padding-top: 1rem;">
+                        <button class="action-btn full-width" onclick="startAnimation()" style="height: 54px; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-clapperboard"></i> 生成可视化动画
+                        </button>
                     </div>
-
-                    <button class="action-btn full-width" onclick="startAnimation()">
-                        <i class="fa-solid fa-film"></i> 生成可视化动画
-                    </button>
                 </div>
 
+                <!-- 右侧显示区 -->
                 <div class="calc-display glass-panel">
                     <div class="video-placeholder" id="video-container">
                         <div class="placeholder-content">
-                            <i class="fa-solid fa-cube" style="color: #334155;"></i>
-                            <p>准备就绪</p>
-                            <span style="font-size:0.9rem; opacity:0.7">点击左侧生成按钮开始渲染</span>
+                            <i class="fa-solid fa-cube" style="color: #475569; opacity: 0.5;"></i>
+                            <p style="font-weight: 500; color: #94a3b8;">等待指令...</p>
+                            <span style="font-size:0.85rem; opacity:0.6; color: #64748b;">输入公式后点击生成按钮</span>
                         </div>
                     </div>
                 </div>
@@ -649,6 +658,28 @@
             <!-- 底部：操作栏 -->
             <div style="padding: 1rem 2rem; border-top: 1px solid #e2e8f0; text-align: right; background: #f8fafc; border-radius: 0 0 20px 20px;">
                 <button class="action-btn" onclick="closeDocsModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 沉浸式视频播放 Modal -->
+    <div id="video-modal" class="modal">
+        <div class="modal-content">
+            <!-- 头部信息栏 -->
+            <div class="video-modal-header">
+                <div class="video-info">
+                    <h3 id="video-modal-title">视频标题</h3>
+                    <p id="video-modal-desc">视频简介...</p>
+                </div>
+                <span class="close-modal" onclick="closeVideoModal()">&times;</span>
+            </div>
+
+            <!-- 播放器主体 -->
+            <div class="video-player-wrapper">
+                <video id="example-video-player" controls autoplay>
+                    <source src="" type="video/mp4">
+                    您的浏览器不支持视频标签。
+                </video>
             </div>
         </div>
     </div>
