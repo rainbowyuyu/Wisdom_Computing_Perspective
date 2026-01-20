@@ -41,7 +41,9 @@
         <div class="logo">
             <img src="assets/智算视界_avatar.svg" alt="icon" width="80"> 智算视界
         </div>
-        <div class="nav-links">
+
+        <!-- 桌面端导航链接 (添加 desktop-nav 类) -->
+        <div class="nav-links desktop-nav">
             <button class="nav-btn active" onclick="showSection('home')">首页</button>
             <button class="nav-btn" onclick="showSection('detect')">智能识别</button>
             <button class="nav-btn" onclick="showSection('my-formulas')">我的算式</button>
@@ -50,14 +52,42 @@
             <button class="nav-btn" onclick="showSection('help')">帮助</button>
             <button class="nav-btn" onclick="openSettings()" title="系统设置"><i class="fa-solid fa-gear"></i></button>
         </div>
-        <div class="auth-buttons">
+
+        <!-- 移动端汉堡按钮 (新增) -->
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+        <div class="auth-buttons desktop-auth">
             <button class="login-btn" onclick="toggleAuthModal(true)">登录 / 注册</button>
             <span id="user-display" style="display:none; color:var(--text-main); font-weight:600;">
-                <i class="fa-regular fa-user-circle"></i> <span id="username-span"></span>
-                <i class="fa-solid fa-arrow-right-from-bracket" style="cursor:pointer; margin-left:10px; color:var(--text-secondary);" onclick="logout()" title="退出"></i>
+                <i class="fa-regular fa-user-circle"></i>
+                <!-- 移动端可以简化显示，甚至隐藏登出按钮放入菜单 -->
             </span>
         </div>
     </nav>
+
+    <!-- 移动端全屏菜单 (新增) -->
+    <div id="mobile-menu-overlay" class="mobile-menu-overlay">
+        <div class="mobile-menu-content">
+            <span class="close-mobile-menu" onclick="toggleMobileMenu()">&times;</span>
+
+            <div class="mobile-nav-links">
+                <button onclick="mobileNavClick('home')">首页</button>
+                <button onclick="mobileNavClick('detect')">智能识别</button>
+                <button onclick="mobileNavClick('my-formulas')">我的算式</button>
+                <button onclick="mobileNavClick('calculate')">动态计算</button>
+                <button onclick="mobileNavClick('examples')">教学案例</button>
+                <button onclick="mobileNavClick('help')">帮助</button>
+                <button onclick="openSettings(); toggleMobileMenu();">系统设置</button>
+            </div>
+
+            <div class="mobile-auth-section">
+                <!-- 这里的内容可以通过 JS 动态同步 -->
+                <button class="login-btn full-width" onclick="toggleAuthModal(true); toggleMobileMenu();">登录 / 注册</button>
+            </div>
+        </div>
+    </div>
 
     <!-- 主要内容区域 -->
     <main class="container">
@@ -159,6 +189,7 @@
                         <label for="image-upload" class="upload-label">
                             <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
                             <span class="upload-text">点击或拖拽图片到此处</span>
+                            <span class="upload-text">或直接粘贴剪贴板图片</span>
                             <!-- 将 input 放在 label 内部，id 必须对应 -->
                             <input type="file" id="image-upload" accept="image/*">
                         </label>
@@ -500,7 +531,20 @@
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-main); font-size: 0.95rem; margin-top: 10px;">
                         <span>开发者</span>
-                        <span>rainbow_yu</span>
+                        <span
+                            onclick="window.open('https://github.com/rainbowyuyu', '_blank')"
+                            style="
+                                font-family: 'JetBrains Mono', monospace;
+                                background: #eff6ff;
+                                color: var(--primary-color);
+                                padding: 2px 8px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                user-select: none;
+                            "
+                        >
+                            rainbow_yu
+                        </span>
                     </div>
                 </div>
 
@@ -664,7 +708,7 @@
         <div class="footer-bottom">
             <p>© 2026 智算视界 (Wisdom Computing Perspective) · All rights reserved.</p>
             <p>
-                Author: rainbow_yu |
+                Author: <a href="https://github.com/rainbowyuyu" target="_blank" style="color:#94a3b8; text-decoration:none;">rainbow_yu</a> |
                 <a href="https://beian.miit.gov.cn/" target="_blank" style="color:#94a3b8; text-decoration:none;">沪ICP备2025156088号-2</a>
             </p>
         </div>

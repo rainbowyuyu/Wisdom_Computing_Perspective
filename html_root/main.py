@@ -445,7 +445,7 @@ async def generate_animation_stream(data: CalcModel):
             try:
                 # capture_output=True 捕获输出，text=True 返回字符串
                 # Windows 下这个同步调用是最稳定的
-                return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=60)
+                return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=180)
             except subprocess.TimeoutExpired:
                 return None
             except Exception as ex:

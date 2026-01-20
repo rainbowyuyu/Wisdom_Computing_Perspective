@@ -118,3 +118,7 @@ window.closeVideoModal = Examples.closeVideoModal;
 // --- Docs 挂载 ---
 window.openDoc = Docs.openDoc;
 window.closeDocsModal = Docs.closeDocsModal;
+
+// 挂载移动端函数
+window.toggleMobileMenu = UI.toggleMobileMenu;
+window.mobileNavClick = UI.mobileNavClick;

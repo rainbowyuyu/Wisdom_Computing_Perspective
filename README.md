@@ -1,12 +1,10 @@
-![logo.png](assert/images/logo.png)
-
-
 ## rainbow_yu 🐋✨
+
+![logo.png](assert/images/logo.png)
 
 # 智算视界 (Wisdom Computing Perspective)
 
 <div align="center">
-  <img src="static/assets/智算视界_avatar.svg" alt="logo" width="120">
   <h3>基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台</h3>
 </div>
 
@@ -65,12 +63,12 @@ pip install -r requirements.txt
 ### 3. 配置数据库 (MySQL)
 
 1.  确保本地或远程 MySQL 服务已启动。
-2.  创建一个新的数据库（例如命名为 `visdom_db`）。
+2.  创建一个新的数据库（例如命名为 `wiscomper_db`）。
 3.  执行以下 SQL 初始化表结构：
 
 ```sql
-CREATE DATABASE IF NOT EXISTS visdom_db;
-USE visdom_db;
+CREATE DATABASE IF NOT EXISTS wiscomper_db;
+USE wiscomper_db;
 
 -- 用户表
 CREATE TABLE IF NOT EXISTS users (
@@ -103,7 +101,7 @@ ALIYUN_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 MYSQL_HOST=localhost
 MYSQL_USER=root
 MYSQL_PASSWORD=your_password
-MYSQL_DB=visdom_db
+MYSQL_DB=wiscomper_db
 MYSQL_PORT=3306
 ```
 

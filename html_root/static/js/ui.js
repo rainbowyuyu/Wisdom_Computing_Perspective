@@ -128,3 +128,29 @@ export function switchInputMode(mode) {
         }
     }
 }
+
+// --- 移动端菜单控制 ---
+export function toggleMobileMenu() {
+    const overlay = document.getElementById('mobile-menu-overlay');
+    if (!overlay) return;
+
+    if (overlay.style.display === 'flex') {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 300);
+    } else {
+        overlay.style.display = 'flex';
+        // 强制重绘
+        requestAnimationFrame(() => {
+            overlay.classList.add('show');
+        });
+    }
+}
+
+export function mobileNavClick(sectionId) {
+    showSection(sectionId);
+    toggleMobileMenu(); // 点击后自动关闭菜单
+}
+
+// ...

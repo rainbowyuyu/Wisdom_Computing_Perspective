@@ -176,7 +176,7 @@ export async function startAnimation() {
 
                         // 处理消息
                         if (data.step === 'generating_code') {
-                            statusText.innerText = "思考中...";
+                            statusText.innerText = "匹配代码中...";
                             addLog("正在请求 Manim 代码...", "#fbbf24");
                         }
                         else if (data.step === 'code_generated') {
