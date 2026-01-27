@@ -7,12 +7,12 @@
 }
 
 .video-card {
-    background: white;
+    background: var(--bg-surface); /* 适配深色 */
     border-radius: var(--radius-md);
     overflow: hidden;
     cursor: pointer;
     transition: all 0.3s ease;
-    border: 1px solid #f1f5f9;
+    border: 1px solid var(--border-color); /* 适配深色 */
     box-shadow: var(--shadow-sm);
     display: flex;
     flex-direction: column;
@@ -21,102 +21,13 @@
 .video-card:hover {
     transform: translateY(-8px);
     box-shadow: var(--shadow-lg);
-    border-color: #cbd5e1;
+    border-color: var(--primary-color);
 }
-
-.thumbnail {
-    height: 180px; /* 增加高度 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-}
-
-/* 播放按钮悬停放大 */
-.thumbnail i {
-    font-size: 3.5rem;
-    color: rgba(255,255,255,0.9);
-    transition: transform 0.3s ease;
-    z-index: 2;
-    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
-}
-
-.video-card:hover .thumbnail i {
-    transform: scale(1.1);
-}
-
-.video-card .info {
-    padding: 1.8rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.video-card h4 {
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-bottom: 0.6rem;
-    color: var(--text-main);
-}
-
-.video-card p {
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    line-height: 1.6;
-}
-
-/* static/css/pages/examples.css */
-
-/* ... (原有样式保持不变) ... */
-
-/* 视频播放模态框样式优化 */
-#video-modal .modal-content {
-    background: black;
-    width: 800px;
-    max-width: 95%;
-    padding: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-#video-modal video {
-    width: 100%;
-    max-height: 80vh;
-    display: block;
-}
-
-#video-modal .modal-header {
-    padding: 1rem;
-    background: #1e293b;
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-#video-modal h3 {
-    margin: 0;
-    font-size: 1.1rem;
-}
-
-#video-modal .close-modal {
-    position: static; /* 重置绝对定位 */
-    color: white;
-    width: auto;
-    height: auto;
-    font-size: 1.5rem;
-}
-
-/* static/css/pages/examples.css */
-
-/* ... (保留 video-grid 等布局样式) ... */
 
 /* 缩略图容器 */
 .video-preview-container {
     height: 180px;
-    background: #000;
+    background: #000; /* 视频背景保持黑色 */
     position: relative;
     overflow: hidden;
     display: flex;
@@ -148,32 +59,32 @@
     opacity: 0;
 }
 
-/* ... (Grid 和 Card 样式保持不变) ... */
-.video-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 2.5rem;
-}
-
-/* ... (Card, Thumbnail, Hover 样式保持不变) ... */
-.video-card {
-    background: white;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: 1px solid #f1f5f9;
-    box-shadow: var(--shadow-sm);
+.video-card .info {
+    padding: 1.8rem;
+    flex: 1;
     display: flex;
     flex-direction: column;
 }
-/* ... */
+
+.video-card h4 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+    color: var(--text-main); /* 适配深色 */
+}
+
+.video-card p {
+    font-size: 0.95rem;
+    color: var(--text-secondary); /* 适配深色 */
+    line-height: 1.6;
+}
 
 /* --- 沉浸式视频播放器 (Immersive Modal) --- */
+/* 这部分已经是深色设计，在深色模式下依然适用，无需大改 */
 #video-modal {
-    background-color: rgba(0, 0, 0, 0.95); /* 深黑背景 */
+    background-color: rgba(0, 0, 0, 0.95);
     backdrop-filter: blur(20px);
-    z-index: 9999; /* 最高层级 */
+    z-index: 9999;
 }
 
 #video-modal .modal-content {
@@ -188,7 +99,7 @@
     justify-content: center;
     border: none;
     padding: 0;
-    overflow: visible; /* 允许关闭按钮溢出 */
+    overflow: visible;
 }
 
 /* 视频容器 */
@@ -216,7 +127,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem 0;
-    color: white;
+    color: white; /* 始终保持白色，因为背景是深黑遮罩 */
 }
 
 .video-info h3 {

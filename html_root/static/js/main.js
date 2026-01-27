@@ -9,6 +9,7 @@ import * as Tutorial from './tutorial.js';
 import * as Formulas from './formulas.js';
 import * as Examples from './examples.js';
 import * as Docs from './docs.js';
+import * as Theme from './theme.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     Canvas.setupCanvas();
@@ -18,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Detect.initDetectListeners();
     Tutorial.checkAutoPlay();
     Examples.loadExamples(); // 加载案例
+    Theme.initTheme();
 
     // 全局快捷键
     document.addEventListener('keydown', (e) => {
@@ -124,3 +126,6 @@ window.closeDocsModal = Docs.closeDocsModal;
 // 挂载移动端函数
 window.toggleMobileMenu = UI.toggleMobileMenu;
 window.mobileNavClick = UI.mobileNavClick;
+
+// 挂载切换函数给 HTML 按钮使用
+window.toggleTheme = Theme.toggleTheme;

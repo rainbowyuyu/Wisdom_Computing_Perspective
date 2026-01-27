@@ -8,8 +8,8 @@
 }
 
 .formula-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-surface); /* 适配深色 */
+    border: 1px solid var(--border-color); /* 适配深色 */
     border-radius: 12px;
     padding: 1.5rem;
     display: flex;
@@ -21,7 +21,7 @@
 
 .formula-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
     border-color: var(--primary-color);
 }
 
@@ -33,9 +33,9 @@
     overflow-x: auto;
     overflow-y: hidden;
     padding: 1rem;
-    background: #f8fafc; /* 浅灰底色突出公式 */
+    background: var(--bg-input); /* 适配深色 */
     border-radius: 8px;
-    border: 1px dashed #cbd5e1;
+    border: 1px dashed var(--border-color);
     min-height: 80px;
     display: flex;
     align-items: center;
@@ -48,7 +48,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--border-color);
     padding-top: 1rem;
 }
 
@@ -95,13 +95,22 @@
 }
 
 .btn-icon:hover {
-    background: #eff6ff;
+    background: #eff6ff; /* 浅色模式悬停背景 */
     color: var(--primary-color);
 }
 
+/* 深色模式下的按钮悬停适配 */
+[data-theme="dark"] .btn-icon:hover {
+    background: rgba(59, 130, 246, 0.2); /* 深色模式悬停背景 */
+}
+
 .btn-icon.delete:hover {
-    background: #fee2e2;
+    background: #fee2e2; /* 浅色模式删除背景 */
     color: #ef4444;
+}
+
+[data-theme="dark"] .btn-icon.delete:hover {
+    background: rgba(239, 68, 68, 0.2); /* 深色模式删除背景 */
 }
 
 /* 空状态 */
@@ -124,20 +133,9 @@
     margin-bottom: 1.5rem;
 }
 
-.btn-icon {
-    /* ... */
-}
-.btn-icon:hover {
-    background: #eff6ff;
-    color: var(--primary-color);
-}
-
-/* static/css/pages/formulas.css */
-
-/* ... */
-
+/* 新建算式卡片 */
 .add-new-card {
-    background-color: #f8fafc;
+    background-color: var(--bg-input); /* 适配深色 */
     transition: all 0.3s ease;
 }
 
@@ -145,6 +143,10 @@
     background-color: #eff6ff;
     border-color: var(--primary-color);
     transform: translateY(-5px);
+}
+
+[data-theme="dark"] .add-new-card:hover {
+    background-color: rgba(59, 130, 246, 0.1);
 }
 
 .add-new-card:hover i {

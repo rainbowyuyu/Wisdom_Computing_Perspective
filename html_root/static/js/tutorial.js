@@ -183,7 +183,7 @@ export function startTutorial() {
                 element: '.nav-links button:nth-child(4)', // 动态计算 tab
                 popover: {
                     title: '7. 动态计算',
-                    description: '这里是核心工作台。您可以组合多个公式，选择算法（如矩阵乘法）。',
+                    description: '这里是核心工作台。您可以选择不同的模式来侧重您想得到的动态可视化结果。',
                     side: "bottom"
                 },
                 onHighlightStarted: () => showSection('calculate')

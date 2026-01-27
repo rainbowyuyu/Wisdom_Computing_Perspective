@@ -27,8 +27,10 @@
     top: 0;
     z-index: 1000;
     transition: var(--transition);
-    flex-wrap: wrap; /* 允许换行 */
-    gap: 10px;
+}
+
+[data-theme="dark"] .navbar {
+    border-bottom: 1px solid rgba(255,255,255,0.05); /* 深色模式下的边框 */
 }
 
 .logo {
@@ -40,41 +42,93 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    z-index: 1001; /* 确保 Logo 在移动端也能看见 */
 }
 
-.nav-links {
+/* 桌面端显示 */
+.desktop-nav {
     display: flex;
-    gap: 8px;
-    background: rgba(0,0,0,0.03);
+    gap: 5px;
+    background: var(--bg-input); /* 适配深色背景 */
     padding: 5px;
     border-radius: 99px;
-    overflow-x: auto; /* 允许横向滚动 */
-    max-width: 100%;
-    -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
-    scrollbar-width: none; /* 隐藏滚动条 */
 }
 
-/* 移动端隐藏 Logo 文字，只留图标，节省空间 */
-@media (max-width: 600px) {
-    .logo { font-size: 0; }
-    .logo img { margin-right: 0; }
-
-    .navbar {
-        padding: 0.8rem 5%;
-    }
-
-    .nav-btn {
-        padding: 0.5rem 0.8rem;
-        font-size: 0.85rem;
-        white-space: nowrap; /* 防止文字换行 */
-    }
-
-    .auth-buttons .login-btn {
-        padding: 0.5rem 1rem;
-        font-size: 0.85rem;
-    }
+.desktop-auth {
+    display: flex;
+    align-items: center;
 }
 
+/* 移动端汉堡按钮 (默认隐藏) */
+.mobile-menu-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-main); /* 适配深色模式 */
+    cursor: pointer;
+    z-index: 1001;
+}
+
+/* 移动端菜单遮罩 (默认隐藏) */
+.mobile-menu-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100vh;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 1000;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* 深色模式下的遮罩 */
+[data-theme="dark"] .mobile-menu-overlay {
+    background: rgba(15, 23, 42, 0.95); /* 深蓝黑半透明 */
+}
+
+.mobile-menu-overlay.show {
+    opacity: 1;
+}
+
+.mobile-menu-content {
+    width: 80%;
+    text-align: center;
+}
+
+.close-mobile-menu {
+    position: absolute;
+    top: 20px; right: 30px;
+    font-size: 2.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.mobile-nav-links button {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.2rem;
+    background: transparent;
+    border: none;
+    color: var(--text-main); /* 适配深色模式 */
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.mobile-nav-links button:hover {
+    color: var(--primary-color);
+}
+
+.mobile-auth-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-color); /* 适配深色模式 */
+}
 
 /* --- Hero Section (首页) --- */
 .hero {
@@ -88,11 +142,15 @@
     position: absolute;
     width: 600px;
     height: 600px;
-    background: radial-gradient(circle, rgba(37,99,235,0.1) 0%, rgba(255,255,255,0) 70%);
+    /* 使用变量，并将结束色改为 transparent 以适配黑/白背景 */
+    background: radial-gradient(circle at center, var(--primary-color) 0%, transparent 70%);
+    opacity: 0.15; /* 通过 opacity 控制透明度 */
     top: -20%;
     left: 50%;
     transform: translateX(-50%);
     z-index: -1;
+    filter: blur(60px);
+    pointer-events: none;
 }
 
 .animate-text {
@@ -124,13 +182,15 @@
 
 /* --- Footer (浅色渐变风格) --- */
 footer {
-    /* 核心修改：渐变背景 */
-    background: linear-gradient(to bottom, var(--bg-body) 0%, #f1f5f9 100%);
+    /* 核心修改：渐变背景 - 适配深色模式 */
+    /* 浅色模式：浅灰渐变到略深灰 */
+    /* 深色模式：深黑渐变到略浅黑 (通过变量实现) */
+    background: linear-gradient(to bottom, var(--bg-body) 0%, var(--bg-input) 100%);
     color: var(--text-secondary);
     padding: 3rem 5% 2rem;
     margin-top: auto;
     font-size: 0.9rem;
-    border-top: 1px solid rgba(0,0,0,0.05); /* 极淡的边框 */
+    border-top: 1px solid var(--border-color); /* 适配深色模式 */
 }
 
 .footer-content {
@@ -140,7 +200,7 @@ footer {
     max-width: 1200px;
     margin: 0 auto;
     padding-bottom: 2rem;
-    border-bottom: 1px solid rgba(0,0,0,0.05); /* 极淡的分割线 */
+    border-bottom: 1px solid var(--border-color); /* 适配深色模式 */
 }
 
 /* 品牌区 */
@@ -151,13 +211,6 @@ footer {
     display: flex;
     align-items: center;
     gap: 10px;
-}
-
-/* 适配 Logo 在浅色背景下的显示 (如果你的 logo 本身是白色的需要反转) */
-/* 假设你的 logo 是彩色的或者深色的，这里不需要 filter */
-/* 如果之前为了深色背景加了 filter: brightness(100)，现在可能需要调整 */
-.footer-brand h3 img {
-    /* filter: none; 视情况而定 */
 }
 
 .footer-brand p {
@@ -180,7 +233,7 @@ footer {
     width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
     border-radius: 50%;
-    background: white; /* 小圆底 */
+    background: var(--bg-surface); /* 小圆底适配深色 */
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
@@ -227,7 +280,7 @@ footer {
     justify-content: space-between;
     align-items: center;
     font-size: 0.85rem;
-    color: #94a3b8; /* 更淡一点的灰色 */
+    color: var(--text-secondary); /* 更淡一点的灰色 */
 }
 
 .footer-bottom a {
@@ -238,7 +291,25 @@ footer {
 
 .footer-bottom a:hover { color: var(--primary-color); }
 
-/* 响应式 */
+/* --- 响应式断点 (关键) --- */
+@media (max-width: 900px) {
+    /* 隐藏桌面端导航和 Auth */
+    .desktop-nav, .desktop-auth {
+        display: none;
+    }
+
+    /* 显示汉堡按钮 */
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    /* Navbar 布局调整 */
+    .navbar {
+        padding: 0.8rem 5%;
+    }
+}
+
+/* 响应式 (Footer) */
 @media (max-width: 768px) {
     .navbar { padding: 1rem; }
     .nav-links { display: none; }
@@ -257,136 +328,5 @@ footer {
         flex-direction: column;
         gap: 0.5rem;
         margin-top: 1rem;
-    }
-}
-
-
-/* static/css/layout.css */
-
-/* ... (Container 等样式保持不变) ... */
-
-/* --- 导航栏 (Desktop) --- */
-.navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 5%;
-    background: var(--bg-glass);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(0,0,0,0.05);
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    transition: var(--transition);
-}
-
-.logo {
-    font-size: 1.5rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    -webkit-background-clip: text;
-    color: transparent;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    z-index: 1001; /* 确保 Logo 在移动端也能看见 */
-}
-
-/* 桌面端显示 */
-.desktop-nav {
-    display: flex;
-    gap: 5px;
-    background: rgba(0,0,0,0.03);
-    padding: 5px;
-    border-radius: 99px;
-}
-
-.desktop-auth {
-    display: flex;
-    align-items: center;
-}
-
-/* 移动端汉堡按钮 (默认隐藏) */
-.mobile-menu-btn {
-    display: none;
-    background: transparent;
-    border: none;
-    font-size: 1.5rem;
-    color: var(--text-main);
-    cursor: pointer;
-    z-index: 1001;
-}
-
-/* 移动端菜单遮罩 (默认隐藏) */
-.mobile-menu-overlay {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100vh;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    z-index: 1000;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.mobile-menu-overlay.show {
-    opacity: 1;
-}
-
-.mobile-menu-content {
-    width: 80%;
-    text-align: center;
-}
-
-.close-mobile-menu {
-    position: absolute;
-    top: 20px; right: 30px;
-    font-size: 2.5rem;
-    cursor: pointer;
-    color: var(--text-secondary);
-}
-
-.mobile-nav-links button {
-    display: block;
-    width: 100%;
-    padding: 1rem;
-    font-size: 1.2rem;
-    background: transparent;
-    border: none;
-    color: var(--text-main);
-    font-weight: 600;
-    cursor: pointer;
-    transition: color 0.2s;
-}
-
-.mobile-nav-links button:hover {
-    color: var(--primary-color);
-}
-
-.mobile-auth-section {
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid #eee;
-}
-
-/* --- 响应式断点 (关键) --- */
-@media (max-width: 900px) {
-    /* 隐藏桌面端导航和 Auth */
-    .desktop-nav, .desktop-auth {
-        display: none;
-    }
-
-    /* 显示汉堡按钮 */
-    .mobile-menu-btn {
-        display: block;
-    }
-
-    /* Navbar 布局调整 */
-    .navbar {
-        padding: 0.8rem 5%;
     }
 }

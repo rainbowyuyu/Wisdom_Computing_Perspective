@@ -27,9 +27,9 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: #0f172a; /* 深色背景统一 */
+    background: #0f172a; /* 深色背景统一，即使在浅色模式下也是深色显示屏 */
     border-radius: 12px;
-    border: 1px solid #1e293b;
+    border: 1px solid var(--border-color); /* 适配边框 */
 }
 
 /* --- 移动端响应式适配 --- */
@@ -67,16 +67,16 @@
 /* 分组容器 (旧样式保留兼容) */
 .matrix-input-group {
     margin-bottom: 1.5rem;
-    background: #f8fafc;
+    background: var(--bg-input); /* 适配深色 */
     padding: 1rem;
     border-radius: 12px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border-color);
 }
 
 /* 核心：单一大公式输入区 */
 .formula-input-wrapper {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-surface); /* 适配深色 */
+    border: 1px solid var(--border-color);
     border-radius: 16px;
     padding: 1.2rem;
     box-shadow: 0 4px 6px -2px rgba(0, 0, 0, 0.02);
@@ -118,21 +118,22 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: #f1f5f9;
+    background: var(--bg-input); /* 适配深色 */
     color: var(--text-secondary);
     transition: all 0.2s;
 }
 
 .btn-import:hover {
-    background: #e2e8f0;
-    color: var(--text-main);
+    background: var(--bg-surface);
+    color: var(--primary-color);
+    border-color: var(--primary-color);
 }
 
 /* MathLive 主输入框 */
 .math-field-container.main-input {
     flex: 1; /* 占据剩余垂直空间 */
-    background: #f8fafc;
-    border: 1px solid #cbd5e1;
+    background: var(--bg-input); /* 适配深色 */
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 1rem;
     display: flex;
@@ -142,7 +143,7 @@
 }
 
 .math-field-container.main-input:focus-within {
-    background: #ffffff;
+    background: var(--bg-surface);
     border-color: var(--primary-color);
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
@@ -156,6 +157,10 @@ math-field {
     outline: none;
     font-size: 1.6rem; /* 加大字体 */
     padding: 0;
+    /* MathLive 的颜色变量，确保深色模式下文字可见 */
+    color: var(--text-main);
+    --keyboard-background: var(--bg-surface);
+    --keyboard-toolbar-text-active: var(--primary-color);
 }
 math-field::part(container) {
     border: none !important;
@@ -165,7 +170,7 @@ math-field::part(container) {
 /* 代码折叠区 */
 .code-details {
     margin-top: 1rem;
-    border-top: 1px dashed #e2e8f0;
+    border-top: 1px dashed var(--border-color);
     padding-top: 0.5rem;
 }
 
@@ -189,10 +194,11 @@ math-field::part(container) {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.85rem;
     padding: 10px;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     resize: none;
+    color: var(--text-main);
 }
 
 /* 隐藏的 Textarea (作为数据中转) */
@@ -211,6 +217,7 @@ textarea[style*="display:none"] {
     color: #94a3b8;
     flex-direction: column;
     position: relative;
+    /* 背景保持深色，不跟随主题，因为是显示屏 */
 }
 
 /* 待机状态背景纹理 */
@@ -257,7 +264,7 @@ textarea[style*="display:none"] {
     overflow-x: auto; /* 允许横向滚动 */
     padding: 1rem;
     color: #abb2bf;
-    background: #282c34;
+    background: #282c34; /* 代码块保持深色背景，对比度最好 */
     border-radius: 8px;
     font-size: 0.85rem;
     line-height: 1.5;

@@ -1,19 +1,62 @@
 /* static/css/markdown.css */
 
+/* --- 容器状态样式 --- */
+
+/* 加载中状态 */
+.docs-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: var(--text-secondary);
+}
+
+.docs-loading i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+}
+
+/* 错误状态 */
+.docs-error {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #ef4444; /* 错误红保持不变 */
+}
+
+.docs-error i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.8;
+}
+
+.docs-error p {
+    color: var(--text-secondary); /* 错误详情文字适配深色 */
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.docs-error .error-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #ef4444;
+}
+
+/* --- Markdown 内容样式 (适配深色模式) --- */
+
 .markdown-body {
     font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: 16px;
     line-height: 1.7;
-    color: var(--text-main); /* 使用全局深色文字 */
+    color: var(--text-main);
 }
 
 /* 标题 */
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
-.markdown-body h4,
-.markdown-body h5,
-.markdown-body h6 {
+.markdown-body h4 {
     margin-top: 24px;
     margin-bottom: 16px;
     font-weight: 700;
@@ -24,74 +67,32 @@
 .markdown-body h1 {
     font-size: 2em;
     padding-bottom: 0.3em;
-    border-bottom: 1px solid #e2e8f0; /* 柔和的分割线 */
+    border-bottom: 1px solid var(--border-color);
 }
 
 .markdown-body h2 {
     font-size: 1.5em;
     padding-bottom: 0.3em;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--border-color);
 }
 
-.markdown-body h3 {
-    font-size: 1.25em;
-}
-
-/* 段落与列表 */
+/* 文本 */
 .markdown-body p {
     margin-bottom: 16px;
-    color: var(--text-secondary); /* 次级文字颜色，增加层次感 */
+    color: var(--text-secondary);
 }
 
+.markdown-body strong {
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+/* 列表 */
 .markdown-body ul,
 .markdown-body ol {
     padding-left: 2em;
     margin-bottom: 16px;
     color: var(--text-secondary);
-}
-
-.markdown-body li {
-    margin-bottom: 0.25em;
-}
-
-/* 引用块 */
-.markdown-body blockquote {
-    padding: 0 1em;
-    color: var(--text-secondary);
-    border-left: 0.25em solid #cbd5e1; /* 浅灰边框 */
-    background-color: #f8fafc; /* 极淡背景 */
-    margin: 0 0 16px 0;
-}
-
-/* 行内代码 */
-.markdown-body code {
-    padding: 0.2em 0.4em;
-    margin: 0;
-    font-size: 85%;
-    background-color: #f1f5f9; /* 浅灰背景 */
-    border-radius: 6px;
-    font-family: 'JetBrains Mono', monospace;
-    color: #0f172a; /* 深色代码文字 */
-}
-
-/* 代码块 (Pre) */
-.markdown-body pre {
-    padding: 16px;
-    overflow: auto;
-    font-size: 85%;
-    line-height: 1.45;
-    background-color: #f8fafc; /* 统一浅色背景，避免突兀的深色 */
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    margin-bottom: 16px;
-}
-
-.markdown-body pre code {
-    background-color: transparent;
-    padding: 0;
-    color: inherit;
-    white-space: pre;
-    font-family: 'JetBrains Mono', monospace;
 }
 
 /* 链接 */
@@ -100,8 +101,51 @@
     text-decoration: none;
     font-weight: 500;
 }
+
 .markdown-body a:hover {
     text-decoration: underline;
+}
+
+/* 引用块 */
+.markdown-body blockquote {
+    padding: 0 1em;
+    color: var(--text-secondary);
+    border-left: 0.25em solid var(--border-color);
+    background-color: var(--bg-input);
+    margin: 0 0 16px 0;
+    border-radius: 0 4px 4px 0;
+}
+
+/* 行内代码 */
+.markdown-body code {
+    padding: 0.2em 0.4em;
+    margin: 0;
+    font-size: 85%;
+    background-color: var(--bg-input);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+}
+
+/* 代码块 */
+.markdown-body pre {
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.markdown-body pre code {
+    background-color: transparent;
+    padding: 0;
+    color: inherit;
+    border: none;
+    white-space: pre;
 }
 
 /* 表格 */
@@ -117,32 +161,99 @@
 .markdown-body table th,
 .markdown-body table td {
     padding: 8px 13px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border-color);
 }
 
 .markdown-body table th {
     font-weight: 600;
-    background-color: #f8fafc;
+    background-color: var(--bg-input);
+    color: var(--text-main);
 }
 
 .markdown-body table tr:nth-child(2n) {
-    background-color: #f8fafc;
+    background-color: var(--bg-input);
 }
 
 /* 图片 */
 .markdown-body img {
     max-width: 100%;
     box-sizing: content-box;
-    background-color: #fff;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    border: 1px solid #e2e8f0;
 }
 
 /* 分割线 */
 .markdown-body hr {
-    height: 0.25em;
+    height: 1px;
     padding: 0;
     margin: 24px 0;
-    background-color: #e2e8f0;
+    background-color: var(--border-color);
     border: 0;
+}
+
+/* --- 文档模态框布局样式 (Docs Modal Layout) --- */
+
+/* 模态框主体 */
+#docs-modal .modal-content {
+    width: 800px;
+    max-height: 85vh;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-surface); /* 适配深色背景 */
+    box-shadow: var(--shadow-lg);
+}
+
+/* 头部区域 */
+.docs-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-surface);
+    border-radius: 20px 20px 0 0; /* 顶部圆角 */
+}
+
+.docs-header h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+/* 覆盖默认关闭按钮的位置 */
+.docs-header .close-modal {
+    position: static;
+    transform: none;
+}
+
+/* 内容滚动区域 */
+#docs-content {
+    padding: 2rem;
+    overflow-y: auto; /* 内部滚动 */
+    flex: 1; /* 占据剩余空间 */
+    background: var(--bg-surface);
+}
+
+/* 加载中提示文字 */
+.docs-loading-placeholder {
+    text-align: center;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 200px;
+}
+
+/* 底部操作栏 */
+.docs-footer {
+    padding: 1rem 2rem;
+    border-top: 1px solid var(--border-color);
+    text-align: right;
+    background: var(--bg-input); /* 使用输入框背景色作为底部区分 */
+    border-radius: 0 0 20px 20px; /* 底部圆角 */
 }

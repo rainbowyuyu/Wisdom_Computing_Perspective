@@ -15,20 +15,20 @@
 
 .nav-btn:hover {
     color: var(--primary-color);
-    background: #fff;
+    background: var(--bg-surface);
     box-shadow: var(--shadow-sm);
 }
 
 .nav-btn.active {
     color: var(--primary-color);
-    background: #fff;
+    background: var(--bg-surface);
     font-weight: 600;
     box-shadow: var(--shadow-sm);
 }
 
 .login-btn {
     background: var(--text-main);
-    color: white;
+    color: var(--text-inverse); /* 适配深色模式下的反色 */
     border: none;
     padding: 0.6rem 1.5rem;
     border-radius: 99px;
@@ -41,6 +41,7 @@
     background: var(--primary-color);
     transform: translateY(-2px);
     box-shadow: var(--shadow-glow);
+    color: white; /* 悬停时始终为白字 */
 }
 
 .cta-btn {
@@ -68,20 +69,20 @@
 }
 
 .cta-btn.secondary {
-    background: white;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
     color: var(--text-main);
 }
 
 .cta-btn.secondary:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
+    background: var(--bg-input);
+    border-color: var(--text-secondary);
     transform: translateY(-2px);
 }
 
 .action-btn {
     background: var(--text-main);
-    color: white;
+    color: var(--text-inverse);
     border: none;
     padding: 0.8rem 1.5rem;
     border-radius: 8px;
@@ -94,6 +95,7 @@
     background: var(--primary-color);
     transform: translateY(-1px);
     box-shadow: var(--shadow-glow);
+    color: white;
 }
 
 .action-btn.full-width {
@@ -104,7 +106,7 @@
 /* --- 面板与卡片 --- */
 .glass-panel {
     background: var(--bg-surface);
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 1.5rem;
     box-shadow: var(--shadow-md);
@@ -136,8 +138,8 @@
 .tech-select, .tech-input {
     width: 100%;
     padding: 12px;
-    background: #fff;
-    border: 1px solid #cbd5e1;
+    background: var(--bg-input); /* 适配深色背景 */
+    border: 1px solid var(--border-color);
     color: var(--text-main);
     border-radius: 8px;
     margin-bottom: 1.2rem;
@@ -153,8 +155,8 @@
 textarea {
     width: 100%;
     height: 100px;
-    background: #fff;
-    border: 1px solid #cbd5e1;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
     color: var(--text-main);
     padding: 12px;
     border-radius: 8px;
@@ -191,17 +193,18 @@ textarea:focus {
 .modal.show { opacity: 1; }
 
 .modal-content {
-    background: white;
+    background: var(--bg-surface); /* 关键适配 */
     width: 450px;
     max-width: 92vw;
     border-radius: 20px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color); /* 在深色模式下增加边框 */
     position: relative;
     overflow: hidden;
     transform: scale(0.95) translateY(10px);
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    max-height: 90vh; /* 防止高度溢出 */
-    overflow-y: auto; /* 内部滚动 */
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .modal.show .modal-content {
@@ -211,16 +214,22 @@ textarea:focus {
 /* 针对文档 Modal 的特殊处理 */
 #docs-modal .modal-content {
     width: 800px;
-    height: 80vh; /* 固定高度 */
+    height: 80vh;
+}
+
+/* 设置 Modal 背景修复 */
+#settings-modal .modal-content {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
 }
 
 @media (max-width: 600px) {
     .modal-content {
         width: 100%;
-        border-radius: 20px 20px 0 0; /* 底部直角，类似 Sheet */
+        border-radius: 20px 20px 0 0;
         position: fixed;
         bottom: 0;
-        top: auto; /* 取消垂直居中 */
+        top: auto;
         transform: translateY(100%);
     }
 
@@ -228,7 +237,6 @@ textarea:focus {
         transform: translateY(0);
     }
 
-    /* 验证码行在手机上垂直排列 */
     .captcha-row {
         flex-direction: column;
         align-items: flex-start;
@@ -258,13 +266,13 @@ textarea:focus {
 
 .close-modal:hover {
     color: var(--text-main);
-    background: #f1f5f9;
+    background: var(--bg-input);
 }
 
 .auth-tabs {
     display: flex;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
+    background: var(--bg-input); /* 浅灰/深灰 */
+    border-bottom: 1px solid var(--border-color);
     padding: 0 1rem;
 }
 
@@ -308,7 +316,7 @@ textarea:focus {
     height: 48px;
     border-radius: 8px;
     cursor: pointer;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border-color);
     transition: var(--transition);
 }
 
@@ -318,26 +326,25 @@ textarea:focus {
 }
 
 .modal-content input.tech-input {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
     padding: 14px;
     font-size: 0.95rem;
     margin-bottom: 1.2rem;
+    color: var(--text-main);
 }
 
 .modal-content input.tech-input:focus {
-    background: white;
+    background: var(--bg-surface); /* 聚焦稍微亮一点 */
     border-color: var(--primary-color);
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
-
-/* 在 components.css 末尾添加 */
-
+/* 录制按钮动画 */
 .action-btn.recording {
-    background: #f59e0b; /* 橙色表示录制中 */
-    color: white;
-    border-color: #f59e0b;
+    background: #f59e0b !important;
+    color: white !important;
+    border-color: #f59e0b !important;
     animation: pulse 1.5s infinite;
 }
 
@@ -347,18 +354,14 @@ textarea:focus {
     100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
 }
 
-/* static/css/components.css 末尾添加 */
-
 /* --- Driver.js 引导样式定制 --- */
 .driver-popover.driverjs-theme {
-    background-color: white;
+    background-color: var(--bg-surface); /* 适配深色 */
     color: var(--text-main);
     border-radius: 16px;
     padding: 1.5rem;
-    box-shadow:
-        0 20px 25px -5px rgba(0, 0, 0, 0.1),
-        0 8px 10px -6px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e2e8f0;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
     font-family: 'Plus Jakarta Sans', sans-serif;
     max-width: 320px;
 }
@@ -377,10 +380,7 @@ textarea:focus {
     margin-bottom: 1.2rem;
 }
 
-/* 按钮组 */
-.driver-popover-footer {
-    margin-top: 0;
-}
+.driver-popover-footer { margin-top: 0; }
 
 .driver-popover-btn {
     border-radius: 8px;
@@ -395,11 +395,12 @@ textarea:focus {
 /* 下一步按钮 */
 .driver-popover-next-btn {
     background-color: var(--text-main) !important;
-    color: white !important;
+    color: var(--text-inverse) !important; /* 文字反色 */
     text-shadow: none !important;
 }
 .driver-popover-next-btn:hover {
     background-color: var(--primary-color) !important;
+    color: white !important;
     transform: translateY(-1px);
 }
 
@@ -407,14 +408,14 @@ textarea:focus {
 .driver-popover-prev-btn, .driver-popover-close-btn {
     background-color: transparent !important;
     color: var(--text-secondary) !important;
-    border: 1px solid #e2e8f0 !important;
+    border: 1px solid var(--border-color) !important;
 }
 .driver-popover-prev-btn:hover {
-    background-color: #f8fafc !important;
+    background-color: var(--bg-input) !important;
     color: var(--text-main) !important;
 }
 
 /* 高亮遮罩颜色 */
 .driver-overlay path {
-    fill: rgba(15, 23, 42, 0.6) !important; /* 深蓝灰色遮罩 */
+    fill: rgba(15, 23, 42, 0.75) !important; /* 深蓝灰色遮罩 */
 }

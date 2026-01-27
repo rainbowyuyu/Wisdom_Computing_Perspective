@@ -555,7 +555,15 @@
                             rainbow_yu
                         </span>
                     </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-main); font-size: 0.95rem; margin-top: 10px;">
+                        <span>深色模式</span>
+                        <button class="nav-btn" onclick="toggleTheme()" title="切换模式">
+                            <i id="theme-toggle-icon" class="fa-solid fa-moon"></i>
+                        </button>
+                    </div>
                 </div>
+
 
                 <div style="margin-bottom: 2rem;">
                     <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">快捷键设置（画板）</h4>
@@ -639,24 +647,27 @@
         </div>
     </div>
 
+    <!-- 通用文档模态框 -->
     <div id="docs-modal" class="modal">
-        <div class="modal-content glass-panel" style="width: 800px; max-height: 85vh; padding: 0; display: flex; flex-direction: column;">
+        <!-- 移除内联样式，使用 CSS 控制 -->
+        <div class="modal-content glass-panel">
 
-            <!-- 头部：标题与关闭 -->
-            <div style="padding: 1.5rem 2rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: white; border-radius: 20px 20px 0 0;">
-                <h3 id="docs-title" style="margin: 0; font-size: 1.4rem; color: var(--text-main);">文档标题</h3>
-                <span class="close-modal" onclick="closeDocsModal()" style="position: static;">&times;</span>
+            <!-- 头部 -->
+            <div class="docs-header">
+                <h3 id="docs-title">文档标题</h3>
+                <span class="close-modal" onclick="closeDocsModal()">&times;</span>
             </div>
 
-            <!-- 内容区域：可滚动 -->
-            <div id="docs-content" class="markdown-body" style="padding: 2rem; overflow-y: auto; flex: 1; background: #fff;">
-                <div style="text-align: center; color: var(--text-secondary);">
-                    <i class="fa-solid fa-spinner fa-spin"></i> 加载中...
+            <!-- 内容区域 -->
+            <div id="docs-content" class="markdown-body">
+                <div class="docs-loading-placeholder">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <span>加载中...</span>
                 </div>
             </div>
 
-            <!-- 底部：操作栏 -->
-            <div style="padding: 1rem 2rem; border-top: 1px solid #e2e8f0; text-align: right; background: #f8fafc; border-radius: 0 0 20px 20px;">
+            <!-- 底部 -->
+            <div class="docs-footer">
                 <button class="action-btn" onclick="closeDocsModal()">关闭</button>
             </div>
         </div>
@@ -696,9 +707,9 @@
                 </h3>
                 <p>基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台。致力于降低数学学习门槛，让抽象公式触手可及。</p>
                 <div class="social-links">
-                    <a href="https://github.com/rainbowyuyu/animate_cal" target="_blank" class="social-link" title="GitHub"><i class="fa-brands fa-github"></i></a>
+                    <a href="https://github.com/rainbowyuyu/Wisdom_Computing_Perspective" target="_blank" class="social-link" title="GitHub"><i class="fa-brands fa-github"></i></a>
                     <a href="https://www.bilibili.com/video/BV1n3dGYJEEJ/" target="_blank" class="social-link" title="Bilibili"><i class="fa-brands fa-bilibili"></i></a>
-                    <a href="#" class="social-link" title="Email"><i class="fa-solid fa-envelope"></i></a>
+                    <a href="mailto:rainbowyu619@gmail.com" class="social-link" title="Email"><i class="fa-solid fa-envelope"></i></a>
                 </div>
             </div>
 
@@ -728,9 +739,9 @@
             <div class="footer-column">
                 <h4>关于我们</h4>
                 <ul>
-                    <li><a href="https://github.com/rainbowyuyu/animate_cal" target="_blank">项目背景</a></li>
-                    <li><a href="https://github.com/rainbowyuyu/animate_cal" target="_blank">加入我们</a></li>
-                    <li><a href="https://github.com/rainbowyuyu/animate_cal" target="_blank">联系合作</a></li>
+                    <li><a href="https://github.com/rainbowyuyu/Wisdom_Computing_Perspective" target="_blank">项目背景</a></li>
+                    <li><a href="https://github.com/rainbowyuyu/Wisdom_Computing_Perspective" target="_blank">加入我们</a></li>
+                    <li><a href="https://github.com/rainbowyuyu/Wisdom_Computing_Perspective" target="_blank">联系合作</a></li>
                     <li><a href="javascript:void(0)" onclick="openDoc('privacy.md', '隐私政策')">隐私政策</a></li>
                 </ul>
             </div>

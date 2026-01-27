@@ -1,26 +1,26 @@
 /* static/css/base.css */
 
 :root {
-    /* 核心色板 - 清新学术风 */
-    --primary-color: #2563eb;       /* 皇家学术蓝 */
+    /* --- 浅色模式 (默认) --- */
+    --primary-color: #2563eb;
     --primary-hover: #1d4ed8;
-    --secondary-color: #7c3aed;     /* 智慧紫 */
-    --accent-color: #06b6d4;        /* 清新青 */
+    --secondary-color: #7c3aed;
+    --accent-color: #06b6d4;
 
-    /* 背景色体系 */
-    --bg-body: #f8fafc;             /* 极淡的灰蓝背景 */
-    --bg-surface: #ffffff;          /* 卡片纯白背景 */
-    --bg-glass: rgba(255, 255, 255, 0.85); /* 磨砂玻璃，稍微不透明一点以增加质感 */
+    --bg-body: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-glass: rgba(255, 255, 255, 0.85);
 
-    /* 文字颜色 */
-    --text-main: #0f172a;           /* 深邃蓝黑 */
-    --text-secondary: #64748b;      /* 次级灰蓝 */
+    --bg-input: #f8fafc;      /* 输入框背景 */
+    --border-color: #e2e8f0;  /* 边框颜色 */
+
+    --text-main: #0f172a;
+    --text-secondary: #64748b;
     --text-inverse: #ffffff;
 
-    /* 装饰性效果 */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     --shadow-glow: 0 0 20px rgba(37, 99, 235, 0.15);
 
     --radius-sm: 8px;
@@ -30,6 +30,35 @@
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* --- 深色模式 (Dark Mode) --- */
+[data-theme="dark"] {
+    /* 核心色板 (保持品牌色，或者稍微提亮一点以增加对比度) */
+    --primary-color: #3b82f6;
+    --primary-hover: #60a5fa;
+    --secondary-color: #8b5cf6;
+    --accent-color: #22d3ee;
+
+    /* 背景色体系 */
+    --bg-body: #0f172a;       /* 深蓝黑背景 */
+    --bg-surface: #1e293b;    /* 卡片背景 (稍微亮一点的深色) */
+    --bg-glass: rgba(30, 41, 59, 0.85);
+
+    --bg-input: #0f172a;      /* 输入框深色背景 */
+    --border-color: #334155;  /* 深色边框 */
+
+    /* 文字颜色 */
+    --text-main: #f1f5f9;     /* 亮白 */
+    --text-secondary: #94a3b8;/* 灰蓝 */
+    --text-inverse: #0f172a;
+
+    /* 装饰性效果 */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+/* ... (后续重置样式保持不变) ... */
 * {
     margin: 0;
     padding: 0;
@@ -39,7 +68,7 @@
 
 body {
     background-color: var(--bg-body);
-    /* 背景网格纹理 */
+    /* 适配深色模式的网格背景 */
     background-image:
         radial-gradient(var(--text-secondary) 1px, transparent 1px),
         radial-gradient(var(--text-secondary) 1px, transparent 1px);
@@ -52,10 +81,11 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    transition: background-color 0.3s, color 0.3s; /* 增加平滑过渡 */
 }
 
-/* 页面切换动画 */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(15px); }
-    to { opacity: 1; transform: translateY(0); }
+/* 降低深色模式下背景网格的透明度 */
+[data-theme="dark"] body {
+    background-blend-mode: soft-light;
+    opacity: 0.9;
 }

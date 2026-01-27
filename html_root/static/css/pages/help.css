@@ -6,18 +6,23 @@
 }
 
 details {
-    background: white;
+    background: var(--bg-surface); /* 适配深色 */
     margin-bottom: 1rem;
     border-radius: 12px;
     padding: 1.2rem 1.5rem;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border-color); /* 适配深色 */
     transition: all 0.3s ease;
 }
 
 details[open] {
     border-color: var(--primary-color);
-    background: #eff6ff;
+    background: #eff6ff; /* 浅色模式保持原样 */
     box-shadow: var(--shadow-md);
+}
+
+/* 深色模式下展开状态背景调整 */
+[data-theme="dark"] details[open] {
+    background: rgba(37, 99, 235, 0.1); /* 深色下的微蓝背景 */
 }
 
 summary {
@@ -47,18 +52,10 @@ details[open] summary::after {
 details p {
     margin-top: 1.2rem;
     color: var(--text-secondary);
-    line-height: 1.7;
+    line-height: 1.8;
     padding-top: 1rem;
-    border-top: 1px solid rgba(0,0,0,0.05); /* 分割线 */
-}
-
-details p {
-    margin-top: 1.2rem;
-    color: var(--text-secondary);
-    line-height: 1.8; /* 增加行高，阅读更舒适 */
-    padding-top: 1rem;
-    border-top: 1px solid rgba(0,0,0,0.05);
-    font-size: 0.95rem; /*稍微调小字号，显得精致 */
+    border-top: 1px solid var(--border-color); /* 适配深色 */
+    font-size: 0.95rem;
 }
 
 /* 强调文字样式 */
@@ -67,13 +64,10 @@ details p b {
     font-weight: 600;
 }
 
-/* static/css/pages/help.css */
-
-/* ... 原有样式 ... */
-
-/* 新增 Banner 样式 */
+/* --- 新增 Banner 样式 --- */
 .tutorial-banner {
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); /* 浅蓝色渐变 */
+    /* 浅色模式渐变 */
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
     border: 1px solid #bfdbfe;
     border-radius: 16px;
     padding: 1.5rem;
@@ -86,6 +80,13 @@ details p b {
     box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);
 }
 
+/* 深色模式下的 Banner 覆盖 */
+[data-theme="dark"] .tutorial-banner {
+    background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(30, 41, 59, 0.4) 100%);
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
 .tutorial-banner:hover {
     transform: translateY(-4px);
     box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2);
@@ -95,7 +96,7 @@ details p b {
 .banner-icon {
     width: 56px;
     height: 56px;
-    background: white;
+    background: white; /* 浅色模式背景 */
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -103,6 +104,10 @@ details p b {
     color: var(--primary-color);
     font-size: 1.8rem;
     flex-shrink: 0;
+}
+
+[data-theme="dark"] .banner-icon {
+    background: var(--bg-surface); /* 深色模式背景 */
 }
 
 .banner-content {
@@ -121,7 +126,7 @@ details p b {
     font-size: 0.9rem;
     color: var(--text-secondary);
     line-height: 1.5;
-    border: none; /* 覆盖 details p 的样式 */
+    border: none;
     padding: 0;
 }
 
@@ -144,7 +149,7 @@ details p b {
     .banner-action {
         width: 100%;
         justify-content: center;
-        background: white;
+        background: var(--bg-surface); /* 适配深色 */
         padding: 0.8rem;
         border-radius: 8px;
     }

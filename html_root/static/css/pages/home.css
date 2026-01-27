@@ -1,15 +1,17 @@
 /* static/css/pages/home.css */
 
 /* --- Hero Section --- */
-/* (Hero 基础布局已在 layout.css 中定义，这里补充细节) */
 
 /* 增强 Hero 背景光晕 */
 .hero::before {
-    background: radial-gradient(circle at center, rgba(37, 99, 235, 0.15) 0%, rgba(255, 255, 255, 0) 60%);
-    width: 800px; /* 加大光晕 */
+    /* 使用变量，并将结束色改为 transparent 以适配黑/白背景 */
+    background: radial-gradient(circle at center, var(--primary-color) 0%, transparent 60%);
+    opacity: 0.15; /* 通过 opacity 控制透明度，而不是在颜色里硬编码 rgba */
+    width: 800px;
     height: 800px;
     top: -30%;
-    filter: blur(60px); /* 增加模糊让光晕更柔和 */
+    filter: blur(60px);
+    pointer-events: none; /* 防止遮挡点击 */
 }
 
 /* --- Features Grid --- */
@@ -43,11 +45,11 @@
 
 .feature-card {
     background: var(--bg-surface);
-    border: 1px solid #f1f5f9;
+    border: 1px solid var(--border-color); /* 替换硬编码颜色 */
     padding: 2.5rem;
     border-radius: var(--radius-md);
     text-align: left;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* 更弹性的动画 */
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     box-shadow: var(--shadow-sm);
     position: relative;
     overflow: hidden;
@@ -63,7 +65,7 @@
 .feature-icon-box {
     width: 64px;
     height: 64px;
-    background: #eff6ff;
+    background: var(--bg-input); /* 替换 #eff6ff，使用输入框背景色变量 */
     border-radius: 16px;
     display: flex;
     align-items: center;
@@ -73,12 +75,12 @@
 }
 
 .feature-card:hover .feature-icon-box {
-    transform: scale(1.1) rotate(5deg); /* 图标微动 */
+    transform: scale(1.1) rotate(5deg);
     background: var(--primary-color);
 }
 
 .feature-card:hover .feature-icon-box i {
-    color: white; /* 悬停时图标变白 */
+    color: var(--text-inverse); /* 替换 white，使用反色变量 */
 }
 
 .feature-icon-box i {
@@ -99,9 +101,7 @@
     line-height: 1.7;
 }
 
-/* ... 前面的样式保持不变 ... */
-
-/* --- 新手引导入口按钮优化 --- */
+/* --- 新手引导入口按钮 (玻璃拟态) --- */
 .tutorial-link {
     /* 布局 */
     margin-top: 2.5rem;
@@ -111,9 +111,9 @@
 
     /* 形状与尺寸 */
     padding: 10px 24px;
-    border-radius: 99px; /* 胶囊形状 */
+    border-radius: 99px;
 
-    /* 玻璃拟态风格 (与卡片呼应，但更轻薄) */
+    /* 默认浅色模式下的玻璃效果 */
     background: rgba(255, 255, 255, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(8px);
@@ -132,15 +132,31 @@
     animation: fadeInUp 0.8s ease-out 0.8s backwards;
 }
 
+/* 深色模式下的玻璃效果覆盖 */
+[data-theme="dark"] .tutorial-link {
+    background: rgba(30, 41, 59, 0.4); /* 深色半透明 */
+    border: 1px solid rgba(255, 255, 255, 0.1); /* 微弱的白边 */
+    color: var(--text-main);
+}
+
 /* 悬停效果 */
 .tutorial-link:hover {
-    background: rgba(255, 255, 255, 0.9); /* 变实 */
-    color: var(--primary-color); /* 文字变蓝 */
+    transform: translateY(-3px);
+    /* 浅色模式悬停 */
+    background: rgba(255, 255, 255, 0.9);
     border-color: rgba(37, 99, 235, 0.2);
-    transform: translateY(-3px); /* 微微上浮 */
+    color: var(--primary-color);
     box-shadow:
-        0 10px 20px -5px rgba(37, 99, 235, 0.15), /* 柔和阴影 */
-        0 0 0 4px rgba(37, 99, 235, 0.05); /* 外发光环 */
+        0 10px 20px -5px rgba(37, 99, 235, 0.15),
+        0 0 0 4px rgba(37, 99, 235, 0.05);
+}
+
+/* 深色模式悬停覆盖 */
+[data-theme="dark"] .tutorial-link:hover {
+    background: rgba(30, 41, 59, 0.9); /* 变实 */
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.5); /* 深色阴影 */
 }
 
 /* 图标微交互 */
@@ -150,7 +166,7 @@
     color: var(--primary-color);
 }
 
-/* 悬停时图标晃动，增加趣味性 */
+/* 悬停时图标晃动 */
 .tutorial-link:hover i {
     transform: rotate(15deg) scale(1.1);
 }
