@@ -96,8 +96,8 @@ export function copyToCalc() {
 
         // 延时一点点以确保 DOM 可见，然后填充
         setTimeout(() => {
-            // 填充到计算页面的矩阵 A (MathLive 组件)
-            const targetField = document.getElementById('math-field-a');
+            // 填充到计算页面的矩阵(MathLive 组件)
+            const targetField = document.getElementById('math-field-main');
             if (targetField && targetField.setValue) {
                 targetField.setValue(detected);
             }

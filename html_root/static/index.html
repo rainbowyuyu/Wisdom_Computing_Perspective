@@ -298,21 +298,23 @@
         </section>
 
         <!-- 3. 动态计算 Section -->
+        <!-- 4. 动态计算 Section (核心重构：支持分屏与Tab切换) -->
         <section id="calculate" class="section">
             <h2 class="section-title">数学运算可视化</h2>
             <div class="calc-layout">
+                <!-- 左侧配置区 -->
                 <div class="calc-sidebar glass-panel">
-
-                    <!-- 顶部：运算模式选择 -->
                     <div style="margin-bottom: 1.5rem;">
                         <label style="font-weight:700; display:block; margin-bottom:0.8rem; color:var(--text-main); font-size:0.95rem;">
                             <i class="fa-solid fa-layer-group" style="color:var(--primary-color); margin-right:5px;"></i>
                             演示模式
                         </label>
                         <select id="calc-method" class="tech-select">
-                            <option value="other">通用公式推演 (推荐)</option>
-                            <option value="det">行列式计算 (Determinant)</option>
-                            <option value="solve">方程求解 (Solve)</option>
+                            <option value="normal">通用公式推演+可视化 (推荐)</option>
+                            <option value="formular">公式推演</option>
+                            <option value="visualization">可视化演示</option>
+                            <option value="det" disabled>矩阵专项</option>
+                            <option value="int" disabled>微积分专项</option>
                         </select>
                         <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:5px;">
                             * "通用模式"下，将自动分析您输入的算式并生成对应动画。
@@ -357,13 +359,45 @@
                     </div>
                 </div>
 
-                <!-- 右侧显示区 -->
-                <div class="calc-display glass-panel">
-                    <div class="video-placeholder" id="video-container">
-                        <div class="placeholder-content">
-                            <i class="fa-solid fa-cube" style="color: #475569; opacity: 0.5;"></i>
-                            <p style="font-weight: 500; color: #94a3b8;">等待指令...</p>
-                            <span style="font-size:0.85rem; opacity:0.6; color: #64748b;">输入公式后点击生成按钮</span>
+                <!-- 右侧显示区 (重构：分屏布局) -->
+                <div class="calc-display glass-panel" style="display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+
+                    <!-- 1. 顶部：视频切换选项卡 (JS动态控制显示) -->
+                    <div id="video-tabs" style="display: none; background: #0f172a; border-bottom: 1px solid #334155; padding: 0 10px;">
+                        <!-- JS 注入 -->
+                    </div>
+
+                    <!-- 2. 上半部分：视频播放区 -->
+                    <div id="calc-video-wrapper" style="flex: 3; background: #000; position: relative; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #334155; min-height: 300px;">
+                        <!-- 默认占位符 -->
+                        <div id="video-placeholder-content" style="text-align: center; color: #64748b;">
+                            <i class="fa-solid fa-cube" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                            <p style="font-weight: 500;">等待指令...</p>
+                            <span style="font-size:0.85rem; opacity:0.6;">配置左侧参数后点击生成</span>
+                        </div>
+                        <!-- 视频播放器 (初始隐藏) -->
+                        <video id="result-video-player" controls style="width: 100%; height: 100%; display: none; outline: none;">
+                            <source src="" type="video/mp4">
+                            您的浏览器不支持视频标签。
+                        </video>
+                    </div>
+
+                    <!-- 3. 下半部分：代码/日志控制台 -->
+                    <div id="calc-terminal-wrapper" style="flex: 2; background: #0f172a; display: flex; flex-direction: column; min-height: 200px;">
+                        <!-- 头部 -->
+                        <div style="padding: 8px 15px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: #94a3b8;">
+                                <i class="fa-solid fa-terminal"></i> <span id="console-title">系统日志</span>
+                            </span>
+                            <span id="gen-percent" style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: #34d399;">0%</span>
+                        </div>
+                        <!-- 进度条 -->
+                        <div style="height: 2px; background: #334155; width: 100%;">
+                            <div id="gen-progress" style="width: 0%; height: 100%; background: #3b82f6; transition: width 0.3s;"></div>
+                        </div>
+                        <!-- 日志内容 -->
+                        <div id="gen-log" style="flex: 1; overflow-y: auto; padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #cbd5e1;">
+                            <div class="log-entry" style="color: #64748b;">> 系统就绪，等待输入...</div>
                         </div>
                     </div>
                 </div>

@@ -385,7 +385,11 @@ async def generate_animation(data: CalcModel):
 from logic.prompt import return_prompt
 
 def generate_manim_prompt(latex_a, latex_b, operation):
-    op_desc = {"add": "矩阵加法", "mul": "矩阵乘法", "det": "行列式计算", "other": "公式展示"}.get(operation,"数学展示")
+    op_desc = {
+        "formular": "公式推演",
+        "visualization": "可视化演示",
+        "normal": "通用演示",
+    }.get(operation,"数学展示")
     return return_prompt(op_desc, latex_a, latex_b)
 
 
@@ -407,7 +411,7 @@ async def generate_animation_stream(data: CalcModel):
             yield f"data: {json.dumps({'step': 'code_generated', 'message': '代码生成完毕，准备渲染...', 'code': code, 'progress': 30})}\n\n"
         except Exception as e:
             logger.error(f"LLM Error: {e}")
-            yield f"data: {json.dumps({'step': 'error', 'message': f'AI 生成失败: {str(e)}'})}\n\n"
+            yield f"data: {json.dumps({'step': 'error', 'message': f'生成失败: {str(e)}'})}\n\n"
             return
 
         py_filename = f"gen_{task_id}.py"
