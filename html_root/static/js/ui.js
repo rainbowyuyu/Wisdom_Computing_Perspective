@@ -32,6 +32,11 @@ export function showSection(sectionId) {
             btn.classList.add('active');
         }
     });
+
+    // --- 新增：切换页面时强制关闭 MathLive 虚拟键盘 ---
+    if (window.mathVirtualKeyboard) {
+        window.mathVirtualKeyboard.hide();
+    }
 }
 
 // static/js/ui.js

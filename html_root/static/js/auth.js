@@ -5,13 +5,29 @@ import * as Formulas from "./formulas.js";
 
 let currentCaptchaId = '';
 
-// ... (initAuth, refreshCaptcha 保持不变) ...
-
-export function initAuth() {
+// --- 初始化：检查服务端 Session ---
+export async function initAuth() {
     refreshCaptcha('login');
     refreshCaptcha('register');
+
+    // 修改：不再读取 localStorage，而是向后端询问 Session 状态
+    try {
+        const res = await fetch('/api/user/me');
+        const data = await res.json();
+
+        if (data.status === 'success' && data.username) {
+            updateUserDisplay(data.username);
+            // 预加载用户公式
+            if (Formulas && Formulas.loadMyFormulas) {
+                Formulas.loadMyFormulas();
+            }
+        }
+    } catch (e) {
+        console.log("Not logged in or session expired");
+    }
 }
 
+// ... (refreshCaptcha 保持不变) ...
 export async function refreshCaptcha(type) {
     const imgId = type === 'login' ? 'captcha-img-login' : 'captcha-img-reg';
     const imgEl = document.getElementById(imgId);
@@ -31,14 +47,21 @@ export async function refreshCaptcha(type) {
     }
 }
 
-// 登录处理
+// --- 登录处理 ---
 export async function handleLogin() {
     const u = document.getElementById('login-user').value;
     const p = document.getElementById('login-pass').value;
     const c = document.getElementById('login-captcha').value;
+    const agree = document.getElementById('login-agree').checked; // 获取复选框状态
 
     if(!u || !p || !c) {
         alert("请填写完整信息");
+        return;
+    }
+
+    // 新增：隐私协议校验
+    if (!agree) {
+        alert("请阅读并同意服务协议与隐私政策");
         return;
     }
 
@@ -63,44 +86,15 @@ export async function handleLogin() {
 
         if(data.status === 'success') {
             toggleAuthModal(false);
+            updateUserDisplay(data.username);
 
-            // --- 核心修复 & 移动端适配 ---
-
-            // 1. 更新所有登录按钮（桌面+移动）为隐藏
-            document.querySelectorAll('.login-btn').forEach(b => b.style.display = 'none');
-
-            // 2. 更新桌面端显示
-            const userDisplay = document.getElementById('user-display');
-            const usernameSpan = document.getElementById('username-span');
-            if (userDisplay && usernameSpan) {
-                userDisplay.style.display = 'inline-block';
-                usernameSpan.innerText = data.username;
-            }
-
-            // 3. 更新移动端菜单显示 (如果存在)
-            const mobileAuthSection = document.querySelector('.mobile-auth-section');
-            if (mobileAuthSection) {
-                mobileAuthSection.innerHTML = `
-                    <div style="font-weight:bold; color:var(--primary-color); margin-bottom:10px; font-size:1.1rem;">
-                        <i class="fa-regular fa-user-circle"></i> ${data.username}
-                    </div>
-                    <button onclick="logout()" style="width:100%; padding:10px; background:white; border:1px solid #eee; border-radius:8px; color:#666;">
-                        <i class="fa-solid fa-arrow-right-from-bracket"></i> 退出登录
-                    </button>
-                `;
-            }
-
-            // 4. 加载用户数据
             if (Formulas && Formulas.loadMyFormulas) {
                 Formulas.loadMyFormulas();
             }
-
             alert("登录成功！");
         }  else {
             alert(data.message || "登录失败");
-            // 关键：失败后必须刷新验证码，因为后端可能已经销毁了旧的，或者为了安全需要更换
             refreshCaptcha('login');
-            // 清空输入框
             document.getElementById('login-captcha').value = '';
         }
     } catch(e) {
@@ -113,14 +107,28 @@ export async function handleLogin() {
     }
 }
 
-// 注册处理
+// --- 注册处理 ---
 export async function handleRegister() {
     const u = document.getElementById('reg-user').value;
     const p = document.getElementById('reg-pass').value;
+    const pConfirm = document.getElementById('reg-pass-confirm').value; // 获取确认密码
     const c = document.getElementById('reg-captcha').value;
+    const agree = document.getElementById('reg-agree').checked; // 获取复选框
 
-    if(!u || !p || !c) {
+    if(!u || !p || !pConfirm || !c) {
         alert("请填写完整信息");
+        return;
+    }
+
+    // 新增：密码一致性校验
+    if (p !== pConfirm) {
+        alert("两次输入的密码不一致，请重新输入");
+        return;
+    }
+
+    // 新增：隐私协议校验
+    if (!agree) {
+        alert("请阅读并同意服务协议与隐私政策");
         return;
     }
 
@@ -146,6 +154,7 @@ export async function handleRegister() {
         if(data.status === 'success') {
             alert("注册成功，请登录");
             if(window.switchAuthMode) window.switchAuthMode('login');
+            refreshCaptcha('login'); // 切换后刷新登录验证码
         } else {
             alert(data.message || "注册失败");
             refreshCaptcha('register');
@@ -158,5 +167,45 @@ export async function handleRegister() {
     } finally {
         btn.innerText = originalText;
         btn.disabled = false;
+    }
+}
+
+// --- 辅助：更新 UI 显示用户名 ---
+function updateUserDisplay(username) {
+    // 1. 隐藏导航栏登录按钮
+    document.querySelectorAll('.login-btn').forEach(b => b.style.display = 'none');
+
+    // 2. 显示桌面端用户信息
+    const userDisplay = document.getElementById('user-display');
+    const usernameSpan = document.getElementById('username-span');
+    if (userDisplay && usernameSpan) {
+        userDisplay.style.display = 'inline-block';
+        usernameSpan.innerText = username;
+    }
+
+    // 3. 更新移动端菜单
+    const mobileAuthSection = document.querySelector('.mobile-auth-section');
+    if (mobileAuthSection) {
+        mobileAuthSection.innerHTML = `
+            <div style="font-weight:bold; color:var(--text-inverse); margin-bottom:10px; font-size:1.1rem; text-align:center;">
+                <i class="fa-regular fa-user-circle"></i> ${username}
+            </div>
+            <button onclick="logout()" style="width:100%; padding:10px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:var(--text-inverse);">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> 退出登录
+            </button>
+        `;
+    }
+}
+
+// --- 登出 ---
+// 需要挂载到 window，因为 HTML 中 onclick="logout()" 直接调用
+window.logout = async function() {
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+        // 刷新页面以清除状态
+        location.reload();
+    } catch (e) {
+        console.error("Logout failed", e);
+        location.reload();
     }
 }

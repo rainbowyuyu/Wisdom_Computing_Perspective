@@ -1,19 +1,21 @@
 /* static/css/layout.css */
 
-/* --- 容器 --- */
+/* =========================================
+   1. 基础容器与布局
+   ========================================= */
 .container {
     flex: 1; /* 自动撑开高度 */
     padding: 0 5%;
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
-
-    /* 核心修改：增加底部间距 */
-    /* 无论内容多少，这都会在内容和页脚之间强制留出一段距离，避免拥挤 */
-    margin-bottom: 8rem;
+    /* 增加底部间距，防止内容贴底 */
+    margin-bottom: 4rem;
 }
 
-/* --- 导航栏 --- */
+/* =========================================
+   2. 导航栏 (Navbar)
+   ========================================= */
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -30,7 +32,7 @@
 }
 
 [data-theme="dark"] .navbar {
-    border-bottom: 1px solid rgba(255,255,255,0.05); /* 深色模式下的边框 */
+    border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
 .logo {
@@ -42,14 +44,14 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    z-index: 1001; /* 确保 Logo 在移动端也能看见 */
+    z-index: 1001;
 }
 
-/* 桌面端显示 */
+/* 桌面端导航 */
 .desktop-nav {
     display: flex;
     gap: 5px;
-    background: var(--bg-input); /* 适配深色背景 */
+    background: var(--bg-input);
     padding: 5px;
     border-radius: 99px;
 }
@@ -59,23 +61,23 @@
     align-items: center;
 }
 
-/* 移动端汉堡按钮 (默认隐藏) */
+/* 移动端菜单按钮 */
 .mobile-menu-btn {
     display: none;
     background: transparent;
     border: none;
     font-size: 1.5rem;
-    color: var(--text-main); /* 适配深色模式 */
+    color: var(--text-main);
     cursor: pointer;
     z-index: 1001;
 }
 
-/* 移动端菜单遮罩 (默认隐藏) */
+/* 移动端全屏菜单遮罩 */
 .mobile-menu-overlay {
     display: none;
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100vh;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(10px);
     z-index: 1000;
     flex-direction: column;
@@ -85,19 +87,13 @@
     transition: opacity 0.3s ease;
 }
 
-/* 深色模式下的遮罩 */
 [data-theme="dark"] .mobile-menu-overlay {
-    background: rgba(15, 23, 42, 0.95); /* 深蓝黑半透明 */
+    background: rgba(15, 23, 42, 0.98);
 }
 
-.mobile-menu-overlay.show {
-    opacity: 1;
-}
+.mobile-menu-overlay.show { opacity: 1; }
 
-.mobile-menu-content {
-    width: 80%;
-    text-align: center;
-}
+.mobile-menu-content { width: 80%; text-align: center; }
 
 .close-mobile-menu {
     position: absolute;
@@ -114,23 +110,23 @@
     font-size: 1.2rem;
     background: transparent;
     border: none;
-    color: var(--text-main); /* 适配深色模式 */
+    color: var(--text-main);
     font-weight: 600;
     cursor: pointer;
     transition: color 0.2s;
 }
 
-.mobile-nav-links button:hover {
-    color: var(--primary-color);
-}
+.mobile-nav-links button:hover { color: var(--primary-color); }
 
 .mobile-auth-section {
     margin-top: 2rem;
     padding-top: 2rem;
-    border-top: 1px solid var(--border-color); /* 适配深色模式 */
+    border-top: 1px solid var(--border-color);
 }
 
-/* --- Hero Section (首页) --- */
+/* =========================================
+   3. Hero Section (首页头图)
+   ========================================= */
 .hero {
     text-align: center;
     padding: 6rem 0 4rem;
@@ -140,13 +136,10 @@
 .hero::before {
     content: '';
     position: absolute;
-    width: 600px;
-    height: 600px;
-    /* 使用变量，并将结束色改为 transparent 以适配黑/白背景 */
+    width: 600px; height: 600px;
     background: radial-gradient(circle at center, var(--primary-color) 0%, transparent 70%);
-    opacity: 0.15; /* 通过 opacity 控制透明度 */
-    top: -20%;
-    left: 50%;
+    opacity: 0.15;
+    top: -20%; left: 50%;
     transform: translateX(-50%);
     z-index: -1;
     filter: blur(60px);
@@ -180,61 +173,57 @@
     gap: 15px;
 }
 
-/* --- Footer (浅色渐变风格) --- */
+/* =========================================
+   4. Footer (核心优化版)
+   ========================================= */
 footer {
-    /* 核心修改：渐变背景 - 适配深色模式 */
-    /* 浅色模式：浅灰渐变到略深灰 */
-    /* 深色模式：深黑渐变到略浅黑 (通过变量实现) */
-    background: linear-gradient(to bottom, var(--bg-body) 0%, var(--bg-input) 100%);
-    color: var(--text-secondary);
-    padding: 3rem 5% 2rem;
+    background-color: var(--bg-surface);
+    border-top: 1px solid var(--border-color);
     margin-top: auto;
-    font-size: 0.9rem;
-    border-top: 1px solid var(--border-color); /* 适配深色模式 */
 }
 
 .footer-content {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr;
-    gap: 2rem;
     max-width: 1200px;
     margin: 0 auto;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid var(--border-color); /* 适配深色模式 */
+    padding: 4rem 2rem 2rem;
+    display: grid;
+    /* Desktop: 品牌(2份) + 4个链接列(各1份) */
+    grid-template-columns: 2fr repeat(4, 1fr);
+    gap: 2rem;
+    align-items: start;
 }
 
-/* 品牌区 */
+/* --- 品牌列 --- */
 .footer-brand h3 {
-    color: var(--text-main); /* 改为深色文字 */
-    font-size: 1.3rem;
-    margin-bottom: 0.8rem;
     display: flex;
     align-items: center;
     gap: 10px;
+    font-size: 1.3rem;
+    color: var(--text-main);
+    margin-bottom: 1rem;
 }
 
 .footer-brand p {
-    line-height: 1.6;
-    margin-bottom: 1.2rem;
-    max-width: 320px;
-    font-size: 0.9rem;
     color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    max-width: 300px;
 }
 
 .social-links {
     display: flex;
-    gap: 12px;
+    gap: 1rem;
 }
 
 .social-link {
-    color: var(--text-secondary); /* 默认深灰 */
+    color: var(--text-secondary);
     font-size: 1.2rem;
-    transition: all 0.3s ease;
+    transition: var(--transition);
     width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
     border-radius: 50%;
-    background: var(--bg-surface); /* 小圆底适配深色 */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    background: var(--bg-input);
 }
 
 .social-link:hover {
@@ -243,14 +232,15 @@ footer {
     transform: translateY(-2px);
 }
 
-/* 链接列 */
+/* --- 链接列 --- */
 .footer-column h4 {
-    color: var(--text-main); /* 深色标题 */
-    margin-bottom: 1rem;
-    font-size: 0.95rem;
+    color: var(--text-main);
+    margin-bottom: 1.2rem;
+    font-size: 0.9rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    opacity: 0.9;
 }
 
 .footer-column ul {
@@ -259,74 +249,93 @@ footer {
     margin: 0;
 }
 
-.footer-column li { margin-bottom: 0.6rem; }
+.footer-column li {
+    margin-bottom: 0.8rem;
+}
 
 .footer-column a {
     color: var(--text-secondary);
     text-decoration: none;
-    transition: color 0.2s;
+    transition: all 0.2s ease;
     font-size: 0.9rem;
+    display: inline-block;
 }
 
 .footer-column a:hover {
     color: var(--primary-color);
+    transform: translateX(3px);
 }
 
-/* 版权行 */
+/* --- 底部版权 --- */
 .footer-bottom {
-    max-width: 1200px;
-    margin: 1.5rem auto 0;
+    border-top: 1px solid var(--border-color);
+    padding: 1.5rem 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-top: 2rem;
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    font-size: 0.85rem;
-    color: var(--text-secondary); /* 更淡一点的灰色 */
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
-.footer-bottom a {
-    color: var(--text-secondary);
-    text-decoration: none;
-    transition: color 0.2s;
-}
+/* =========================================
+   5. 响应式适配 (Responsive)
+   ========================================= */
 
-.footer-bottom a:hover { color: var(--primary-color); }
-
-/* --- 响应式断点 (关键) --- */
+/* --- 平板与手机 (Max Width 900px) --- */
 @media (max-width: 900px) {
-    /* 隐藏桌面端导航和 Auth */
-    .desktop-nav, .desktop-auth {
-        display: none;
+    /* 导航栏调整 */
+    .desktop-nav, .desktop-auth { display: none; }
+    .mobile-menu-btn { display: block; }
+    .navbar { padding: 0.8rem 5%; }
+
+    /* Footer 布局重构: 2列网格 */
+    .footer-content {
+        padding: 3rem 1.5rem;
+        grid-template-columns: repeat(2, 1fr); /* 2列链接 */
+        gap: 2.5rem 1.5rem;
     }
 
-    /* 显示汉堡按钮 */
-    .mobile-menu-btn {
-        display: block;
+    /* 品牌列独占第一行 */
+    .footer-brand {
+        grid-column: 1 / -1;
+        text-align: center;
+        border-bottom: 1px dashed var(--border-color);
+        padding-bottom: 2rem;
+        margin-bottom: 0.5rem;
     }
 
-    /* Navbar 布局调整 */
-    .navbar {
-        padding: 0.8rem 5%;
+    /* 品牌内容居中 */
+    .footer-brand h3, .footer-brand p {
+        justify-content: center;
+        margin-left: auto;
+        margin-right: auto;
     }
+
+    .social-links { justify-content: center; }
 }
 
-/* 响应式 (Footer) */
+/* --- 小屏幕手机 (Max Width 768px) --- */
 @media (max-width: 768px) {
-    .navbar { padding: 1rem; }
-    .nav-links { display: none; }
     .hero { padding: 3rem 0; }
     .animate-text { font-size: 2.5rem; }
+    .subtitle { font-size: 1rem; padding: 0 1rem; }
 
-    /* Footer 移动端适配 */
-    .footer-content {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-        text-align: center;
-    }
-    .footer-brand p { margin: 0 auto 1rem; }
-    .social-links { justify-content: center; }
     .footer-bottom {
         flex-direction: column;
         gap: 0.5rem;
-        margin-top: 1rem;
     }
+}
+
+/* --- 超小屏幕 (Max Width 480px) --- */
+@media (max-width: 480px) {
+    .footer-content {
+        gap: 2rem 1rem; /* 减小间距 */
+    }
+
+    .footer-column h4 { font-size: 0.85rem; }
+    .footer-column a { font-size: 0.85rem; }
 }

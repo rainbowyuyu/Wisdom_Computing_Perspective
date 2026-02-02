@@ -13,8 +13,63 @@ export function initCalculateListeners() {
     }
 }
 
-// 核心：开始生成动画 (SSE 流式 - 优化版：分离视频与代码)
+// 辅助：冷却逻辑 (独立并行)
+function startCooldown(duration = 10) {
+    const btn = document.querySelector('.calc-sidebar .action-btn.full-width');
+    if (!btn) return;
+
+    // 如果已经在冷却中，不再重复触发（双重保险）
+    if (btn.classList.contains('is-cooldown')) return;
+
+    // 1. 保存原始按钮内容 (如果还没保存过)
+    if (!btn.dataset.originalHtml) {
+        btn.dataset.originalHtml = btn.innerHTML;
+    }
+
+    // 2. 设置冷却状态
+    btn.disabled = true;
+    btn.classList.add('is-cooldown'); // 添加标记
+    btn.style.opacity = '0.7';
+    btn.style.cursor = 'not-allowed';
+
+    let timeLeft = duration;
+    btn.innerHTML = `<i class="fa-regular fa-clock"></i> 冷却中 (${timeLeft}s)`;
+
+    // 3. 启动倒计时 (不等待 Promise，独立运行)
+    const timer = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            // 4. 恢复原始状态
+            btn.disabled = false;
+            btn.classList.remove('is-cooldown');
+            btn.innerHTML = btn.dataset.originalHtml;
+            btn.style.opacity = '';
+            btn.style.cursor = '';
+        } else {
+            btn.innerHTML = `<i class="fa-regular fa-clock"></i> 冷却中 (${timeLeft}s)`;
+        }
+    }, 1000);
+}
+
+// 核心：开始生成动画
 export async function startAnimation() {
+    const btn = document.querySelector('.calc-sidebar .action-btn.full-width');
+
+    // 检查是否正在冷却
+    if (btn && btn.disabled) return;
+
+    const formulaField = document.getElementById('math-field-main');
+    const formula = formulaField ? formulaField.getValue() : "";
+
+    if (!formula.trim()) {
+        alert("请输入公式");
+        return;
+    }
+
+    // --- 核心修改：点击后立即启动冷却 (并行执行) ---
+    startCooldown(30);
+
     // 获取 DOM 元素
     const videoWrapper = document.getElementById('calc-video-wrapper');
     const placeholder = document.getElementById('video-placeholder-content');
@@ -23,21 +78,19 @@ export async function startAnimation() {
     const logBox = document.getElementById('gen-log');
     const progBar = document.getElementById('gen-progress');
     const percentText = document.getElementById('gen-percent');
-
     const method = document.getElementById('calc-method').value;
-    const formula = document.getElementById('math-field-main').getValue();
 
     // 1. 重置 UI 状态
-    // 清空日志
-    logBox.innerHTML = '';
+    if(logBox) logBox.innerHTML = '';
     addLog("正在初始化生成任务...", "#94a3b8");
 
-    // 重置进度条
-    progBar.style.width = '0%';
-    progBar.className = ''; // 移除可能的错误颜色类
-    percentText.innerText = '0%';
+    if(progBar) {
+        progBar.style.width = '0%';
+        progBar.className = '';
+        progBar.style.background = "#3b82f6";
+    }
+    if(percentText) percentText.innerText = '0%';
 
-    // 重置视频区域：显示占位符，隐藏播放器
     if(videoPlayer) {
         videoPlayer.pause();
         videoPlayer.style.display = 'none';
@@ -47,6 +100,7 @@ export async function startAnimation() {
 
     // 辅助：添加日志
     function addLog(msg, color = "#cbd5e1") {
+        if (!logBox) return;
         const div = document.createElement('div');
         div.className = 'log-entry';
         div.style.color = color;
@@ -59,7 +113,7 @@ export async function startAnimation() {
 
     // 辅助：流式打字机显示代码
     async function streamCodeBlock(fullCode) {
-        // 创建代码块容器
+        if (!logBox) return;
         const pre = document.createElement('pre');
         pre.style.marginTop = "10px";
         pre.style.marginBottom = "10px";
@@ -70,7 +124,7 @@ export async function startAnimation() {
         pre.style.overflowX = "auto";
 
         const codeEl = document.createElement('code');
-        codeEl.className = "language-python hljs"; // 使用 highlight.js 类名
+        codeEl.className = "language-python hljs";
         codeEl.style.fontFamily = "'JetBrains Mono', monospace";
         codeEl.style.fontSize = "0.8rem";
 
@@ -82,7 +136,7 @@ export async function startAnimation() {
 
         return new Promise((resolve) => {
             let i = 0;
-            const speed = 5; // 打字速度
+            const speed = 5;
 
             function type() {
                 if (i < chars.length) {
@@ -93,7 +147,6 @@ export async function startAnimation() {
                     i += speed;
                     requestAnimationFrame(type);
                 } else {
-                    // 打字完成，应用高亮
                     if (window.hljs) window.hljs.highlightElement(codeEl);
                     resolve();
                 }
@@ -131,18 +184,15 @@ export async function startAnimation() {
                     try {
                         const data = JSON.parse(jsonStr);
 
-                        // 更新进度
                         if (data.progress) {
-                            progBar.style.width = data.progress + '%';
-                            percentText.innerText = data.progress + '%';
+                            if(progBar) progBar.style.width = data.progress + '%';
+                            if(percentText) percentText.innerText = data.progress + '%';
 
-                            // 根据进度改变颜色
-                            if(data.progress < 30) progBar.style.background = "#3b82f6"; // Blue
-                            else if(data.progress < 90) progBar.style.background = "#8b5cf6"; // Purple
-                            else progBar.style.background = "#10b981"; // Green
+                            if(data.progress < 30 && progBar) progBar.style.background = "#3b82f6";
+                            else if(data.progress < 90 && progBar) progBar.style.background = "#8b5cf6";
+                            else if(progBar) progBar.style.background = "#10b981";
                         }
 
-                        // 处理不同阶段
                         if (data.step === 'generating_code') {
                             addLog("正在构思数学可视化脚本...", "#fbbf24");
                         }
@@ -159,12 +209,9 @@ export async function startAnimation() {
                         }
                         else if (data.step === 'complete') {
                             addLog("✨ 渲染完成！视频加载中...", "#a78bfa");
-
-                            // 切换视频显示
                             setTimeout(() => {
                                 if (placeholder) placeholder.style.display = 'none';
                                 if (videoPlayer) {
-                                    // 加上时间戳防止缓存
                                     videoPlayer.src = `${data.video_url}?t=${new Date().getTime()}`;
                                     videoPlayer.style.display = 'block';
                                     videoPlayer.play();
@@ -174,7 +221,8 @@ export async function startAnimation() {
                         }
                         else if (data.step === 'error') {
                             addLog("❌ 错误: " + data.message, "#ef4444");
-                            progBar.style.background = "#ef4444";
+                            if(progBar) progBar.style.background = "#ef4444";
+                            // 出错时也不需要手动停止冷却，让它自然倒计时结束即可（防止刷错误）
                             return;
                         }
 

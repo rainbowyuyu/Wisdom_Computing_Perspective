@@ -49,6 +49,7 @@
             <button class="nav-btn" onclick="showSection('my-formulas')">我的算式</button>
             <button class="nav-btn" onclick="showSection('calculate')">动态计算</button>
             <button class="nav-btn" onclick="showSection('examples')">教学案例</button>
+            <button class="nav-btn" onclick="showSection('devtools')">开发者工具</button>
             <button class="nav-btn" onclick="showSection('help')">帮助</button>
             <button class="nav-btn" onclick="openSettings()" title="系统设置"><i class="fa-solid fa-gear"></i></button>
         </div>
@@ -130,21 +131,21 @@
             </div>
 
             <div class="features-grid">
-                <div class="feature-card">
+                <div class="feature-card" onclick="showSection('detect')">
                     <div class="feature-icon-box">
                         <i class="fa-solid fa-eye"></i>
                     </div>
                     <h3>视觉识别</h3>
                     <p>支持手写公式与图片上传，毫秒级精准转换 LaTeX 代码，复杂矩阵也能一键提取。</p>
                 </div>
-                <div class="feature-card">
+                <div class="feature-card" onclick="showSection('calculate')">
                     <div class="feature-icon-box">
                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                     </div>
                     <h3>动态推演</h3>
                     <p>拒绝死板的答案。基于 Python Manim 引擎，实时渲染矩阵变换、行列式展开过程。</p>
                 </div>
-                <div class="feature-card">
+                <div class="feature-card" onclick="showSection('examples')">
                     <div class="feature-icon-box">
                         <i class="fa-solid fa-laptop-code"></i>
                     </div>
@@ -253,18 +254,16 @@
                                 <i class="fa-regular fa-keyboard"></i> 点击公式可直接修改
                             </div>
 
-                            <!-- 修改按钮：改为“保存并查看” -->
                             <div style="display: flex; gap: 10px;">
-                                 <!--
-                                    原有 copyToCalc 逻辑是跳转到 Calculate 页面。
-                                    现在我们改为 saveAndShowFormula，既保存到数据库，又跳转到 My Formulas 列表。
-                                 -->
-                                <button class="btn-calc-go" onclick="saveAndShowFormula()" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                                <!-- 修改 1: 添加 id="btn-save-check" 和 disabled -->
+                                <button id="btn-save-check" class="btn-calc-go" onclick="saveAndShowFormula()" disabled
+                                        style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
                                     <i class="fa-regular fa-floppy-disk"></i> 保存并查看
                                 </button>
 
-                                <!-- 保留原本的“去计算”作为备选项，或者用次级按钮 -->
-                                <button class="action-btn secondary" onclick="copyToCalc()" style="padding: 0.8rem 1.5rem; border-radius: 99px;" title="仅跳转到计算页，不保存">
+                                <!-- 修改 2: 添加 id="btn-copy-calc" 和 disabled -->
+                                <button id="btn-copy-calc" class="action-btn secondary" onclick="copyToCalc()" disabled
+                                        style="padding: 0.8rem 1.5rem; border-radius: 99px;" title="仅跳转到计算页，不保存">
                                     去计算 <i class="fa-solid fa-arrow-right"></i>
                                 </button>
                             </div>
@@ -337,8 +336,8 @@
 
                         <!-- MathLive 可视化编辑 -->
                         <div class="math-field-container main-input">
-                            <math-field id="math-field-main" virtual-keyboard-mode="manual" placeholder="在此输入公式，例如 \int x^2 dx">
-                                \int_{0}^{1} x^2 + 3x + 1 \, dx
+                            <math-field id="math-field-main" virtual-keyboard-mode="manual" placeholder="在此输入公式，例如 \sin(x) = \frac{1}{2}">
+                                \sin(x) = \frac{1}{2}
                             </math-field>
                         </div>
 
@@ -414,6 +413,116 @@
         </section>
 
 
+        <!-- 开发者工具 Section (完全替换原有代码) -->
+        <section id="devtools" class="section">
+            <h2 class="section-title">代码开发者工作台</h2>
+
+            <div class="workspace">
+                <!-- 左侧导航 -->
+                <div class="tools-panel" style="flex: 0 0 240px;">
+                    <div class="control-group">
+                        <label>工具箱</label>
+                        <div class="tools-list">
+                            <button class="tab-btn active" onclick="switchDevTool('latex')">
+                                <i class="fa-solid fa-square-root-variable"></i> LaTeX 可视化编辑器
+                            </button>
+                            <button class="tab-btn" onclick="switchDevTool('manim')">
+                                <i class="fa-brands fa-python"></i> Manim 代码云端渲染工作台
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="control-group" style="margin-top: auto;">
+                        <label>快捷键</label>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6;">
+                            <p><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 运行代码</p>
+                            <p><kbd>Tab</kbd> 自动补全 (Beta)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧工作区 -->
+                <div class="workspace-main">
+
+                    <!-- 1. LaTeX 编辑器 -->
+                    <div id="dev-latex" class="dev-panel">
+                        <div class="dev-split-view">
+                            <!-- 输入区 (MathLive) -->
+                            <div class="dev-col">
+                                <div class="dev-label">
+                                    <span><i class="fa-solid fa-keyboard"></i> 可视化输入</span>
+                                    <span style="font-size:0.7rem; opacity:0.7;">MathLive Engine</span>
+                                </div>
+                                <div style="flex:1; display:flex; align-items:center;">
+                                    <math-field id="dev-latex-mathfield" virtual-keyboard-mode="manual">
+                                        x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+                                    </math-field>
+                                </div>
+                            </div>
+
+                            <!-- 源码预览区 -->
+                            <div class="dev-col">
+                                <div class="dev-label">
+                                    <span><i class="fa-solid fa-code"></i> LaTeX 源码</span>
+                                    <button class="action-btn secondary" style="padding: 2px 8px; font-size:0.7rem;" onclick="copyDevLatex()">
+                                        <i class="fa-regular fa-copy"></i> 复制
+                                    </button>
+                                </div>
+                                <textarea id="dev-latex-source" class="tech-input" style="flex:1; margin:0; font-family:monospace; resize:none;" readonly></textarea>
+                            </div>
+                        </div>
+
+                        <!-- 底部渲染预览 (MathJax) -->
+                        <div class="dev-col" style="flex: 0 0 150px;">
+                            <div class="dev-label">
+                                <span><i class="fa-solid fa-eye"></i> 最终渲染预览</span>
+                            </div>
+                            <div id="dev-latex-preview"></div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Manim 工作台 -->
+                    <div id="dev-manim" class="dev-panel" style="display: none; padding: 0;">
+                        <div class="ide-layout">
+                            <!-- 代码编辑器 -->
+                            <div class="ide-editor">
+                                <div class="ide-toolbar">
+                                    <span><i class="fa-brands fa-python"></i> main.py</span>
+                                    <button id="btn-run-manim" class="ide-btn-run" onclick="runDevManim()">
+                                        <i class="fa-solid fa-play"></i> 运行脚本
+                                    </button>
+                                </div>
+
+                                <div class="code-wrapper">
+                                    <!-- 高亮层：移除 language-python 类，交给 innerHTML 处理，保持干净 -->
+                                    <pre id="dev-manim-highlight" class="code-layer"></pre>
+
+                                    <!-- 输入层 -->
+                                    <textarea id="dev-manim-input" class="code-layer" spellcheck="false"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- 视频预览 -->
+                            <div class="ide-preview">
+                                <video id="dev-manim-video" controls style="width:100%; height:100%; display:none; object-fit:contain;"></video>
+
+                                <div id="dev-manim-placeholder" class="ide-placeholder">
+                                    <i class="fa-solid fa-clapperboard" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                                    <p>编写代码并点击运行<br>预览将在此处显示</p>
+                                </div>
+
+                                <div id="dev-manim-loading" class="ide-loading" style="display: none;">
+                                    <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2rem; color: #4caf50;"></i>
+                                    <p style="margin-top: 10px; font-size: 0.9rem;">正在云端渲染...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
         <!-- 5. 帮助 Section -->
         <section id="help" class="section">
             <h2 class="section-title">常见问题与指南</h2>
@@ -467,7 +576,7 @@
 
                 <details>
                     <summary>渲染动画需要多久？生成的视频可以下载吗？</summary>
-                    <p>简单的矩阵加减法通常在 <b>3-5 秒</b>内完成。复杂的 4x4 矩阵乘法、求逆或行列式展开可能需要 <b>10-15 秒</b>。
+                    <p>简单通用算法通常在 <b>30-50 秒</b>内完成。复杂的算法如复杂的微积分矩阵的推演和可视化可能需要 <b>100-150 秒</b>，如果超过 <b>180秒</b> 由于服务器算力限制暂时会判定为timeout，请简化算式。
                     <br>动画生成后，您可以点击视频播放器右下角的“三个点”图标选择<b>“下载”</b>，或右键点击视频选择“视频另存为”，将其保存到本地用于PPT演示或教学。</p>
                 </details>
 
@@ -522,6 +631,16 @@
                         <img id="captcha-img-login" src="" alt="点击刷新" class="captcha-img" onclick="refreshCaptcha('login')" title="点击刷新验证码">
                     </div>
 
+                    <!-- 新增：隐私协议勾选 -->
+                    <div style="margin-bottom: 1.5rem; display: flex; align-items: start; gap: 8px; font-size: 0.85rem; color: var(--text-secondary);">
+                        <input type="checkbox" id="login-agree" style="margin-top: 3px;">
+                        <label for="login-agree" style="cursor: pointer; user-select: none;">
+                            我已阅读并同意
+                            <a href="javascript:void(0)" onclick="openDoc('terms.md', '服务协议')" style="color: var(--primary-color);">服务协议</a> 与
+                            <a href="javascript:void(0)" onclick="openDoc('privacy.md', '隐私政策')" style="color: var(--primary-color);">隐私政策</a>
+                        </label>
+                    </div>
+
                     <button type="button" id="btn-login-submit" class="action-btn full-width" onclick="handleLogin()">立即登录</button>
                 </form>
 
@@ -530,9 +649,22 @@
                     <input type="text" placeholder="设置用户名" class="tech-input" id="reg-user">
                     <input type="password" placeholder="设置密码" class="tech-input" id="reg-pass">
 
+                    <!-- 新增：确认密码 -->
+                    <input type="password" placeholder="确认密码" class="tech-input" id="reg-pass-confirm">
+
                     <div class="captcha-row">
                         <input type="text" placeholder="验证码" class="tech-input" id="reg-captcha">
                         <img id="captcha-img-reg" src="" alt="点击刷新" class="captcha-img" onclick="refreshCaptcha('register')" title="点击刷新验证码">
+                    </div>
+
+                    <!-- 新增：隐私协议勾选 -->
+                    <div style="margin-bottom: 1.5rem; display: flex; align-items: start; gap: 8px; font-size: 0.85rem; color: var(--text-secondary);">
+                        <input type="checkbox" id="reg-agree" style="margin-top: 3px;">
+                        <label for="reg-agree" style="cursor: pointer; user-select: none;">
+                            我已阅读并同意
+                            <a href="javascript:void(0)" onclick="openDoc('terms.md', '服务协议')" style="color: var(--primary-color);">服务协议</a> 与
+                            <a href="javascript:void(0)" onclick="openDoc('privacy.md', '隐私政策')" style="color: var(--primary-color);">隐私政策</a>
+                        </label>
                     </div>
 
                     <button type="button" id="btn-reg-submit" class="action-btn full-width" onclick="handleRegister()">注册账户</button>
@@ -777,6 +909,17 @@
                     <li><a href="https://github.com/rainbowyuyu/Wisdom_Computing_Perspective" target="_blank">加入我们</a></li>
                     <li><a href="https://github.com/rainbowyuyu/Wisdom_Computing_Perspective" target="_blank">联系合作</a></li>
                     <li><a href="javascript:void(0)" onclick="openDoc('privacy.md', '隐私政策')">隐私政策</a></li>
+                </ul>
+            </div>
+
+            <!-- 链接列 4：开发者工具 -->
+            <div class="footer-column">
+                <h4>开发者工具</h4>
+                <ul>
+                    <!-- 跳转并自动切换到 LaTeX 标签 -->
+                    <li><a href="javascript:void(0)" onclick="showSection('devtools'); switchDevTool('latex')">LaTeX 编辑器</a></li>
+                    <!-- 跳转并自动切换到 Manim 标签 -->
+                    <li><a href="javascript:void(0)" onclick="showSection('devtools'); switchDevTool('manim')">Manim 工作台</a></li>
                 </ul>
             </div>
         </div>

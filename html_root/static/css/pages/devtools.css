@@ -1,0 +1,271 @@
+/* static/css/pages/devtools.css */
+
+/* =========================================
+   1. 整体容器 & 基础面板
+   ========================================= */
+#devtools .workspace-main {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* 确保填满父容器 */
+}
+
+.dev-panel {
+    flex: 1;
+    display: flex; /* 默认隐藏，JS 控制 display: flex */
+    flex-direction: column;
+    padding: 1.5rem;
+    gap: 1.5rem;
+    height: 100%;
+    overflow: hidden; /* 防止溢出 */
+}
+
+/* =========================================
+   2. LaTeX 编辑器板块
+   ========================================= */
+.dev-split-view {
+    display: flex;
+    gap: 1.5rem;
+    flex: 1;
+    min-height: 0; /* 关键：允许 flex 子项收缩 */
+}
+
+.dev-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.dev-col:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    background: var(--bg-surface);
+}
+
+.dev-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* MathLive 编辑器定制 */
+#dev-latex-mathfield {
+    flex: 1;
+    font-size: 1.5rem;
+    width: 100%;
+    outline: none;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    /* MathLive CSS 变量适配 */
+    --keyboard-background: var(--bg-surface);
+    --keyboard-toolbar-text-active: var(--primary-color);
+}
+
+/* 预览区 (MathJax) */
+#dev-latex-preview {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: var(--text-main);
+    overflow: auto;
+    background: var(--bg-surface);
+    border-radius: 8px;
+    border: 1px dashed var(--border-color);
+}
+
+/* =========================================
+   3. Manim 工作台 (IDE) - 核心修复部分
+   ========================================= */
+.ide-layout {
+    display: flex;
+    flex-direction: column; /* 垂直布局 */
+    height: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #1e1e1e; /* 整体深色背景 */
+}
+
+/* --- 上半部分：代码编辑器 --- */
+.ide-editor {
+    flex: 3; /* 占比 60% */
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid #333;
+    position: relative;
+    min-height: 200px;
+}
+
+.ide-toolbar {
+    height: 40px;
+    background: #252526;
+    border-bottom: 1px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    color: #cccccc;
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+}
+
+.ide-btn-run {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: 0.2s;
+}
+.ide-btn-run:hover { background: #43a047; }
+.ide-btn-run:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
+
+/* --- 核心：高亮叠加层 --- */
+.code-wrapper {
+    position: relative;
+    flex: 1;
+    overflow: hidden; /* 隐藏外层滚动条 */
+    /* 建立独立的排版上下文 */
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* 通用层样式 (Textarea 和 Pre 必须完全一致) */
+.code-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 15px; /* 内边距必须一致 */
+    border: none;
+
+    /* 1. 字体强制统一 (重要) */
+    font-family: 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace !important;
+
+    /* 2. 字号行高强制统一 */
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+
+    /* 3. 排版细节统一 */
+    letter-spacing: 0px !important;
+    white-space: pre; /* 不换行，保持代码格式 */
+    word-wrap: normal;
+    overflow: auto; /* 允许滚动 */
+    box-sizing: border-box;
+    background: transparent;
+    tab-size: 4;
+}
+
+/* 底层：高亮显示层 (Pre) */
+#dev-manim-highlight {
+    color: #d4d4d4; /* 默认文本色 */
+    pointer-events: none; /* 让鼠标穿透 */
+    z-index: 1;
+    scrollbar-width: none; /* Firefox 隐藏滚动条 */
+}
+#dev-manim-highlight::-webkit-scrollbar { display: none; /* Chrome 隐藏滚动条 */ }
+
+/* 修复：覆盖 highlight.js 对 code 标签的样式干扰 */
+#dev-manim-highlight code {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+/* 顶层：输入层 (Textarea) */
+#dev-manim-input {
+    color: transparent; /* 文字透明 */
+    caret-color: #fff; /* 光标白色 */
+    z-index: 2;
+    resize: none;
+    outline: none;
+    background: transparent;
+    /* 字体平滑处理，防止不同层渲染差异 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 选中文本时的背景色 */
+#dev-manim-input::selection {
+    background: rgba(38, 79, 120, 0.5); /* VS Code 风格选中色 */
+    color: transparent;
+}
+
+/* --- 下半部分：预览区域 --- */
+.ide-preview {
+    flex: 2; /* 占比 40% */
+    background: #000;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    overflow: hidden;
+}
+
+.ide-placeholder {
+    color: #666;
+    text-align: center;
+    pointer-events: none;
+}
+
+.ide-loading {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    text-align: center;
+    background: rgba(0,0,0,0.8);
+    padding: 20px 30px;
+    border-radius: 12px;
+    z-index: 10;
+}
+
+/* =========================================
+   4. 响应式适配
+   ========================================= */
+@media (max-width: 900px) {
+    .dev-split-view {
+        flex-direction: column; /* LaTeX 编辑器改为上下排列 */
+    }
+
+    .ide-editor {
+        flex: 1;
+        min-height: 300px;
+    }
+
+    .ide-preview {
+        flex: 1;
+        min-height: 250px;
+    }
+}

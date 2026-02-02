@@ -8,7 +8,8 @@ import json
 import asyncio
 import sys
 import subprocess  # 引入 subprocess 用于同步调用
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Response, Request, Cookie
+from typing import Optional # 新增
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -57,6 +58,10 @@ except Exception as e:
 
 # 简单内存存储验证码
 CAPTCHA_STORE = {}
+
+# 简单的内存 Session 存储 { "session_id": "username" }
+# 注意：重启服务器会导致所有用户登出。生产环境请使用 Redis。
+SESSION_STORE = {}
 
 # 1. 挂载静态文件目录
 os.makedirs("static/videos", exist_ok=True)
@@ -175,6 +180,7 @@ async def get_captcha():
 
 @app.post("/api/register")
 async def register(data: AuthModel):
+    # ... (原有逻辑保持不变: 验证码校验 -> 数据库插入) ...
     # 1. 验证码校验
     stored_code = CAPTCHA_STORE.get(data.captcha_id)
     if not stored_code:
@@ -182,36 +188,23 @@ async def register(data: AuthModel):
 
     if stored_code != data.captcha.upper():
         return JSONResponse(status_code=400, content={"status": "error", "message": "验证码错误"})
-
-    # 验证通过后删除
     del CAPTCHA_STORE[data.captcha_id]
 
-    # 2. 数据库操作
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-
-        # 检查用户是否存在
         cursor.execute("SELECT id FROM users WHERE username = %s", (data.username,))
         if cursor.fetchone():
             return JSONResponse(status_code=400, content={"status": "error", "message": "用户名已存在"})
 
         # 加密密码
         hashed_pw = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
-
-        # 插入用户
-        cursor.execute(
-            "INSERT INTO users (username, hashed_password) VALUES (%s, %s)",
-            (data.username, hashed_pw)
-        )
+        cursor.execute("INSERT INTO users (username, hashed_password) VALUES (%s, %s)", (data.username, hashed_pw))
         conn.commit()
-
         return {"status": "success", "message": "注册成功"}
-
     except Exception as e:
-        logger.error(f"Register Error: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         if cursor: cursor.close()
@@ -219,16 +212,11 @@ async def register(data: AuthModel):
 
 
 @app.post("/api/login")
-async def login(data: AuthModel):
+async def login(data: AuthModel, response: Response):  # 注入 Response 对象
     # 1. 验证码校验
     stored_code = CAPTCHA_STORE.get(data.captcha_id)
-    if not stored_code:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "验证码已过期，请刷新"})
-
-    if stored_code != data.captcha.upper():
+    if not stored_code or stored_code != data.captcha.upper():
         return JSONResponse(status_code=400, content={"status": "error", "message": "验证码错误"})
-
-    # 验证通过后删除
     del CAPTCHA_STORE[data.captcha_id]
 
     conn = None
@@ -236,29 +224,57 @@ async def login(data: AuthModel):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-
-        # 查询用户
         cursor.execute("SELECT * FROM users WHERE username = %s", (data.username,))
         user = cursor.fetchone()
 
-        if not user:
-            return JSONResponse(status_code=401, content={"status": "error", "message": "用户不存在"})
+        if user and bcrypt.checkpw(data.password.encode(), user["hashed_password"].encode()):
+            # --- 核心修改：生成 Session 并设置 Cookie ---
+            session_id = str(uuid.uuid4())
+            SESSION_STORE[session_id] = user["username"]
 
-        # 验证密码
-        if bcrypt.checkpw(data.password.encode(), user["hashed_password"].encode()):
+            # 设置 Cookie：key="auth_session", 有效期 1天 (86400秒), httponly 防止 XSS
+            response.set_cookie(
+                key="auth_session",
+                value=session_id,
+                max_age=86400,
+                httponly=True,
+                samesite="lax"
+            )
             return {"status": "success", "username": user["username"]}
         else:
-            return JSONResponse(status_code=401, content={"status": "error", "message": "密码错误"})
+            return JSONResponse(status_code=401, content={"status": "error", "message": "用户名或密码错误"})
     except Exception as e:
-        logger.error(f"Login Error: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
 
 
-# --- 新增：我的算式功能 (MySQL版) ---
+# --- 新增：检查登录状态接口 (用于自动登录) ---
+@app.get("/api/user/me")
+async def get_current_user(auth_session: Optional[str] = Cookie(None)):
+    if not auth_session:
+        return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
 
+    username = SESSION_STORE.get(auth_session)
+    if not username:
+        return JSONResponse(status_code=401, content={"status": "error", "message": "Session expired"})
+
+    return {"status": "success", "username": username}
+
+
+# --- 新增：登出接口 ---
+@app.post("/api/logout")
+async def logout(response: Response, auth_session: Optional[str] = Cookie(None)):
+    if auth_session and auth_session in SESSION_STORE:
+        del SESSION_STORE[auth_session]
+
+    # 删除 Cookie
+    response.delete_cookie(key="auth_session")
+    return {"status": "success", "message": "Logged out"}
+
+
+# --- 新增：我的算式功能 (MySQL版) ---
 @app.post("/api/formulas/save")
 async def save_formula(data: FormulaModel):
     conn = None
@@ -504,6 +520,61 @@ async def generate_animation_stream(data: CalcModel):
             yield "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+class ManimCodeModel(BaseModel):
+    code: str
+
+
+@app.post("/api/devtools/run_manim")
+async def run_custom_manim(data: ManimCodeModel):
+    # 安全检查 (简易版)
+    if "import os" in data.code or "import sys" in data.code or "subprocess" in data.code:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "禁止使用系统操作库"})
+
+    task_id = str(uuid.uuid4())
+    py_filename = f"dev_{task_id}.py"
+    py_path = os.path.join("static/videos", py_filename)
+
+    try:
+        with open(py_path, "w", encoding="utf-8") as f:
+            f.write(data.code)
+
+        media_dir = os.path.abspath("static/videos")
+        output_file = f"{task_id}.mp4"
+
+        # 运行 Manim (低质量快速渲染)
+        cmd = [sys.executable, "-m", "manim", "-ql", "--media_dir", media_dir, "-o", output_file,
+               os.path.abspath(py_path), "GenScene"]
+
+        # 同步调用 (为了简单，建议用异步线程池)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, lambda: subprocess.run(cmd, capture_output=True, text=True,
+                                                                         encoding="utf-8", timeout=60))
+
+        if result.returncode == 0:
+            # 查找并移动文件逻辑 (参考之前 main.py 中的实现)
+            # ... 简写 ...
+            final_url = f"/videos/{output_file}"
+            # 注意：实际代码中要加上文件查找和移动逻辑，确保文件路径正确
+            # 这里假设 render_matrix_animation 或 process_single_phase 里的逻辑是通用的，可以直接复用逻辑封装
+
+            # 临时补全文件查找逻辑
+            base_search_path = os.path.join(media_dir, "videos", py_filename.replace(".py", ""), "480p15")
+            expected_file = os.path.join(base_search_path, output_file)
+
+            if os.path.exists(expected_file):
+                import shutil
+                shutil.move(expected_file, os.path.join("static/videos", output_file))
+                return {"status": "success", "video_url": f"/videos/{output_file}"}
+
+            return JSONResponse(status_code=500, content={"status": "error", "message": "渲染成功但未找到文件"})
+
+        else:
+            return JSONResponse(status_code=400, content={"status": "error", "message": result.stderr})
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 # --- 静态资源与路由 ---

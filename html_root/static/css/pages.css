@@ -10,6 +10,7 @@
 @import url('pages/calculate.css');
 @import url('pages/examples.css');
 @import url('pages/help.css');
+@import url('pages/devtools.css');
 
 /* 通用 section 控制 */
 .section {

@@ -10,6 +10,7 @@ import * as Formulas from './formulas.js';
 import * as Examples from './examples.js';
 import * as Docs from './docs.js';
 import * as Theme from './theme.js';
+import * as DevTools from './devtools.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     Canvas.setupCanvas();
@@ -20,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Tutorial.checkAutoPlay();
     Examples.loadExamples(); // 加载案例
     Theme.initTheme();
+    DevTools.initDevTools();
 
     // 全局快捷键
     document.addEventListener('keydown', (e) => {
@@ -129,3 +131,8 @@ window.mobileNavClick = UI.mobileNavClick;
 
 // 挂载切换函数给 HTML 按钮使用
 window.toggleTheme = Theme.toggleTheme;
+
+// 挂载全局 开发者工具
+window.switchDevTool = DevTools.switchDevTool;
+window.runDevManim = DevTools.runDevManim;
+window.copyDevLatex = DevTools.copyDevLatex;
