@@ -526,54 +526,118 @@ class ManimCodeModel(BaseModel):
     code: str
 
 
+# main.py
+
 @app.post("/api/devtools/run_manim")
 async def run_custom_manim(data: ManimCodeModel):
-    # 安全检查 (简易版)
-    if "import os" in data.code or "import sys" in data.code or "subprocess" in data.code:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "禁止使用系统操作库"})
+    # 1. 安全检查 (稍微放宽，防止误杀)
+    # 注意：这种基于字符串的检查非常脆弱，生产环境建议使用沙箱 (Docker/NSjail)
+    forbidden = ["import os", "import sys", "import subprocess", "rm -rf", "shutil"]
+    for keyword in forbidden:
+        if keyword in data.code:
+            return JSONResponse(status_code=400,
+                                content={"status": "error", "message": f"安全拦截: 禁止使用 '{keyword}'"})
 
     task_id = str(uuid.uuid4())
     py_filename = f"dev_{task_id}.py"
     py_path = os.path.join("static/videos", py_filename)
 
     try:
+        # 写入代码
         with open(py_path, "w", encoding="utf-8") as f:
             f.write(data.code)
 
         media_dir = os.path.abspath("static/videos")
         output_file = f"{task_id}.mp4"
 
-        # 运行 Manim (低质量快速渲染)
-        cmd = [sys.executable, "-m", "manim", "-ql", "--media_dir", media_dir, "-o", output_file,
-               os.path.abspath(py_path), "GenScene"]
+        # 2. 构造命令
+        # -ql: 低质量快速渲染
+        # --disable_caching: 禁用缓存，防止旧文件干扰
+        # --format=mp4: 强制 mp4
+        cmd = [
+            sys.executable, "-m", "manim",
+            "-ql",
+            "--media_dir", media_dir,
+            "-o", output_file,
+            "--disable_caching",
+            os.path.abspath(py_path),
+            "GenScene"  # 确保前端传来的代码里类名也是 GenScene
+        ]
 
-        # 同步调用 (为了简单，建议用异步线程池)
+        logger.info(f"Running Manim DevTools: {' '.join(cmd)}")
+
+        # 3. 执行
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, lambda: subprocess.run(cmd, capture_output=True, text=True,
-                                                                         encoding="utf-8", timeout=60))
+        result = await loop.run_in_executor(None, lambda: subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60
+        ))
 
+        # 4. 处理结果
         if result.returncode == 0:
-            # 查找并移动文件逻辑 (参考之前 main.py 中的实现)
-            # ... 简写 ...
-            final_url = f"/videos/{output_file}"
-            # 注意：实际代码中要加上文件查找和移动逻辑，确保文件路径正确
-            # 这里假设 render_matrix_animation 或 process_single_phase 里的逻辑是通用的，可以直接复用逻辑封装
+            # 查找文件逻辑
+            # Manim 的输出路径结构通常是: /media_dir/videos/filename/quality/scene_name.mp4
+            # 或者由 -o 参数强行指定
 
-            # 临时补全文件查找逻辑
-            base_search_path = os.path.join(media_dir, "videos", py_filename.replace(".py", ""), "480p15")
-            expected_file = os.path.join(base_search_path, output_file)
+            # 优先检查 -o 指定的直接路径
+            # 注意：Manim 的 -o 参数行为比较诡异，它有时只作为文件名，路径还是遵循目录结构
 
-            if os.path.exists(expected_file):
-                import shutil
-                shutil.move(expected_file, os.path.join("static/videos", output_file))
+            # 兼容性查找：递归搜索 media_dir 下所有新生成的 mp4
+            # 这里我们简化逻辑：尝试几个可能的路径
+
+            possible_paths = [
+                # 1. 绝对路径指定 (理想情况)
+                os.path.join(media_dir, output_file),
+                # 2. 默认结构: videos/dev_xxx/480p15/GenScene.mp4 (如果 -o 无效)
+                os.path.join(media_dir, "videos", py_filename.replace(".py", ""), "480p15", "GenScene.mp4"),
+                # 3. 指定了文件名: videos/dev_xxx/480p15/uuid.mp4
+                os.path.join(media_dir, "videos", py_filename.replace(".py", ""), "480p15", output_file)
+            ]
+
+            final_path = os.path.join("static/videos", output_file)
+            found = False
+
+            for p in possible_paths:
+                if os.path.exists(p):
+                    # 移动到静态资源根目录
+                    import shutil
+                    shutil.move(p, final_path)
+                    found = True
+                    break
+
+            if found:
+                # 清理
+                try:
+                    os.remove(py_path)
+                except:
+                    pass
                 return {"status": "success", "video_url": f"/videos/{output_file}"}
-
-            return JSONResponse(status_code=500, content={"status": "error", "message": "渲染成功但未找到文件"})
+            else:
+                logger.error(f"Render success but file not found. Search paths: {possible_paths}")
+                return JSONResponse(status_code=500, content={"status": "error", "message": "渲染成功但未找到输出文件"})
 
         else:
-            return JSONResponse(status_code=400, content={"status": "error", "message": result.stderr})
+            # 执行失败
+            logger.error(f"Manim Stderr: {result.stderr}")
+            logger.error(f"Manim Stdout: {result.stdout}")
 
+            # 返回更有意义的错误信息给前端
+            error_msg = result.stderr if result.stderr else result.stdout
+            # 过滤掉一些无关的进度条信息
+            error_lines = [line for line in error_msg.split('\n') if
+                           'Error' in line or 'Exception' in line or 'Traceback' in line]
+            if not error_lines:
+                error_lines = error_msg.split('\n')[-10:]  # 取最后10行
+
+            return JSONResponse(status_code=400, content={"status": "error", "message": "\n".join(error_lines)})
+
+    except subprocess.TimeoutExpired:
+        return JSONResponse(status_code=408, content={"status": "error", "message": "渲染超时 (60s)"})
     except Exception as e:
+        logger.error(f"Server Error: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 

@@ -12,6 +12,20 @@ import * as Docs from './docs.js';
 import * as Theme from './theme.js';
 import * as DevTools from './devtools.js';
 
+// 1. 解析URL参数的工具函数（通用可复用）
+function getUrlParams() {
+  const params = {};
+  // 获取URL中?后的参数部分，若无则返回空对象
+  const search = window.location.search.slice(1);
+  if (!search) return params;
+  // 分割参数并解析为键值对
+  search.split('&').forEach(item => {
+    const [key, value] = item.split('=');
+    params[key] = value || '';
+  });
+  return params;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     Canvas.setupCanvas();
     UI.showSection('home');
@@ -30,6 +44,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isMatch(e, shortcuts.undo)) { e.preventDefault(); Canvas.undo(); }
         else if (isMatch(e, shortcuts.redo)) { e.preventDefault(); Canvas.redo(); }
     });
+
+    const params = getUrlParams(); // 获取所有URL参数
+      // 若存在section参数，执行showSection
+      if (params.section) {
+        showSection(params.section);
+      }
+      // 若存在devtool参数，执行switchDevTool
+      if (params.devtool) {
+        switchDevTool(params.devtool);
+      }
 });
 
 function isMatch(e, config) {

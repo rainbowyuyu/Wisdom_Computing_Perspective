@@ -80,6 +80,7 @@
                 <button onclick="mobileNavClick('my-formulas')">我的算式</button>
                 <button onclick="mobileNavClick('calculate')">动态计算</button>
                 <button onclick="mobileNavClick('examples')">教学案例</button>
+                <button onclick="mobileNavClick('devtools')">开发者工具</button>
                 <button onclick="mobileNavClick('help')">帮助</button>
                 <button onclick="openSettings(); toggleMobileMenu();">系统设置</button>
             </div>
@@ -429,6 +430,10 @@
                             <button class="tab-btn" onclick="switchDevTool('manim')">
                                 <i class="fa-brands fa-python"></i> Manim 代码云端渲染工作台
                             </button>
+                            <button class="tab-btn" onclick="switchDevTool('rainbow')">
+                                <i class="fa-solid fa-layer-group"></i> rainbow鱼的扩展库
+                                <span style="font-size:0.6rem; background:var(--primary-color); color:white; padding:1px 4px; border-radius:4px; margin-left:5px;">NEW</span>
+                            </button>
                         </div>
                     </div>
 
@@ -487,22 +492,17 @@
                             <!-- 代码编辑器 -->
                             <div class="ide-editor">
                                 <div class="ide-toolbar">
-                                    <span><i class="fa-brands fa-python"></i> main.py</span>
+                                    <span><i class="fa-brands fa-python"></i> main.py (Monaco Kernel)</span>
                                     <button id="btn-run-manim" class="ide-btn-run" onclick="runDevManim()">
                                         <i class="fa-solid fa-play"></i> 运行脚本
                                     </button>
                                 </div>
 
-                                <div class="code-wrapper">
-                                    <!-- 高亮层：移除 language-python 类，交给 innerHTML 处理，保持干净 -->
-                                    <pre id="dev-manim-highlight" class="code-layer"></pre>
-
-                                    <!-- 输入层 -->
-                                    <textarea id="dev-manim-input" class="code-layer" spellcheck="false"></textarea>
-                                </div>
+                                <!-- 核心：Monaco 容器 -->
+                                <div id="monaco-container" style="flex: 1; width: 100%; height: 100%; overflow: hidden;"></div>
                             </div>
 
-                            <!-- 视频预览 -->
+                            <!-- 视频预览 (保持不变) -->
                             <div class="ide-preview">
                                 <video id="dev-manim-video" controls style="width:100%; height:100%; display:none; object-fit:contain;"></video>
 
@@ -517,6 +517,12 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- [新增] Rainbow 扩展库面板 -->
+                    <div id="dev-rainbow" class="dev-panel" style="display: none; overflow-y: auto;">
+                        <!-- 内容将由 JS 动态生成 -->
+                        <div id="rainbow-content-container"></div>
                     </div>
 
                 </div>
@@ -548,8 +554,7 @@
                 <details open>
                     <summary>系统支持哪些手写格式和数学内容？</summary>
                     <p>目前系统针对<b>线性代数</b>进行了深度优化。
-                    <br>✅ <b>完美支持：</b> 矩阵（方阵、列向量、稀疏矩阵）、行列式、基础代数运算（加减乘除）。
-                    <br>⚠️ <b>正在训练：</b> 复杂的微积分符号（积分、极限）目前仅支持识别，暂不支持动画生成。
+                    <br>✅ <b>完美支持：</b> 矩阵（方阵、列向量、稀疏矩阵）、行列式、基础代数运算（加减乘除）、微积分符号（积分、极限）等。
                     <br>💡 <b>建议：</b> 书写时请尽量保持字符间距，避免连笔；使用黑色或深蓝色墨水在白纸上书写效果最佳。</p>
                 </details>
 
@@ -920,6 +925,8 @@
                     <li><a href="javascript:void(0)" onclick="showSection('devtools'); switchDevTool('latex')">LaTeX 编辑器</a></li>
                     <!-- 跳转并自动切换到 Manim 标签 -->
                     <li><a href="javascript:void(0)" onclick="showSection('devtools'); switchDevTool('manim')">Manim 工作台</a></li>
+                    <!-- 跳转并自动切换到 rainbow 标签 -->
+                    <li><a href="javascript:void(0)" onclick="showSection('devtools'); switchDevTool('rainbow')">rainbow鱼拓展库</a></li>
                 </ul>
             </div>
         </div>
