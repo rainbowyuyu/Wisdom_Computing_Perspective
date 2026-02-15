@@ -1,5 +1,15 @@
-import { toggleModal, showSection, toggleAuthModal } from './ui.js';
+import { toggleModal, showSection, toggleAuthModal, showToast } from './ui.js';
 import { loadMyFormulas, normalizeLatex } from './formulas.js';
+import * as Formulas from './formulas.js';
+
+let lastGeneratedCode = '';
+
+function getCurrentUser() {
+    const userDisplay = document.getElementById('user-display');
+    const usernameSpan = document.getElementById('username-span');
+    if (userDisplay && userDisplay.style.display !== 'none' && usernameSpan) return usernameSpan.innerText;
+    return null;
+}
 
 // 初始化计算页面的监听器
 export function initCalculateListeners() {
@@ -97,6 +107,10 @@ export async function startAnimation() {
         videoPlayer.src = "";
     }
     if(placeholder) placeholder.style.display = 'block';
+    const saveScriptWrap = document.getElementById('calc-save-script-wrap');
+    if(saveScriptWrap) saveScriptWrap.style.display = 'none';
+    const renderLoading = document.getElementById('calc-render-loading');
+    if(renderLoading) renderLoading.style.display = 'flex';
 
     // 辅助：添加日志
     function addLog(msg, color = "#cbd5e1") {
@@ -197,17 +211,22 @@ export async function startAnimation() {
                             addLog("正在构思数学可视化脚本...", "#fbbf24");
                         }
                         else if (data.step === 'code_generated') {
+                            if (data.code) lastGeneratedCode = data.code;
                             addLog("脚本生成完毕，代码预览：", "#34d399");
                             if (data.code) {
                                 await streamCodeBlock(data.code);
                             }
                         }
+                        else if (data.step === 'fixing_code') {
+                            addLog(data.message || "渲染报错，正在根据错误信息修正代码并重试...", "#fbbf24");
+                        }
                         else if (data.step === 'rendering') {
-                            if (data.message && !data.message.includes("渲染帧")) {
+                            if (data.message) {
                                 addLog(data.message, "#e2e8f0");
                             }
                         }
                         else if (data.step === 'complete') {
+                            if (renderLoading) renderLoading.style.display = 'none';
                             addLog("✨ 渲染完成！视频加载中...", "#a78bfa");
                             setTimeout(() => {
                                 if (placeholder) placeholder.style.display = 'none';
@@ -216,13 +235,15 @@ export async function startAnimation() {
                                     videoPlayer.style.display = 'block';
                                     videoPlayer.play();
                                 }
+                                const saveScriptWrap = document.getElementById('calc-save-script-wrap');
+                                if (saveScriptWrap && lastGeneratedCode) saveScriptWrap.style.display = 'block';
                             }, 500);
                             return;
                         }
                         else if (data.step === 'error') {
+                            if (renderLoading) renderLoading.style.display = 'none';
                             addLog("❌ 错误: " + data.message, "#ef4444");
                             if(progBar) progBar.style.background = "#ef4444";
-                            // 出错时也不需要手动停止冷却，让它自然倒计时结束即可（防止刷错误）
                             return;
                         }
 
@@ -235,6 +256,8 @@ export async function startAnimation() {
 
     } catch (e) {
         console.error(e);
+        const loadingEl = document.getElementById('calc-render-loading');
+        if (loadingEl) loadingEl.style.display = 'none';
         addLog("网络连接错误，请检查服务器状态。", "#ef4444");
     }
 }
@@ -315,6 +338,38 @@ async function loadFormulaSelectorList() {
         }
     } catch (e) {
         container.innerHTML = "加载失败";
+    }
+}
+
+export async function saveLastCodeToScripts() {
+    const user = getCurrentUser();
+    if (!user) {
+        showToast('请先登录', 'error');
+        toggleAuthModal(true);
+        return;
+    }
+    if (!lastGeneratedCode.trim()) {
+        showToast('暂无可保存的代码', 'error');
+        return;
+    }
+    const note = prompt('请输入脚本备注（用于在动画脚本库中识别）：', '动态计算 ' + new Date().toLocaleString());
+    if (note === null) return;
+    try {
+        const res = await fetch('/api/animation_scripts/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, note: note.trim() || '未命名', code: lastGeneratedCode })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            showToast('已保存到动画脚本库', 'success');
+            showSection('my-formulas');
+            Formulas.switchFormulasSubTab('scripts');
+        } else {
+            showToast(data.message || '保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('网络错误', 'error');
     }
 }
 

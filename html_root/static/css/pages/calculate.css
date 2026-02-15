@@ -239,6 +239,29 @@ textarea[style*="display:none"] {
     color: #3b82f6;
 }
 
+/* 计算渲染中加载层：覆盖在视频区上方，请求期间一直转 */
+.calc-render-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.92);
+    z-index: 8;
+    pointer-events: none;
+}
+.calc-render-loading-spinner {
+    font-size: 2.25rem;
+    color: #3b82f6;
+    margin-bottom: 0.75rem;
+}
+.calc-render-loading-text {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    margin: 0;
+}
+
 /* --- 日志控制台样式 --- */
 #gen-log {
     font-family: 'JetBrains Mono', monospace;

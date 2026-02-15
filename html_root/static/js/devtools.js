@@ -41,7 +41,49 @@ export function switchDevTool(tool) {
 // 2. 初始化入口
 export function initDevTools() {
     initLatexTool();
-    // Manim 工具改为懒加载，点击 Tab 时再初始化
+    initManimResize();
+}
+
+/** 代码 / 视频 / 日志 三者交界处拖拽调整大小 */
+function initManimResize() {
+    const editorPane = document.getElementById('ide-editor-pane');
+    const previewPane = document.getElementById('ide-preview-pane');
+    const innerPane = document.getElementById('ide-preview-inner-pane');
+    const logPane = document.getElementById('ide-log-pane');
+    const handleEditorPreview = document.getElementById('ide-resize-editor-preview');
+    const handlePreviewLog = document.getElementById('ide-resize-preview-log');
+    if (!editorPane || !previewPane || !handleEditorPreview) return;
+
+    function dragVertical(handle, paneAbove, paneBelow, minAbove, minBelow) {
+        let startY = 0, startAbove = 0;
+        function onMove(e) {
+            const dy = e.clientY - startY;
+            const newAbove = Math.max(minAbove, startAbove + dy);
+            paneAbove.style.flex = `0 0 ${newAbove}px`;
+            paneBelow.style.flex = '1 1 0%';
+        }
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            if (monacoEditor) monacoEditor.layout();
+        }
+        handle.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            startY = e.clientY;
+            startAbove = paneAbove.getBoundingClientRect().height;
+            document.body.style.cursor = 'ns-resize';
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    dragVertical(handleEditorPreview, editorPane, previewPane, 180, 180);
+    if (handlePreviewLog && innerPane && logPane) {
+        dragVertical(handlePreviewLog, innerPane, logPane, 120, 80);
+    }
 }
 
 // --- LaTeX 模块 (保持不变) ---
@@ -209,8 +251,6 @@ export async function runDevManim() {
         alert("请等待冷却时间结束");
         return;
     }
-
-    // 必须确保编辑器已加载
     if (!monacoEditor) return;
     const code = monacoEditor.getValue();
 
@@ -218,37 +258,87 @@ export async function runDevManim() {
     const video = document.getElementById('dev-manim-video');
     const placeholder = document.getElementById('dev-manim-placeholder');
     const loading = document.getElementById('dev-manim-loading');
+    const logEl = document.getElementById('dev-manim-log');
 
-    // UI 锁定
     startCooldownTimer(30, btn);
     placeholder.style.display = 'none';
     video.style.display = 'none';
     loading.style.display = 'block';
+    if (logEl) {
+        logEl.textContent = '';
+        logEl.style.display = 'block';
+    }
 
     try {
-        const res = await fetch('/api/devtools/run_manim', {
+        const res = await fetch('/api/devtools/run_manim_stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: code })
+            body: JSON.stringify({ code })
         });
-
-        const data = await res.json();
-
-        if (data.status === 'success') {
-            // 添加时间戳防止缓存
-            video.src = `${data.video_url}?t=${new Date().getTime()}`;
-            video.style.display = 'block';
-        } else {
-            alert("渲染报错:\n" + data.message);
+        if (!res.ok || !res.body) {
+            if (logEl) logEl.textContent = '请求失败';
             placeholder.style.display = 'block';
+            loading.style.display = 'none';
+            return;
         }
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        if (data.type === 'log' && data.message && logEl) {
+                            logEl.textContent += '> ' + data.message + '\n';
+                            logEl.scrollTop = logEl.scrollHeight;
+                        } else if (data.type === 'start' && logEl) {
+                            logEl.textContent += '> ' + (data.message || '') + '\n';
+                            logEl.scrollTop = logEl.scrollHeight;
+                        } else if (data.type === 'complete' && data.video_url) {
+                            video.src = `${data.video_url}?t=${new Date().getTime()}`;
+                            video.style.display = 'block';
+                            if (logEl) { logEl.textContent += '> 渲染完成。\n'; logEl.scrollTop = logEl.scrollHeight; }
+                        } else if (data.type === 'error') {
+                            if (logEl) { logEl.textContent += '> 错误: ' + (data.message || '') + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+                            placeholder.style.display = 'block';
+                        }
+                    } catch (_) {}
+                }
+            }
+        }
+        if (video.style.display !== 'block') placeholder.style.display = 'block';
     } catch (e) {
         console.error(e);
-        alert("网络请求失败");
+        if (logEl) logEl.textContent += '网络错误: ' + e.message + '\n';
         placeholder.style.display = 'block';
     } finally {
         loading.style.display = 'none';
     }
+}
+
+/** 从外部（如我的算式-动画脚本库）跳转到本工作台并填入代码，可选自动运行 */
+export function openManimWorkbenchWithCode(code, options = {}) {
+    switchDevTool('manim');
+    const setCode = () => {
+        if (monacoEditor) {
+            monacoEditor.setValue(code || '');
+            if (options.autoRun) setTimeout(() => runDevManim(), 400);
+        }
+    };
+    setTimeout(setCode, 150);
+    const t = setInterval(() => {
+        if (monacoEditor) {
+            setCode();
+            clearInterval(t);
+        }
+    }, 100);
+    setTimeout(() => clearInterval(t), 6000);
 }
 
 function startCooldownTimer(seconds, btn) {
@@ -354,4 +444,130 @@ window.loadIntoWorkbench = function(index) {
 // 辅助：HTML 转义
 function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// --- 导入面板：我的脚本 + Rainbow 样例 ---
+function getCurrentUsername() {
+    const userDisplay = document.getElementById('user-display');
+    const usernameSpan = document.getElementById('username-span');
+    if (userDisplay && userDisplay.style.display !== 'none' && usernameSpan) return usernameSpan.innerText;
+    return null;
+}
+
+export function toggleImportPanel() {
+    const panel = document.getElementById('manim-import-panel');
+    const btn = document.getElementById('btn-manim-import');
+    if (!panel) return;
+    if (panel.style.display === 'flex') {
+        panel.style.display = 'none';
+        return;
+    }
+    panel.style.display = 'flex';
+    // 使用 fixed 定位并相对「导入」按钮贴齐，避免被父级 overflow 裁剪
+    if (btn) {
+        const r = btn.getBoundingClientRect();
+        panel.style.position = 'fixed';
+        panel.style.left = r.left + 'px';
+        panel.style.top = (r.bottom + 6) + 'px';
+        panel.style.right = 'auto';
+        const maxH = window.innerHeight - r.bottom - 16;
+        if (maxH < 320) panel.style.maxHeight = Math.max(200, maxH) + 'px';
+        else panel.style.maxHeight = '360px';
+    }
+    const scriptsTab = panel.querySelector('.manim-import-tab[data-tab="scripts"]');
+    const rainbowTab = panel.querySelector('.manim-import-tab[data-tab="rainbow"]');
+    if (scriptsTab && scriptsTab.classList.contains('active')) {
+        renderImportScripts();
+    } else if (rainbowTab && rainbowTab.classList.contains('active')) {
+        renderImportRainbow();
+    }
+    // 点击外部关闭
+    const close = (e) => {
+        if (!panel.contains(e.target) && !btn?.contains(e.target)) {
+            panel.style.display = 'none';
+            document.removeEventListener('click', close);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', close), 0);
+}
+
+function renderImportScripts() {
+    const listEl = document.getElementById('manim-import-scripts');
+    const rainbowEl = document.getElementById('manim-import-rainbow');
+    if (!listEl || !rainbowEl) return;
+    listEl.style.display = 'block';
+    rainbowEl.style.display = 'none';
+    const user = getCurrentUsername();
+    if (!user) {
+        listEl.innerHTML = '<p style="padding:1rem; color:#94a3b8; font-size:0.85rem;">请先登录后在此选择已保存的脚本。</p>';
+        return;
+    }
+    listEl.innerHTML = '<p style="padding:0.5rem; color:#94a3b8; font-size:0.8rem;">加载中...</p>';
+    fetch(`/api/animation_scripts/list?username=${encodeURIComponent(user)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status !== 'success' || !data.data || data.data.length === 0) {
+                listEl.innerHTML = '<p style="padding:1rem; color:#94a3b8; font-size:0.85rem;">暂无保存的脚本，可前往「我的算式 → 动画脚本库」保存。</p>';
+                return;
+            }
+            listEl.innerHTML = data.data.map(s => {
+                const note = (s.note || '未命名').replace(/</g, '&lt;');
+                return `<button type="button" class="import-item" data-id="${s.id}">${note}<small>ID: ${s.id}</small></button>`;
+            }).join('');
+            listEl.querySelectorAll('.import-item').forEach(btn => {
+                btn.addEventListener('click', () => loadScriptIntoEditor(parseInt(btn.dataset.id, 10)));
+            });
+        })
+        .catch(() => {
+            listEl.innerHTML = '<p style="padding:1rem; color:#ef4444; font-size:0.85rem;">加载失败</p>';
+        });
+}
+
+function loadScriptIntoEditor(scriptId) {
+    const user = getCurrentUsername();
+    if (!user) return;
+    fetch(`/api/animation_scripts/get?id=${scriptId}&username=${encodeURIComponent(user)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success' && data.data && data.data.code && monacoEditor) {
+                monacoEditor.setValue(data.data.code);
+                document.getElementById('manim-import-panel').style.display = 'none';
+            }
+        });
+}
+
+function renderImportRainbow() {
+    const listEl = document.getElementById('manim-import-rainbow');
+    const scriptsEl = document.getElementById('manim-import-scripts');
+    if (!listEl || !scriptsEl) return;
+    listEl.style.display = 'block';
+    scriptsEl.style.display = 'none';
+    const modules = RAINBOW_LIB_INFO.modules || [];
+    if (modules.length === 0) {
+        listEl.innerHTML = '<p style="padding:1rem; color:#94a3b8;">暂无样例</p>';
+        return;
+    }
+    listEl.innerHTML = modules.map((mod, i) => {
+        const title = (mod.title || '').replace(/</g, '&lt;');
+        const desc = (mod.desc || '').replace(/</g, '&lt;').substring(0, 60);
+        return `<button type="button" class="import-item" data-rainbow-index="${i}">${title}<small>${desc}${desc.length >= 60 ? '…' : ''}</small></button>`;
+    }).join('');
+    listEl.querySelectorAll('.import-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const i = parseInt(btn.dataset.rainbowIndex, 10);
+            const code = RAINBOW_LIB_INFO.modules[i]?.code;
+            if (code && monacoEditor) {
+                monacoEditor.setValue(code);
+                document.getElementById('manim-import-panel').style.display = 'none';
+            }
+        });
+    });
+}
+
+export function switchImportTab(tab) {
+    document.querySelectorAll('#manim-import-panel .manim-import-tab').forEach(t => t.classList.remove('active'));
+    const btn = document.querySelector(`#manim-import-panel .manim-import-tab[data-tab="${tab}"]`);
+    if (btn) btn.classList.add('active');
+    if (tab === 'scripts') renderImportScripts();
+    else renderImportRainbow();
 }

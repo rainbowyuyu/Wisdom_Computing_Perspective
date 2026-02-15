@@ -45,6 +45,7 @@
         <!-- 桌面端导航链接 (添加 desktop-nav 类) -->
         <div class="nav-links desktop-nav">
             <button class="nav-btn active" onclick="showSection('home')">首页</button>
+            <button class="nav-btn" onclick="showSection('agent')">智能体</button>
             <button class="nav-btn" onclick="showSection('detect')">智能识别</button>
             <button class="nav-btn" onclick="showSection('my-formulas')">我的算式</button>
             <button class="nav-btn" onclick="showSection('calculate')">动态计算</button>
@@ -76,6 +77,7 @@
 
             <div class="mobile-nav-links">
                 <button onclick="mobileNavClick('home')">首页</button>
+                <button onclick="mobileNavClick('agent')">智能体</button>
                 <button onclick="mobileNavClick('detect')">智能识别</button>
                 <button onclick="mobileNavClick('my-formulas')">我的算式</button>
                 <button onclick="mobileNavClick('calculate')">动态计算</button>
@@ -90,6 +92,13 @@
                 <button class="login-btn full-width" onclick="toggleAuthModal(true); toggleMobileMenu();">登录 / 注册</button>
             </div>
         </div>
+    </div>
+
+    <!-- 顶部更新消息：智能体 -->
+    <div class="agent-update-banner" id="agent-update-banner">
+        <span class="agent-update-text">新功能：智能体已上线 — 用自然语言调用识别、计算、开发者工具等</span>
+        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志')" class="agent-update-detail" title="查看更新详情">?</a>
+        <button type="button" class="agent-update-close" onclick="closeAgentBanner()" title="关闭" aria-label="关闭"><i class="fa-solid fa-times"></i></button>
     </div>
 
     <!-- 主要内容区域 -->
@@ -116,7 +125,10 @@
                 </p>
 
                 <div class="hero-btns">
-                    <button class="cta-btn primary" onclick="showSection('detect')">
+                    <button class="cta-btn primary" onclick="showSection('agent')">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 试试智能体
+                    </button>
+                    <button class="cta-btn secondary" onclick="showSection('detect')">
                         立即体验 <i class="fa-solid fa-arrow-right"></i>
                     </button>
                     <button class="cta-btn secondary" onclick="showSection('examples')">
@@ -124,14 +136,33 @@
                     </button>
                 </div>
 
-                <!-- 新手引导入口 -->
-                <div class="tutorial-link" onclick="startTutorial()">
-                    <i class="fa-regular fa-circle-question"></i>
-                    <span>不知道怎么用？查看 30 秒教程</span>
+                <div class="hero-links">
+                    <span class="tutorial-link" onclick="showSection('agent')"><i class="fa-solid fa-robot"></i> 用一句话完成识别与动画</span>
+                    <span class="tutorial-link" onclick="startTutorial()"><i class="fa-regular fa-circle-question"></i> 30 秒教程</span>
+                </div>
+            </div>
+
+            <!-- 智能体功能高亮 -->
+            <div class="agent-feature-strip" onclick="showSection('agent')">
+                <div class="agent-feature-strip-inner">
+                    <span class="agent-feature-badge">NEW</span>
+                    <div class="agent-feature-strip-content">
+                        <h3>智能体</h3>
+                        <p>用自然语言描述需求，自动跳转并执行：识别公式、生成动画、打开 LaTeX / Manim 工作台等，一站调度全站能力。</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right agent-feature-arrow"></i>
                 </div>
             </div>
 
             <div class="features-grid">
+                <div class="feature-card" onclick="showSection('agent')">
+                    <span class="feature-card-badge">推荐</span>
+                    <div class="feature-icon-box">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <h3>智能体</h3>
+                    <p>用一句话调用全站功能。例如："把 sin(x) = 1/2 做成动画" 或 "识别这张图并去计算"，自动跳转并完成任务。</p>
+                </div>
                 <div class="feature-card" onclick="showSection('detect')">
                     <div class="feature-icon-box">
                         <i class="fa-solid fa-eye"></i>
@@ -146,17 +177,67 @@
                     <h3>动态推演</h3>
                     <p>拒绝死板的答案。基于 Python Manim 引擎，实时渲染矩阵变换、行列式展开过程。</p>
                 </div>
-                <div class="feature-card" onclick="showSection('examples')">
+                <!-- <div class="feature-card" onclick="showSection('examples')">
                     <div class="feature-icon-box">
                         <i class="fa-solid fa-laptop-code"></i>
                     </div>
                     <h3>交互学习</h3>
                     <p>不仅仅是计算器。支持实时修改公式参数，通过可视化过程深入理解底层数学逻辑。</p>
+                </div> -->
+            </div>
+        </section>
+
+        <!-- 2. 智能体 Section：自然语言 + 图片 -> 一键可视化（登录后可用） -->
+        <section id="agent" class="section agent-section">
+            <div class="agent-hero">
+                <span class="agent-badge"><i class="fa-solid fa-crown"></i> 会员功能</span>
+                <h2 class="section-title agent-title">智能体</h2>
+                <p class="agent-desc">用自然语言描述你想做的事，智能体会自动调用识别、计算、动画、LaTeX 编辑等能力，一步到位完成复杂任务。</p>
+                <ul class="agent-features-list">
+                    <li><i class="fa-solid fa-check"></i> 一句话生成动画、打开编辑器或识别公式</li>
+                    <li><i class="fa-solid fa-check"></i> 支持上传公式图片，自动识别并跳转计算</li>
+                    <li><i class="fa-solid fa-check"></i> 与本站所有功能无缝联动</li>
+                </ul>
+            </div>
+            <!-- 未登录时显示：引导登录 -->
+            <div id="agent-gate" class="agent-gate">
+                <div class="agent-gate-card">
+                    <div class="agent-gate-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                    <h3 class="agent-gate-title">登录后即可使用智能体</h3>
+                    <p class="agent-gate-desc">智能体为登录用户专属功能，登录后可享受一句话调度识别、计算与动画等全部能力。</p>
+                    <button type="button" class="agent-gate-btn" onclick="toggleAuthModal(true)">
+                        <i class="fa-solid fa-right-to-bracket"></i> 登录 / 注册
+                    </button>
+                </div>
+            </div>
+            <!-- 已登录时显示：工作区 -->
+            <div id="agent-workspace-wrap" class="agent-workspace-wrap" style="display: none;">
+                <div class="agent-workspace">
+                    <div class="agent-input-card">
+                        <label class="agent-label"><i class="fa-solid fa-comment-dots"></i> 描述你的需求</label>
+                        <textarea id="agent-prompt" class="agent-textarea" placeholder="例如：把 sin(x) = 1/2 做成动画&#10;打开 LaTeX 编辑器&#10;识别这张图片里的公式并去计算页生成动画" rows="4"></textarea>
+                        <div class="agent-upload-row">
+                            <label class="agent-upload-label" for="agent-image-upload">
+                                <i class="fa-solid fa-image"></i> 上传公式图片（可选）
+                            </label>
+                            <input type="file" id="agent-image-upload" accept="image/*" style="display:none;">
+                            <span id="agent-file-name" class="agent-file-name"></span>
+                        </div>
+                        <button type="button" id="agent-submit-btn" class="agent-submit-btn" onclick="Agent.execute()">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> 执行
+                        </button>
+                    </div>
+                    <div class="agent-result-card">
+                        <div id="agent-status" class="agent-status">输入描述后点击“执行”，将自动跳转到对应页面并完成任务。</div>
+                        <div id="agent-result-area" class="agent-result-area" style="display: none;">
+                            <p id="agent-result-message" class="agent-result-message"></p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- 2. 识别与画板 Section (重构版布局) -->
+        <!-- 3. 识别与画板 Section (重构版布局) -->
         <section id="detect" class="section">
             <h2 class="section-title" style="margin: 1.5rem 0 1rem; font-size:1.8rem;">智能算式识别</h2>
 
@@ -221,7 +302,7 @@
                             <img id="uploaded-preview" src="" alt="预览" style="display:none;">
                         </div>
                         <!-- 提示浮层 -->
-                        <div style="position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 6px 16px; border-radius: 20px; color: var(--text-secondary); font-size: 0.85rem; pointer-events: none; border: 1px solid #e2e8f0; box-shadow: var(--shadow-sm);">
+                        <div class="canvas-hint" style="position: absolute; top: 15px; left: 50%; transform: translateX(-50%); padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; pointer-events: none;">
                             <i class="fa-solid fa-info-circle"></i> 在此区域绘制公式
                         </div>
                     </div>
@@ -237,7 +318,7 @@
                                 <summary style="font-size:0.85rem; color:var(--text-secondary); cursor:pointer;">
                                     <i class="fa-solid fa-terminal"></i> 查看源码
                                 </summary>
-                                <div style="position: absolute; bottom: 100%; right: 0; width: 300px; background: white; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: var(--shadow-lg); z-index: 20;">
+                                <div class="code-detail-popup" style="position: absolute; bottom: 100%; right: 0; width: 300px; padding: 10px; border-radius: 8px; z-index: 20;">
                                     <textarea id="latex-code-detect" placeholder="LaTeX 代码..." style="width:100%; height:100px; font-family:monospace;"></textarea>
                                 </div>
                             </details>
@@ -278,19 +359,60 @@
         <!-- 3. 新增“我的算式”页面 (插在 Calculate Section 之后) -->
         <section id="my-formulas" class="section">
             <h2 class="section-title">我的算式库</h2>
-            <div class="container" style="max-width: 1000px;">
-                <div class="glass-panel" style="min-height: 500px;">
+            <div class="container formulas-container" style="max-width: 1000px;">
+                <!-- 子导航：算式库 | 动画脚本库 -->
+                <div class="formulas-sub-nav">
+                    <button type="button" class="formulas-sub-tab active" data-tab="formulas" onclick="Formulas.switchFormulasSubTab('formulas')">算式库</button>
+                    <button type="button" class="formulas-sub-tab" data-tab="scripts" onclick="Formulas.switchFormulasSubTab('scripts')">动画脚本库</button>
+                </div>
+
+                <!-- 算式库面板 -->
+                <div id="formulas-panel" class="formulas-panel glass-panel">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem;">
                         <h3 style="margin:0; color:var(--text-main);">已保存的公式</h3>
                         <button class="action-btn secondary" onclick="loadMyFormulas()">
                             <i class="fa-solid fa-rotate"></i> 刷新列表
                         </button>
                     </div>
+                    <div id="formula-list" class="formula-grid"></div>
+                </div>
 
-                    <div id="formula-list" class="formula-grid">
-                        <!-- JS 动态填充 -->
-                        <div style="text-align:center; color:var(--text-secondary); padding:2rem;">
-                            <i class="fa-solid fa-spinner fa-spin"></i> 加载中...
+                <!-- 动画脚本库面板：列表 + 详情(Monaco) -->
+                <div id="scripts-panel" class="formulas-panel glass-panel" style="display:none;">
+                    <div id="scripts-list-view">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem;">
+                            <h3 style="margin:0; color:var(--text-main);">已保存的 Manim 脚本</h3>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" class="action-btn secondary" onclick="Formulas.openScriptDetail('new')">
+                                    <i class="fa-solid fa-plus"></i> 新建空白脚本
+                                </button>
+                                <button class="action-btn secondary" onclick="Formulas.loadAnimationScripts()">
+                                    <i class="fa-solid fa-rotate"></i> 刷新
+                                </button>
+                            </div>
+                        </div>
+                        <div id="animation-scripts-list" class="formula-grid">
+                            <div style="text-align:center; color:var(--text-secondary); padding:2rem;">加载中...</div>
+                        </div>
+                    </div>
+                    <div id="scripts-detail-view" style="display:none;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                            <button type="button" class="action-btn secondary" onclick="Formulas.closeScriptDetail()">
+                                <i class="fa-solid fa-arrow-left"></i> 返回列表
+                            </button>
+                            <div style="display:flex; gap:10px;">
+                                <button type="button" id="btn-save-script" class="action-btn secondary" onclick="Formulas.saveScriptFromDetail()">保存</button>
+                                <button type="button" id="btn-run-script" class="action-btn" onclick="Formulas.runScriptFromDetail()">
+                                    <i class="fa-solid fa-play"></i> 运行渲染
+                                </button>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label style="display:block; margin-bottom:6px; font-weight:600; color:var(--text-secondary); font-size:0.9rem;">备注</label>
+                            <input type="text" id="script-detail-note" class="tech-input" placeholder="脚本备注" style="max-width:400px;">
+                        </div>
+                        <div id="formulas-monaco-wrap" style="height:420px; border:1px solid var(--border-color); border-radius:12px; overflow:hidden;">
+                            <div id="formulas-monaco-container" style="width:100%; height:100%;"></div>
                         </div>
                     </div>
                 </div>
@@ -375,11 +497,21 @@
                             <p style="font-weight: 500;">等待指令...</p>
                             <span style="font-size:0.85rem; opacity:0.6;">配置左侧参数后点击生成</span>
                         </div>
+                        <!-- 渲染中加载层：请求期间一直转，避免用户以为卡住 -->
+                        <div id="calc-render-loading" class="calc-render-loading" style="display: none;">
+                            <i class="fa-solid fa-circle-notch fa-spin calc-render-loading-spinner"></i>
+                            <p class="calc-render-loading-text">正在生成与渲染...</p>
+                        </div>
                         <!-- 视频播放器 (初始隐藏) -->
                         <video id="result-video-player" controls style="width: 100%; height: 100%; display: none; outline: none;">
                             <source src="" type="video/mp4">
                             您的浏览器不支持视频标签。
                         </video>
+                        <div id="calc-save-script-wrap" style="display:none; position:absolute; bottom:12px; right:12px;">
+                            <button type="button" class="action-btn secondary" id="btn-save-to-scripts" onclick="Calculate.saveLastCodeToScripts()" style="font-size:0.85rem; padding:8px 14px;">
+                                <i class="fa-solid fa-bookmark"></i> 保存到动画脚本库
+                            </button>
+                        </div>
                     </div>
 
                     <!-- 3. 下半部分：代码/日志控制台 -->
@@ -488,32 +620,52 @@
 
                     <!-- 2. Manim 工作台 -->
                     <div id="dev-manim" class="dev-panel" style="display: none; padding: 0;">
-                        <div class="ide-layout">
+                        <div class="ide-layout" id="ide-layout-manim">
                             <!-- 代码编辑器 -->
-                            <div class="ide-editor">
+                            <div class="ide-editor ide-resize-pane" id="ide-editor-pane" style="flex: 1 1 45%; min-height: 180px;">
                                 <div class="ide-toolbar">
                                     <span><i class="fa-brands fa-python"></i> main.py (Monaco Kernel)</span>
-                                    <button id="btn-run-manim" class="ide-btn-run" onclick="runDevManim()">
-                                        <i class="fa-solid fa-play"></i> 运行脚本
-                                    </button>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <div class="manim-import-wrap">
+                                            <button type="button" class="ide-btn-import" id="btn-manim-import" onclick="DevTools.toggleImportPanel()">
+                                                <i class="fa-solid fa-file-import"></i> 导入
+                                            </button>
+                                            <div id="manim-import-panel" class="manim-import-panel" style="display: none;">
+                                                <div class="manim-import-tabs">
+                                                    <button type="button" class="manim-import-tab active" data-tab="scripts" onclick="DevTools.switchImportTab('scripts')">我的脚本</button>
+                                                    <button type="button" class="manim-import-tab" data-tab="rainbow" onclick="DevTools.switchImportTab('rainbow')">Rainbow 样例</button>
+                                                </div>
+                                                <div id="manim-import-scripts" class="manim-import-list"></div>
+                                                <div id="manim-import-rainbow" class="manim-import-list" style="display: none;"></div>
+                                            </div>
+                                        </div>
+                                        <button id="btn-run-manim" class="ide-btn-run" onclick="runDevManim()">
+                                            <i class="fa-solid fa-play"></i> 运行脚本
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <!-- 核心：Monaco 容器 -->
                                 <div id="monaco-container" style="flex: 1; width: 100%; height: 100%; overflow: hidden;"></div>
                             </div>
-
-                            <!-- 视频预览 (保持不变) -->
-                            <div class="ide-preview">
-                                <video id="dev-manim-video" controls style="width:100%; height:100%; display:none; object-fit:contain;"></video>
-
-                                <div id="dev-manim-placeholder" class="ide-placeholder">
-                                    <i class="fa-solid fa-clapperboard" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
-                                    <p>编写代码并点击运行<br>预览将在此处显示</p>
+                            <div class="ide-resize-handle ide-resize-h" id="ide-resize-editor-preview" title="拖拽调整代码与预览区高度"></div>
+                            <!-- 视频预览 + 渲染日志 -->
+                            <div class="ide-preview ide-resize-pane" id="ide-preview-pane" style="flex: 1 1 55%; flex-direction: column; min-height: 180px;">
+                                <div class="ide-preview-inner" id="ide-preview-inner-pane" style="flex: 1 1 60%; min-height: 120px;">
+                                    <video id="dev-manim-video" class="ide-preview-video" controls></video>
+                                    <div id="dev-manim-placeholder" class="ide-placeholder">
+                                        <i class="ide-placeholder-icon fa-solid fa-clapperboard"></i>
+                                        <p class="ide-placeholder-text">编写代码并点击运行<br>可从「导入」选择已保存脚本或 Rainbow 样例</p>
+                                    </div>
+                                    <div id="dev-manim-loading" class="ide-loading" style="display: none;">
+                                        <i class="ide-loading-spinner fa-solid fa-circle-notch fa-spin"></i>
+                                        <p class="ide-loading-text">正在云端渲染...</p>
+                                    </div>
                                 </div>
-
-                                <div id="dev-manim-loading" class="ide-loading" style="display: none;">
-                                    <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2rem; color: #4caf50;"></i>
-                                    <p style="margin-top: 10px; font-size: 0.9rem;">正在云端渲染...</p>
+                                <div class="ide-resize-handle ide-resize-h ide-resize-log" id="ide-resize-preview-log" title="拖拽调整视频与日志高度"></div>
+                                <div class="dev-manim-log-wrap ide-resize-pane" id="ide-log-pane" style="flex: 1 1 40%; min-height: 80px;">
+                                    <div class="dev-manim-log-title">渲染日志</div>
+                                    <pre id="dev-manim-log" class="cmd-log"></pre>
                                 </div>
                             </div>
                         </div>
@@ -534,24 +686,43 @@
             <h2 class="section-title">常见问题与指南</h2>
             <div class="help-container" style="max-width:800px; margin:0 auto;">
 
-                <!-- 新增：再次观看教程的入口 Banner -->
+                <!-- 智能体入口 -->
+                <div class="tutorial-banner agent-help-banner" onclick="showSection('agent')">
+                    <div class="banner-icon">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="banner-content">
+                        <h3>智能体</h3>
+                        <p>用自然语言描述需求，自动跳转到识别、计算或开发者工具并执行对应任务。</p>
+                    </div>
+                    <div class="banner-action">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 去使用
+                    </div>
+                </div>
+
                 <div class="tutorial-banner" onclick="startTutorial()">
                     <div class="banner-icon">
                         <i class="fa-solid fa-graduation-cap"></i>
                     </div>
                     <div class="banner-content">
                         <h3>新手入门指南</h3>
-                        <p>错过引导了？点击这里重新开启交互式教学，30秒掌握所有核心功能。</p>
+                        <p>点击这里开启交互式教学，30 秒掌握核心功能。</p>
                     </div>
                     <div class="banner-action">
                         <i class="fa-solid fa-circle-play"></i> 观看
                     </div>
                 </div>
 
-
-
-                <!-- 1. 识别与输入 -->
+                <!-- 1. 智能体 -->
                 <details open>
+                    <summary>智能体是什么？怎么用？</summary>
+                    <p><b>智能体</b>是本站的"一句话调度"入口。您只需用自然语言描述想做的事（或上传一张公式图片），系统会理解意图并自动跳转到对应页面、预填内容或直接执行任务。
+                    <br>✅ <b>示例：</b>"把 sin(x) = 1/2 做成动画" → 跳转动态计算并自动开始生成；"打开 LaTeX 编辑器" → 跳转开发者工具 LaTeX 标签；"识别这张图里的公式并去计算" → 先识别图片公式，再跳转计算页并填入公式、可自动生成。
+                    <br>💡 在顶部导航或首页点击<b>智能体</b>即可使用。</p>
+                </details>
+
+                <!-- 2. 识别与输入 -->
+                <details>
                     <summary>系统支持哪些手写格式和数学内容？</summary>
                     <p>目前系统针对<b>线性代数</b>进行了深度优化。
                     <br>✅ <b>完美支持：</b> 矩阵（方阵、列向量、稀疏矩阵）、行列式、基础代数运算（加减乘除）、微积分符号（积分、极限）等。
@@ -814,6 +985,22 @@
         </div>
     </div>
 
+    <!-- 动画脚本运行结果弹窗 -->
+    <div id="script-run-modal" class="modal">
+        <div class="modal-content glass-panel" style="width: 560px; max-height: 90vh; display: flex; flex-direction: column;">
+            <span class="close-modal" onclick="toggleModal('script-run-modal', false)">&times;</span>
+            <h3 style="padding: 1rem 2rem 0; color: var(--text-main);">渲染结果</h3>
+            <div style="padding: 1rem 2rem; flex: 1; overflow: auto;">
+                <video id="script-run-video" controls style="width:100%; border-radius:8px; display:none;"></video>
+                <p id="script-run-error" style="color:#ef4444; display:none; white-space:pre-wrap;"></p>
+                <div style="margin-top:10px;">
+                    <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:4px;">渲染日志</div>
+                    <pre id="script-run-log" style="margin:0; padding:8px; background:var(--bg-input); border-radius:8px; font-size:0.75rem; max-height:160px; overflow:auto; white-space:pre-wrap; word-break:break-all;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 通用文档模态框 -->
     <div id="docs-modal" class="modal">
         <!-- 移除内联样式，使用 CSS 控制 -->
@@ -887,7 +1074,7 @@
                     <li><a href="#" onclick="showSection('detect')">智能识别</a></li>
                     <li><a href="#" onclick="showSection('calculate')">动态计算</a></li>
                     <li><a href="#" onclick="showSection('examples')">教学案例库</a></li>
-                    <li><a href="#" onclick="startTutorial()">新手引导</a></li>
+                    <li><a href="javascript:void(0)" onclick="showSection('agent')">智能体</a></li>
                 </ul>
             </div>
 

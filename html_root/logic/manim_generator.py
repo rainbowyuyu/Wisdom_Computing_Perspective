@@ -203,8 +203,9 @@ class {scene_name}(Scene):
     # Manim 默认会输出到 media/videos/temp_xxx/480p15/GenScene.mp4
     # 我们可以通过 --media_dir 指定输出根目录
 
+    # 使用当前解释器 -m manim，保证与主项目环境一致；-ql 为最快渲染预设（480p15）
     cmd = [
-        "manim",
+        sys.executable, "-m", "manim",
         "-ql",
         py_path,
         scene_name,

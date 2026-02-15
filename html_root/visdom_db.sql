@@ -18,3 +18,13 @@ CREATE TABLE IF NOT EXISTS formulas (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(username) ON DELETE CASCADE
 );
+
+-- 动画脚本表（用户保存的 Manim 渲染代码，支持 Monaco 编辑）
+CREATE TABLE IF NOT EXISTS animation_scripts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    note VARCHAR(255) DEFAULT '',
+    code MEDIUMTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(username) ON DELETE CASCADE
+);

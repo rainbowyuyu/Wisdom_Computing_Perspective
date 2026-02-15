@@ -185,9 +185,19 @@ export function startTutorial() {
                     align: 'start'
                 }
             },
+            // --- 小贴士：智能体 ---
+            {
+                element: '.nav-links .desktop-nav button:nth-child(2)', // 智能体
+                popover: {
+                    title: '小贴士：智能体',
+                    description: '除了按步骤操作，你也可以使用【智能体】用自然语言一句话完成识别、生成动画等。例如："把 sin(x) = 1/2 做成动画"、"识别这张图并去计算"。',
+                    side: "bottom"
+                },
+                onHighlightStarted: () => showSection('home')
+            },
             // --- 阶段一：识别 ---
             {
-                element: '.nav-links button:nth-child(2)', // 智能识别 tab
+                element: '.nav-links .desktop-nav button:nth-child(3)', // 智能识别 tab
                 popover: {
                     title: '1. 进入识别工作台',
                     description: '第一步：点击这里进入【智能识别】页面。',
@@ -245,7 +255,7 @@ export function startTutorial() {
             },
             // --- 阶段三：计算 ---
             {
-                element: '.nav-links button:nth-child(4)', // 动态计算 tab
+                element: '.nav-links .desktop-nav button:nth-child(5)', // 动态计算 tab
                 popover: {
                     title: '7. 前往计算引擎',
                     description: '现在，让我们把静态公式变成动画。点击进入【动态计算】页面。',

@@ -1,5 +1,39 @@
 /* static/css/pages/formulas.css */
 
+.formulas-container { padding-bottom: 2rem; }
+
+.formulas-sub-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.formulas-sub-tab {
+    padding: 10px 20px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.formulas-sub-tab:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.formulas-sub-tab.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.formulas-panel {
+    min-height: 500px;
+}
+
 .formula-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

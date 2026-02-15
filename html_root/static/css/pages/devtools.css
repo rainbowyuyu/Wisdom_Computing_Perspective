@@ -116,12 +116,12 @@
 }
 
 .ide-editor {
-    flex: 3;
     display: flex;
     flex-direction: column;
-    border-bottom: 1px solid #333;
+    border-bottom: none;
     position: relative;
-    min-height: 300px;
+    min-height: 180px;
+    overflow: visible;
 }
 
 .ide-toolbar {
@@ -155,28 +155,104 @@
 .ide-btn-run:hover { background: #43a047; }
 .ide-btn-run:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
 
-/* 预览区域 */
+/* 预览区域：视频背景黑色，可与日志区拖拽调整 */
 .ide-preview {
-    flex: 2;
+    display: flex;
+    flex-direction: column;
+    min-height: 180px;
     background: #000;
+    border-left: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+/* 视频与占位、加载圈共用区域；背景黑色 */
+.ide-preview-inner {
     position: relative;
+    min-height: 120px;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 200px;
+    overflow: hidden;
+    background: #000;
 }
 
-.ide-placeholder { color: #666; text-align: center; pointer-events: none; }
+.ide-preview-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
+    background: #000;
+}
+
+/* 代码 | 视频 | 日志 交界处拖拽条 */
+.ide-resize-handle {
+    flex-shrink: 0;
+    background: var(--border-color);
+    cursor: ns-resize;
+    user-select: none;
+    transition: background 0.15s;
+}
+.ide-resize-handle:hover,
+.ide-resize-handle:active {
+    background: var(--primary-color);
+}
+.ide-resize-h {
+    height: 6px;
+    min-height: 6px;
+}
+.ide-resize-log { margin: 0 8px; border-radius: 3px; }
+.ide-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;
+    color: var(--text-secondary);
+    padding: 1.5rem;
+}
+.ide-placeholder-icon {
+    font-size: 2.75rem;
+    margin-bottom: 1rem;
+    opacity: 0.45;
+    color: var(--text-secondary);
+}
+.ide-placeholder-text {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    max-width: 260px;
+}
+
 .ide-loading {
     position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    background: rgba(0,0,0,0.8);
-    padding: 20px 30px;
-    border-radius: 12px;
     z-index: 10;
+    background: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    margin: 8px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem 2rem;
+    min-width: 160px;
+}
+.ide-loading-spinner {
+    font-size: 1.75rem;
+    color: var(--primary-color);
+}
+.ide-loading-text {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-main);
 }
 
 @media (max-width: 900px) {
@@ -364,6 +440,142 @@
 .code-preview::-webkit-scrollbar-thumb {
     background: #475569;
     border-radius: 3px;
+}
+
+/* 渲染日志：与页面主体样式统一，支持浅色/深色主题 */
+.dev-manim-log-wrap {
+    flex: 1 1 40%;
+    min-height: 80px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+.dev-manim-log-title {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-family: inherit;
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-surface);
+}
+.cmd-log {
+    flex: 1;
+    margin: 0;
+    padding: 8px 12px;
+    overflow: auto;
+    font-size: 0.8125rem;
+    color: var(--text-main);
+    font-family: 'Consolas', 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: var(--bg-input);
+    line-height: 1.5;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+.cmd-log:empty::before {
+    content: '等待渲染输出…';
+    color: var(--text-secondary);
+    font-style: normal;
+}
+.cmd-log::-webkit-scrollbar { width: 6px; height: 6px; }
+.cmd-log::-webkit-scrollbar-track { background: var(--bg-surface); border-radius: 3px; }
+.cmd-log::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+.cmd-log::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+/* 导入按钮与下拉面板 */
+.ide-btn-import {
+    background: #334155;
+    color: #e2e8f0;
+    border: 1px solid #475569;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ide-btn-import:hover {
+    background: #475569;
+    border-color: #64748b;
+}
+.manim-import-wrap {
+    position: relative;
+    z-index: 1000;
+}
+.manim-import-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 6px;
+    width: 320px;
+    min-width: 280px;
+    max-height: 360px;
+    min-height: 120px;
+    background: #252526;
+    border: 1px solid #333;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 10001;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.manim-import-tabs {
+    display: flex;
+    border-bottom: 1px solid #333;
+}
+.manim-import-tab {
+    flex: 1;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.manim-import-tab:hover { color: #e2e8f0; }
+.manim-import-tab.active {
+    color: #3b82f6;
+    border-bottom: 2px solid #3b82f6;
+    margin-bottom: -1px;
+}
+.manim-import-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+.manim-import-list .import-item {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.manim-import-list .import-item:hover {
+    background: #334155;
+    border-color: #3b82f6;
+}
+.manim-import-list .import-item small {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    margin-top: 4px;
 }
 
 /* 载入按钮 */

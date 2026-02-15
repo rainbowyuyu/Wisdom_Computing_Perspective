@@ -93,6 +93,15 @@ details p b {
     border-color: var(--primary-color);
 }
 
+.agent-help-banner {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(59, 130, 246, 0.12) 100%);
+    border-color: rgba(124, 58, 237, 0.35);
+}
+[data-theme="dark"] .agent-help-banner {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.25) 0%, rgba(59, 130, 246, 0.2) 100%);
+    border-color: rgba(124, 58, 237, 0.4);
+}
+
 .banner-icon {
     width: 56px;
     height: 56px;

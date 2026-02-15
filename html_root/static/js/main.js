@@ -11,6 +11,7 @@ import * as Examples from './examples.js';
 import * as Docs from './docs.js';
 import * as Theme from './theme.js';
 import * as DevTools from './devtools.js';
+import * as Agent from './agent.js';
 import * as MathLiveKeyboard from './mathlive/mathlive-keyboard.js';
 import * as MathLiveMenu from './mathlive/mathlive-menu.js';
 import * as MathLiveLocale from './mathlive/mathlive-locale.js';
@@ -40,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Examples.loadExamples(); // 加载案例
     Theme.initTheme();
     DevTools.initDevTools();
+    Agent.initAgent();
     MathLiveKeyboard.initMathLiveKeyboard();
     MathLiveMenu.initMathLiveMenuOnce();
     MathLiveLocale.initMathLiveLocale();
@@ -66,7 +68,22 @@ document.addEventListener('DOMContentLoaded', () => {
       if (params.devtool) {
         switchDevTool(params.devtool);
       }
+
+    // 新增功能条：若用户曾关闭则不再显示
+    if (localStorage.getItem('agent_banner_closed')) {
+      const el = document.getElementById('agent-update-banner');
+      if (el) el.style.display = 'none';
+    }
 });
+
+// 关闭顶部“新功能：智能体”条，并记住选择
+window.closeAgentBanner = function () {
+  const el = document.getElementById('agent-update-banner');
+  if (el) {
+    el.style.display = 'none';
+    localStorage.setItem('agent_banner_closed', '1');
+  }
+};
 
 function isMatch(e, config) {
     return e.key.toLowerCase() === config.key &&
@@ -87,8 +104,11 @@ window.deleteFormula = Formulas.deleteFormula;
 window.showSection = (sectionId) => {
     UI.showSection(sectionId);
     if (sectionId === 'detect') setTimeout(() => Canvas.resizeCanvas(), 50);
-    // 切换到我的算式页时自动加载
-    if (sectionId === 'my-formulas') Formulas.loadMyFormulas();
+    if (sectionId === 'my-formulas') {
+        Formulas.loadMyFormulas();
+        Formulas.switchFormulasSubTab('formulas');
+    }
+    if (sectionId === 'agent' && Agent.refreshAgentGate) Agent.refreshAgentGate();
 };
 
 window.toggleAuthModal = UI.toggleAuthModal;
@@ -126,6 +146,9 @@ window.startTutorial = Tutorial.startTutorial;
 window.openEditModal = Formulas.openEditModal;
 window.closeEditModal = Formulas.closeEditModal;
 window.submitFormulaEdit = Formulas.submitFormulaEdit;
+window.Formulas = Formulas;
+window.Calculate = window.Calculate || {};
+window.Calculate.saveLastCodeToScripts = Calculate.saveLastCodeToScripts;
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -172,7 +195,9 @@ window.mobileNavClick = UI.mobileNavClick;
 // 挂载切换函数给 HTML 按钮使用
 window.toggleTheme = Theme.toggleTheme;
 
-// 挂载全局 开发者工具
+// 挂载全局 开发者工具（inline onclick 需用 DevTools.xxx）
+window.DevTools = DevTools;
+window.Agent = Agent;
 window.switchDevTool = DevTools.switchDevTool;
 window.runDevManim = DevTools.runDevManim;
 window.copyDevLatex = DevTools.copyDevLatex;

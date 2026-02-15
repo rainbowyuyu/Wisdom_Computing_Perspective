@@ -1,5 +1,6 @@
 // static/js/formulas.js
 import { showSection, toggleAuthModal, toggleModal } from './ui.js';
+import * as DevTools from './devtools.js';
 
 // 获取当前登录用户名
 function getCurrentUser() {
@@ -320,5 +321,342 @@ export async function submitFormulaEdit() {
     } catch(e) {
         console.error(e);
         alert("网络错误");
+    }
+}
+
+// --- 7. 动画脚本库（子页：算式库 | 动画脚本库）---
+
+let formulasMonacoEditor = null;
+let currentScriptId = null; // 编辑中的脚本 id，null 表示新建
+
+export function switchFormulasSubTab(tab) {
+    document.querySelectorAll('.formulas-sub-tab').forEach(btn => btn.classList.remove('active'));
+    const btn = document.querySelector(`.formulas-sub-tab[data-tab="${tab}"]`);
+    if (btn) btn.classList.add('active');
+
+    const formulasPanel = document.getElementById('formulas-panel');
+    const scriptsPanel = document.getElementById('scripts-panel');
+    if (tab === 'formulas') {
+        if (formulasPanel) formulasPanel.style.display = 'block';
+        if (scriptsPanel) scriptsPanel.style.display = 'none';
+    } else {
+        if (formulasPanel) formulasPanel.style.display = 'none';
+        if (scriptsPanel) scriptsPanel.style.display = 'block';
+        loadAnimationScripts();
+    }
+}
+
+export async function loadAnimationScripts() {
+    const user = getCurrentUser();
+    const listEl = document.getElementById('animation-scripts-list');
+    if (!listEl) return;
+
+    if (!user) {
+        listEl.innerHTML = `
+            <div class="empty-state" style="grid-column:1/-1;">
+                <i class="fa-solid fa-lock"></i>
+                <p>请先登录以查看动画脚本库</p>
+                <button class="action-btn" onclick="toggleAuthModal(true)">立即登录</button>
+            </div>`;
+        return;
+    }
+
+    listEl.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text-secondary);"><i class="fa-solid fa-spinner fa-spin"></i> 加载中...</div>';
+    try {
+        const res = await fetch(`/api/animation_scripts/list?username=${encodeURIComponent(user)}`);
+        const data = await res.json();
+        if (data.status === 'success') renderScriptsList(data.data);
+        else listEl.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">加载失败</div>';
+    } catch (e) {
+        listEl.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">网络错误</div>';
+    }
+}
+
+function renderScriptsList(scripts) {
+    const listEl = document.getElementById('animation-scripts-list');
+    if (!listEl) return;
+
+    const addCard = `
+        <div class="formula-card add-new-card" onclick="showSection('calculate')" style="justify-content:center; align-items:center; border:2px dashed var(--border-color); cursor:pointer; min-height:180px;">
+            <div style="font-size:2.5rem; color:var(--primary-color); margin-bottom:0.5rem;"><i class="fa-solid fa-circle-plus"></i></div>
+            <div style="font-size:1rem; color:var(--text-secondary); font-weight:600;">去动态计算页生成并保存</div>
+        </div>`;
+
+    if (!scripts || scripts.length === 0) {
+        listEl.innerHTML = addCard + `
+            <div class="empty-state" style="grid-column:1/-1; padding-top:1rem;">
+                <p>暂无保存的脚本。在「动态计算」中渲染出想要的内容后，可保存代码到此库，并在此用 Monaco 编辑、重新运行。</p>
+            </div>`;
+        return;
+    }
+
+    const cards = scripts.map(s => {
+        const note = (s.note || '未命名').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const preview = (s.code_preview || s.code || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').substring(0, 120) + (s.code_preview && s.code_preview.length > 120 ? '...' : '');
+        return `
+        <div class="formula-card">
+            <div class="formula-preview" style="font-size:0.8rem; font-family:monospace; white-space:pre-wrap; text-align:left; justify-content:flex-start;">
+                ${preview}
+            </div>
+            <div class="formula-meta">
+                <span class="formula-note" title="${note}">${note}</span>
+                <div class="formula-actions">
+                    <button class="btn-icon" title="在云端工作台编辑" onclick="Formulas.editScriptInWorkbench(${s.id})"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn-icon" title="在云端工作台运行" onclick="Formulas.runScriptInWorkbench(${s.id})"><i class="fa-solid fa-play"></i></button>
+                    <button class="btn-icon delete" title="删除" onclick="Formulas.deleteScript(${s.id})"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+    listEl.innerHTML = addCard + cards;
+}
+
+export async function openScriptDetail(id) {
+    const user = getCurrentUser();
+    if (!user) { toggleAuthModal(true); return; }
+
+    currentScriptId = id;
+    const listView = document.getElementById('scripts-list-view');
+    const detailView = document.getElementById('scripts-detail-view');
+    if (listView) listView.style.display = 'none';
+    if (detailView) detailView.style.display = 'block';
+
+    const noteInput = document.getElementById('script-detail-note');
+    if (noteInput) noteInput.value = '';
+
+    if (id === 'new') {
+        initFormulasMonacoIfNeeded('');
+        if (formulasMonacoEditor) formulasMonacoEditor.setValue(`from manim import *
+
+class GenScene(Scene):
+    def construct(self):
+        circle = Circle(radius=2, color=BLUE)
+        self.play(Create(circle))
+        self.wait(1)`);
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/animation_scripts/get?id=${id}&username=${encodeURIComponent(user)}`);
+        const data = await res.json();
+        if (data.status === 'success' && data.data) {
+            if (noteInput) noteInput.value = data.data.note || '';
+            initFormulasMonacoIfNeeded(data.data.code || '');
+        } else {
+            if (detailView) detailView.style.display = 'none';
+            if (listView) listView.style.display = 'block';
+            alert('加载脚本失败');
+        }
+    } catch (e) {
+        if (detailView) detailView.style.display = 'none';
+        if (listView) listView.style.display = 'block';
+        alert('网络错误');
+    }
+}
+
+export function closeScriptDetail() {
+    currentScriptId = null;
+    const listView = document.getElementById('scripts-list-view');
+    const detailView = document.getElementById('scripts-detail-view');
+    if (listView) listView.style.display = 'block';
+    if (detailView) detailView.style.display = 'none';
+}
+
+function initFormulasMonacoIfNeeded(initialCode) {
+    const container = document.getElementById('formulas-monaco-container');
+    if (!container) return;
+
+    if (window.monaco && !formulasMonacoEditor) {
+        formulasMonacoEditor = window.monaco.editor.create(container, {
+            value: initialCode,
+            language: 'python',
+            theme: 'vs-dark',
+            automaticLayout: true,
+            fontSize: 14,
+            fontFamily: "'JetBrains Mono', monospace",
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            padding: { top: 15, bottom: 15 },
+            lineNumbersMinChars: 3,
+        });
+        return;
+    }
+    if (formulasMonacoEditor) {
+        formulasMonacoEditor.setValue(initialCode);
+        return;
+    }
+
+    if (document.getElementById('monaco-loader-script')) {
+        setTimeout(() => initFormulasMonacoIfNeeded(initialCode), 200);
+        return;
+    }
+    const script = document.createElement('script');
+    script.id = 'monaco-loader-script';
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js';
+    script.onload = () => {
+        window.require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+        window.require(['vs/editor/editor.main'], () => {
+            initFormulasMonacoIfNeeded(initialCode);
+        });
+    };
+    document.body.appendChild(script);
+}
+
+export async function saveScriptFromDetail() {
+    const user = getCurrentUser();
+    if (!user) { toggleAuthModal(true); return; }
+    const note = document.getElementById('script-detail-note')?.value?.trim() || '';
+    const code = formulasMonacoEditor ? formulasMonacoEditor.getValue() : '';
+    if (!code.trim()) { alert('代码不能为空'); return; }
+
+    if (currentScriptId === null || currentScriptId === 'new') {
+        try {
+            const res = await fetch('/api/animation_scripts/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, note, code })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                if (typeof showToast === 'function') showToast('保存成功', 'success');
+                else alert('保存成功');
+                currentScriptId = data.id;
+                loadAnimationScripts();
+            } else {
+                alert('保存失败: ' + (data.message || ''));
+            }
+        } catch (e) {
+            alert('网络错误');
+        }
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/animation_scripts/update', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentScriptId, username: user, note, code })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            if (typeof showToast === 'function') showToast('更新成功', 'success');
+            else alert('更新成功');
+        } else {
+            alert('更新失败: ' + (data.message || ''));
+        }
+    } catch (e) {
+        alert('网络错误');
+    }
+}
+
+export async function runScriptFromDetail() {
+    const code = formulasMonacoEditor ? formulasMonacoEditor.getValue() : '';
+    if (!code.trim()) { alert('请先输入或加载代码'); return; }
+    const btn = document.getElementById('btn-run-script');
+    const modal = document.getElementById('script-run-modal');
+    const video = document.getElementById('script-run-video');
+    const errEl = document.getElementById('script-run-error');
+    const logEl = document.getElementById('script-run-log');
+    if (btn) btn.disabled = true;
+    if (video) video.style.display = 'none';
+    if (errEl) errEl.style.display = 'none';
+    if (logEl) { logEl.textContent = ''; }
+    toggleModal('script-run-modal', true);
+    try {
+        const res = await fetch('/api/devtools/run_manim_stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        if (!res.ok || !res.body) {
+            if (errEl) { errEl.textContent = '请求失败'; errEl.style.display = 'block'; }
+            return;
+        }
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.type === 'log' && data.message && logEl) {
+                        logEl.textContent += data.message + '\n';
+                        logEl.scrollTop = logEl.scrollHeight;
+                    } else if (data.type === 'start' && logEl) {
+                        logEl.textContent += (data.message || '') + '\n';
+                    } else if (data.type === 'complete' && data.video_url && video) {
+                        video.src = data.video_url + '?t=' + Date.now();
+                        video.style.display = 'block';
+                        if (logEl) logEl.textContent += '渲染完成。\n';
+                    } else if (data.type === 'error' && errEl) {
+                        errEl.textContent = data.message || '渲染失败';
+                        errEl.style.display = 'block';
+                        if (logEl) logEl.textContent += '错误: ' + (data.message || '') + '\n';
+                    }
+                } catch (_) {}
+            }
+        }
+    } catch (e) {
+        if (errEl) { errEl.textContent = '网络错误: ' + e.message; errEl.style.display = 'block'; }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+export async function deleteScript(id) {
+    if (!confirm('确定删除该脚本？')) return;
+    const user = getCurrentUser();
+    try {
+        await fetch(`/api/animation_scripts/delete?id=${id}&username=${encodeURIComponent(user)}`, { method: 'DELETE' });
+        loadAnimationScripts();
+        if (currentScriptId === id) closeScriptDetail();
+    } catch (e) {
+        alert('删除失败');
+    }
+}
+
+/** 在开发者工具-云端渲染工作台中编辑该脚本 */
+export async function editScriptInWorkbench(scriptId) {
+    const user = getCurrentUser();
+    if (!user) { toggleAuthModal(true); return; }
+    try {
+        const res = await fetch(`/api/animation_scripts/get?id=${scriptId}&username=${encodeURIComponent(user)}`);
+        const data = await res.json();
+        if (data.status !== 'success' || !data.data || !data.data.code) {
+            if (typeof showToast === 'function') showToast('加载脚本失败', 'error');
+            else alert('加载脚本失败');
+            return;
+        }
+        showSection('devtools');
+        DevTools.openManimWorkbenchWithCode(data.data.code, { autoRun: false });
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('网络错误', 'error');
+        else alert('网络错误');
+    }
+}
+
+/** 在开发者工具-云端渲染工作台中运行该脚本 */
+export async function runScriptInWorkbench(scriptId) {
+    const user = getCurrentUser();
+    if (!user) { toggleAuthModal(true); return; }
+    try {
+        const res = await fetch(`/api/animation_scripts/get?id=${scriptId}&username=${encodeURIComponent(user)}`);
+        const data = await res.json();
+        if (data.status !== 'success' || !data.data || !data.data.code) {
+            if (typeof showToast === 'function') showToast('加载脚本失败', 'error');
+            else alert('加载脚本失败');
+            return;
+        }
+        showSection('devtools');
+        DevTools.openManimWorkbenchWithCode(data.data.code, { autoRun: true });
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('网络错误', 'error');
+        else alert('网络错误');
     }
 }

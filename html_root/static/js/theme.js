@@ -20,6 +20,7 @@ export function initTheme() {
         if (!localStorage.getItem('theme')) {
             const newTheme = e.matches ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', newTheme);
+            window.dispatchEvent(new CustomEvent('theme-change', { detail: newTheme }));
         }
     });
 
@@ -33,6 +34,8 @@ export function toggleTheme() {
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme); // 记住用户的选择
     updateThemeIcon();
+    // 派发主题切换事件，供画板等模块同步更新
+    window.dispatchEvent(new CustomEvent('theme-change', { detail: newTheme }));
 }
 
 function updateThemeIcon() {

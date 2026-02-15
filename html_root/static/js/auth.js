@@ -256,6 +256,15 @@ export async function handleRegister() {
     }
 }
 
+/** 获取当前登录用户名，未登录返回 null（供智能体等模块判断） */
+export function getCurrentUser() {
+    const userDisplay = document.getElementById('user-display');
+    const usernameSpan = document.getElementById('username-span');
+    if (!userDisplay || userDisplay.style.display === 'none' || !usernameSpan) return null;
+    const name = (usernameSpan.innerText || '').trim();
+    return name || null;
+}
+
 // --- 辅助：更新 UI 显示用户名 ---
 function updateUserDisplay(username) {
     // 1. 隐藏导航栏登录按钮
@@ -281,6 +290,7 @@ function updateUserDisplay(username) {
             </button>
         `;
     }
+    window.dispatchEvent(new CustomEvent('auth-state-change', { detail: { username } }));
 }
 
 // --- 登出：调用接口清除服务端 session 与 cookie，再刷新 ---

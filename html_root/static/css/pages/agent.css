@@ -1,0 +1,331 @@
+/* static/css/pages/agent.css — 智能体页面 */
+
+.agent-section {
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.agent-hero {
+    margin-bottom: 2rem;
+}
+
+.agent-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.12));
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    border-radius: 999px;
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.02em;
+}
+
+.agent-title {
+    margin: 0 0 0.5rem !important;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.agent-desc {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin-bottom: 1.25rem;
+    max-width: 560px;
+    line-height: 1.55;
+}
+
+.agent-features-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.agent-features-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.agent-features-list i {
+    color: var(--primary-color);
+    flex-shrink: 0;
+}
+
+/* 未登录时展示的引导卡片 */
+.agent-gate {
+    margin-top: 0.5rem;
+}
+
+.agent-gate-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+}
+
+.agent-gate-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+}
+
+.agent-gate-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: var(--primary-color);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(124, 58, 237, 0.1));
+    border-radius: 16px;
+}
+
+.agent-gate-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0 0 0.5rem;
+}
+
+.agent-gate-desc {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin: 0 0 1.5rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.5;
+}
+
+.agent-gate-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.agent-gate-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+}
+
+.agent-workspace-wrap {
+    margin-top: 0.5rem;
+}
+
+.agent-workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+    max-width: 1000px;
+}
+
+@media (max-width: 768px) {
+    .agent-workspace {
+        grid-template-columns: 1fr;
+    }
+}
+
+.agent-input-card,
+.agent-result-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.agent-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.5rem;
+}
+
+.agent-label i {
+    margin-right: 0.35rem;
+    color: var(--primary-color);
+}
+
+.agent-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-main);
+    resize: vertical;
+    margin-bottom: 1rem;
+}
+
+.agent-textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.agent-upload-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.agent-upload-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    color: var(--primary-color);
+    cursor: pointer;
+}
+
+.agent-upload-label:hover {
+    text-decoration: underline;
+}
+
+.agent-file-name {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.agent-submit-btn {
+    width: 100%;
+    padding: 0.9rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.agent-submit-btn:hover:not(:disabled) {
+    opacity: 0.95;
+    transform: translateY(-1px);
+}
+
+.agent-submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.agent-status {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    padding: 0.5rem 0;
+}
+
+.agent-status-loading {
+    color: var(--primary-color);
+}
+
+.agent-status-success {
+    color: #10b981;
+}
+
+.agent-status-error {
+    color: #ef4444;
+}
+
+.agent-result-area {
+    margin-top: 1rem;
+}
+
+.agent-result-message {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.agent-formula-wrap {
+    margin-bottom: 1rem;
+}
+
+.agent-result-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 0.35rem;
+}
+
+.agent-mathfield {
+    width: 100%;
+    min-height: 48px;
+    padding: 0.5rem;
+    font-size: 1.1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+}
+
+.agent-video-wrap {
+    margin: 1rem 0;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: #000;
+}
+
+.agent-video {
+    width: 100%;
+    max-height: 320px;
+    display: block;
+}
+
+.agent-goto-calc {
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    color: var(--primary-color);
+    background: transparent;
+    border: 1px solid var(--primary-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.agent-goto-calc:hover {
+    background: var(--primary-color);
+    color: #fff;
+}

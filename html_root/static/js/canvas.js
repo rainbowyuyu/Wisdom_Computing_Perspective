@@ -63,7 +63,22 @@ export function setupCanvas() {
         }
     });
 
-    // 4. 文件上传 Input 监听
+    // 4. 主题切换时重绘画布背景，使手写面板与深浅色模式一致
+    window.addEventListener('theme-change', () => {
+        if (!canvas || !ctx) return;
+        const preview = document.getElementById('uploaded-preview');
+        const isUploadMode = preview && preview.style.display !== 'none' && preview.getAttribute('src');
+        const dpr = window.devicePixelRatio || 1;
+        if (!isUploadMode) {
+            ctx.fillStyle = getCanvasBgColor();
+            ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+            historyStack.length = 0;
+            historyStep = -1;
+            saveState();
+        }
+    });
+
+    // 5. 文件上传 Input 监听
     const uploadInput = document.getElementById('image-upload');
     if (uploadInput) {
         uploadInput.addEventListener('change', function(e) {

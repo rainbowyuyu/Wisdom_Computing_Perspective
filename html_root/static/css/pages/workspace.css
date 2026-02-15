@@ -264,6 +264,27 @@
     background: var(--bg-surface);
 }
 
+/* 画板提示浮层：跟随深浅色主题 */
+.canvas-hint {
+    background: var(--bg-glass);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+}
+
+/* 识别结果「查看源码」弹层：跟随主题 */
+.code-detail-popup {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+}
+
+.code-detail-popup textarea {
+    background: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+}
+
 /* 画板本体：绝对定位，层级最高，背景透明 */
 #drawing-board {
     position: absolute;
