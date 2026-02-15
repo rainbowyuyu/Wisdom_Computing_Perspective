@@ -56,6 +56,18 @@ export async function openDoc(fileName, title) {
                 link.setAttribute('rel', 'noopener noreferrer');
             });
 
+            // 7. 更新日志：自动滚动到最新版本（最后一个 h2）
+            if (fileName === 'update.md') {
+                const h2s = contentEl.querySelectorAll('h2');
+                const lastVersion = h2s[h2s.length - 1];
+                if (lastVersion) {
+                    contentEl.scrollTop = 0;
+                    requestAnimationFrame(() => {
+                        lastVersion.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                    });
+                }
+            }
+
         } else {
             console.warn('Marked.js not loaded');
             contentEl.style.whiteSpace = 'pre-wrap';

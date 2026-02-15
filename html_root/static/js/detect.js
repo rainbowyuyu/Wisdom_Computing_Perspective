@@ -33,7 +33,6 @@ export function initDetectListeners() {
         mathField.addEventListener('input', (e) => {
             const val = e.target.value;
             codeArea.value = val;
-            // 实时检查内容，决定是否激活按钮
             setButtonsState(checkContent(val));
         });
 
@@ -41,9 +40,34 @@ export function initDetectListeners() {
         codeArea.addEventListener('input', (e) => {
             const val = e.target.value;
             mathField.setValue(val);
-            // 实时检查内容，决定是否激活按钮
             setButtonsState(checkContent(val));
         });
+
+        // 手机端：点击编辑公式时，将结果面板固定在视口上方，避免键盘弹出后整页跳到最底部
+        const runScrollToPanelTop = () => {
+            const panel = document.querySelector('.result-panel');
+            if (!panel) return;
+            const rect = panel.getBoundingClientRect();
+            const scrollTop = window.scrollY ?? document.documentElement.scrollTop;
+            const targetY = scrollTop + rect.top - 12;
+            window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+        };
+        mathField.addEventListener('focusin', () => {
+            if (!window.matchMedia('(max-width: 900px)').matches) return;
+            requestAnimationFrame(() => {
+                runScrollToPanelTop();
+                setTimeout(runScrollToPanelTop, 120);
+                setTimeout(runScrollToPanelTop, 350);
+            });
+        });
+        if (typeof window.visualViewport !== 'undefined') {
+            window.visualViewport.addEventListener('resize', () => {
+                if (!window.matchMedia('(max-width: 900px)').matches) return;
+                if (document.activeElement && document.activeElement.closest('#latex-output')) {
+                    setTimeout(runScrollToPanelTop, 50);
+                }
+            });
+        }
     }
 }
 

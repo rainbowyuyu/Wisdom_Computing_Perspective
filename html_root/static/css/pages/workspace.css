@@ -23,7 +23,25 @@
     }
     .tools-panel { max-height: 400px; }
     .canvas-wrapper { height: 500px; min-height: 400px; }
-    .result-panel { height: auto; min-height: auto; }
+    /* 手机端：结果区足够高，公式可完整查看与滚动 */
+    .result-panel {
+        height: auto;
+        min-height: max(360px, 42vh);
+        max-height: none;
+    }
+    .result-panel .math-field-container {
+        min-height: 240px;
+        max-height: 58vh;
+        overflow-y: auto;
+        overflow-x: auto;
+        align-items: flex-start;
+        justify-content: flex-start;
+        -webkit-overflow-scrolling: touch;
+    }
+    .result-panel math-field {
+        font-size: 1.5rem;
+        min-height: 1.5em;
+    }
 }
 
 /* --- 2. 左侧：工具栏面板 --- */
@@ -116,6 +134,43 @@
     border-color: var(--primary-color);
     color: var(--primary-color);
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* 快捷键提示按钮：与面板风格一致，不突兀且易发现 */
+.shortcut-hint-btn {
+    margin-top: 14px;
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    animation: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+.shortcut-hint-btn i {
+    font-size: 0.95rem;
+    color: var(--primary-color);
+    opacity: 0.9;
+}
+.shortcut-hint-btn:hover {
+    background: var(--bg-surface);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    transform: none;
+    box-shadow: var(--shadow-sm);
+}
+.shortcut-hint-btn:hover i {
+    opacity: 1;
 }
 
 /* 上传工具区域优化 */
@@ -248,6 +303,11 @@
     z-index: 10;
     position: relative;
     transition: all 0.3s ease;
+    /* 手机端编辑公式时避免被键盘顶到页面最底部，预留视口下方空间 */
+    scroll-margin-bottom: 40vh;
+}
+.result-panel .math-field-container {
+    min-height: 3em;
 }
 
 /* 标题栏 */
@@ -300,12 +360,47 @@ math-field::part(container) {
     border-radius: 8px;
 }
 
+/* 识别结果区的公式框：聚焦/键盘弹出时避免整页滚到最底部 */
+#latex-output {
+    scroll-margin-bottom: 38vh;
+}
+
 /* 底部操作栏 */
 .result-actions {
     margin-top: 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+.result-actions > div:last-child {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-width: 0;
+}
+.result-actions .btn-calc-go,
+.result-actions .action-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.result-actions > div:first-child {
+    font-size: 0.85rem;
+    min-width: 0;
+}
+@media (max-width: 900px) {
+    .result-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .result-actions > div:last-child {
+        justify-content: stretch;
+    }
+    .result-actions .btn-calc-go,
+    .result-actions .action-btn {
+        flex: 1;
+    }
 }
 
 /* 代码折叠详情 */

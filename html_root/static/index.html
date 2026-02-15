@@ -173,14 +173,14 @@
                         <div class="control-group">
                             <label>绘图工具</label>
                             <div class="tools-grid">
-                                <button class="tool-btn active" onclick="setTool('pen')" title="画笔"><i class="fa-solid fa-pen"></i></button>
-                                <button class="tool-btn" onclick="setTool('eraser')" title="橡皮擦"><i class="fa-solid fa-eraser"></i></button>
+                                <button class="tool-btn active" onclick="setTool('pen')" title="画笔 (B)"><i class="fa-solid fa-pen"></i></button>
+                                <button class="tool-btn" onclick="setTool('eraser')" title="橡皮擦 (E)"><i class="fa-solid fa-eraser"></i></button>
                                 <button class="tool-btn" onclick="undo()" title="撤销 (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
                                 <button class="tool-btn" onclick="redo()" title="重做 (Ctrl+Shift+Z)"><i class="fa-solid fa-rotate-right"></i></button>
-                                <button class="tool-btn" onclick="clearCanvas()" title="清空" style="color:#ef4444;"><i class="fa-solid fa-trash"></i></button>
+                                <button class="tool-btn" onclick="clearCanvas()" title="清空画布 (Ctrl+Shift+C)" style="color:#ef4444;"><i class="fa-solid fa-trash"></i></button>
                             </div>
 
-                            <button class="tutorial-link" onclick="openSettings()" title="画板快捷键设置">想要更高效率？点击设置快捷键</button>
+                            <button class="tutorial-link shortcut-hint-btn" onclick="openSettings('shortcuts')" title="画板快捷键设置"><i class="fa-solid fa-keyboard"></i> 点击设置快捷键</button>
                             <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px;">
                                 <label style="margin:0; min-width:40px; font-size:0.8rem;">粗细</label>
                                 <input type="range" id="brush-size" min="1" max="20" value="3" style="flex:1;">
@@ -477,8 +477,8 @@
                             </div>
                         </div>
 
-                        <!-- 底部渲染预览 (MathJax) -->
-                        <div class="dev-col" style="flex: 0 0 150px;">
+                        <!-- 底部渲染预览 (MathJax)：固定高度、可滚动，不抢占 LaTeX 区域 -->
+                        <div class="dev-col dev-latex-preview-wrap">
                             <div class="dev-label">
                                 <span><i class="fa-solid fa-eye"></i> 最终渲染预览</span>
                             </div>
@@ -581,7 +581,7 @@
 
                 <details>
                     <summary>渲染动画需要多久？生成的视频可以下载吗？</summary>
-                    <p>简单通用算法通常在 <b>30-50 秒</b>内完成。复杂的算法如复杂的微积分矩阵的推演和可视化可能需要 <b>100-150 秒</b>，如果超过 <b>180秒</b> 由于服务器算力限制暂时会判定为timeout，请简化算式。
+                    <p>简单通用算法通常在 <b>30-50 秒</b>内完成。复杂的算法如复杂的微积分矩阵的推演和可视化可能需要 <b>100-150 秒</b>，如果超过 <b>300秒</b> 由于服务器算力限制暂时会判定为超时，请简化算式或稍后再试。
                     <br>动画生成后，您可以点击视频播放器右下角的“三个点”图标选择<b>“下载”</b>，或右键点击视频选择“视频另存为”，将其保存到本地用于PPT演示或教学。</p>
                 </details>
 
@@ -651,7 +651,10 @@
 
                 <!-- 注册表单 -->
                 <form id="register-form" style="display:none;">
-                    <input type="text" placeholder="设置用户名" class="tech-input" id="reg-user">
+                    <div class="username-check-wrap">
+                        <input type="text" placeholder="设置用户名" class="tech-input" id="reg-user" autocomplete="username">
+                        <span id="reg-username-hint" class="username-hint" aria-live="polite"></span>
+                    </div>
                     <input type="password" placeholder="设置密码" class="tech-input" id="reg-pass">
 
                     <!-- 新增：确认密码 -->
@@ -681,10 +684,12 @@
     <!-- index.html Settings Modal 部分 -->
 
     <div id="settings-modal" class="modal">
-        <div class="modal-content glass-panel" style="width: 500px;">
-            <span class="close-modal" onclick="closeSettings()">&times;</span>
-            <h3 style="padding: 1.5rem 2rem 0; color: var(--text-main);">系统设置</h3>
-
+        <div class="modal-content glass-panel settings-modal-content">
+            <div class="settings-modal-header">
+                <h3 class="settings-modal-title">系统设置</h3>
+                <span class="close-modal" onclick="closeSettings()">&times;</span>
+            </div>
+            <div class="settings-modal-body">
             <div style="padding: 2rem;">
 
                 <!-- 新增：基本信息 -->
@@ -736,26 +741,17 @@
                 </div>
 
 
-                <div style="margin-bottom: 2rem;">
-                    <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">快捷键设置（画板）</h4>
-
-                    <div style="display: flex; align-items: center; margin-bottom: 1rem; gap: 10px;">
-                        <label style="width: 80px; font-weight: 600;">撤销</label>
-                        <input type="text" id="shortcut-undo-display" class="tech-input" readonly style="margin:0; text-align: center;">
-                        <button id="btn-record-undo" class="action-btn secondary" style="padding: 0.5rem 1rem;" onclick="startRecording('undo')">修改</button>
-                    </div>
-
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <label style="width: 80px; font-weight: 600;">重做</label>
-                        <input type="text" id="shortcut-redo-display" class="tech-input" readonly style="margin:0; text-align: center;">
-                        <button id="btn-record-redo" class="action-btn secondary" style="padding: 0.5rem 1rem;" onclick="startRecording('redo')">修改</button>
-                    </div>
+                <div id="settings-shortcuts" class="shortcuts-panel" style="margin-bottom: 2rem;">
+                    <h4 style="margin-bottom: 1rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">快捷键设置（画板）</h4>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">点击「修改」后按下要绑定的组合键，类 Photoshop 操作。</p>
+                    <div id="shortcuts-list"></div>
                 </div>
 
                 <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1.5rem;">
                     <button class="action-btn" onclick="resetDefaults()" style="background: #ef4444; border:none; color:white; font-size:0.9rem;">恢复默认设置</button>
                     <button class="action-btn" onclick="closeSettings()" style="margin-left: 10px;">完成</button>
                 </div>
+            </div>
             </div>
         </div>
     </div>

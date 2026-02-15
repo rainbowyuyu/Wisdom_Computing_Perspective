@@ -161,4 +161,41 @@ export function mobileNavClick(sectionId) {
     toggleMobileMenu(); // 点击后自动关闭菜单
 }
 
-// ...
+/** 轻提示 Toast：type = 'success' | 'error' | 'info'，自动消失 */
+export function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container') || (() => {
+        const el = document.createElement('div');
+        el.id = 'toast-container';
+        document.body.appendChild(el);
+        return el;
+    })();
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    const icons = {
+        success: 'fa-circle-check',
+        error: 'fa-circle-xmark',
+        info: 'fa-circle-info'
+    };
+    toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} toast-icon"></i><span class="toast-text">${escapeHtml(message)}</span>`;
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('toast-show'));
+
+    const duration = type === 'error' ? 4500 : 3000;
+    const t = setTimeout(() => {
+        toast.classList.remove('toast-show');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+    toast.addEventListener('click', () => {
+        clearTimeout(t);
+        toast.classList.remove('toast-show');
+        setTimeout(() => toast.remove(), 300);
+    });
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}

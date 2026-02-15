@@ -11,6 +11,9 @@ import * as Examples from './examples.js';
 import * as Docs from './docs.js';
 import * as Theme from './theme.js';
 import * as DevTools from './devtools.js';
+import * as MathLiveKeyboard from './mathlive/mathlive-keyboard.js';
+import * as MathLiveMenu from './mathlive/mathlive-menu.js';
+import * as MathLiveLocale from './mathlive/mathlive-locale.js';
 
 // 1. 解析URL参数的工具函数（通用可复用）
 function getUrlParams() {
@@ -28,6 +31,7 @@ function getUrlParams() {
 
 document.addEventListener('DOMContentLoaded', () => {
     Canvas.setupCanvas();
+    if (typeof window.currentToolType === 'undefined') window.currentToolType = 'pen';
     UI.showSection('home');
     Auth.initAuth();
     Settings.initSettings();
@@ -36,13 +40,21 @@ document.addEventListener('DOMContentLoaded', () => {
     Examples.loadExamples(); // 加载案例
     Theme.initTheme();
     DevTools.initDevTools();
+    MathLiveKeyboard.initMathLiveKeyboard();
+    MathLiveMenu.initMathLiveMenuOnce();
+    MathLiveLocale.initMathLiveLocale();
 
-    // 全局快捷键
+    // 画板快捷键（类 Photoshop），仅在非输入框时生效
     document.addEventListener('keydown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        const shortcuts = Settings.getShortcuts();
-        if (isMatch(e, shortcuts.undo)) { e.preventDefault(); Canvas.undo(); }
-        else if (isMatch(e, shortcuts.redo)) { e.preventDefault(); Canvas.redo(); }
+        const s = Settings.getShortcuts();
+        if (isMatch(e, s.undo)) { e.preventDefault(); Canvas.undo(); }
+        else if (isMatch(e, s.redo)) { e.preventDefault(); Canvas.redo(); }
+        else if (isMatch(e, s.clearCanvas)) { e.preventDefault(); Canvas.clearCanvas(); }
+        else if (isMatch(e, s.toolPen)) { e.preventDefault(); window.setTool(window.currentToolType === 'pen' ? 'eraser' : 'pen'); }
+        else if (isMatch(e, s.toolEraser)) { e.preventDefault(); window.setTool(window.currentToolType === 'eraser' ? 'pen' : 'eraser'); }
+        else if (isMatch(e, s.brushSizeUp)) { e.preventDefault(); Canvas.setBrushSizeDelta(1); }
+        else if (isMatch(e, s.brushSizeDown)) { e.preventDefault(); Canvas.setBrushSizeDelta(-1); }
     });
 
     const params = getUrlParams(); // 获取所有URL参数
@@ -81,7 +93,11 @@ window.showSection = (sectionId) => {
 
 window.toggleAuthModal = UI.toggleAuthModal;
 window.switchInputMode = UI.switchInputMode;
-window.switchAuthMode = (mode) => { UI.switchAuthMode(mode); Auth.refreshCaptcha(mode); };
+window.switchAuthMode = (mode) => {
+    UI.switchAuthMode(mode);
+    Auth.refreshCaptcha(mode);
+    if (mode === 'register') Auth.clearUsernameHint?.();
+};
 window.clearCanvas = Canvas.clearCanvas;
 window.undo = Canvas.undo;
 window.redo = Canvas.redo;
@@ -99,7 +115,7 @@ window.startAnimation = Calculate.startAnimation;
 window.handleLogin = Auth.handleLogin;
 window.handleRegister = Auth.handleRegister;
 window.refreshCaptcha = Auth.refreshCaptcha;
-window.logout = () => location.reload();
+window.logout = Auth.logout;
 window.openSettings = Settings.openSettings;
 window.closeSettings = () => UI.toggleModal('settings-modal', false);
 window.startRecording = Settings.startRecording;

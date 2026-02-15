@@ -9,6 +9,24 @@ const historyStack = [];
 let historyStep = -1;
 const MAX_HISTORY = 50;
 
+// 手机端防误触：仅当判定为「书写」时才占住触摸，否则允许页面上下滑动
+const TOUCH_COMMIT_DIST = 10;       // 移动超过此像素才做意图判断
+const TOUCH_SCROLL_VERTICAL_RATIO = 1.3; // 垂直位移 / 水平位移 > 此值视为滚动
+let touchStartX = 0;
+let touchStartY = 0;
+let touchCommittedToDraw = false;
+
+// 深色模式下画板与笔/橡皮颜色与主题一致，避免颜色错误
+function isDarkTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+function getCanvasBgColor() {
+    return isDarkTheme() ? '#1e293b' : '#FFFFFF';
+}
+function getPenColor() {
+    return isDarkTheme() ? '#e2e8f0' : '#000000';
+}
+
 export function setupCanvas() {
     canvas = document.getElementById('drawing-board');
     if (!canvas) return;
@@ -27,9 +45,9 @@ export function setupCanvas() {
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDraw);
     canvas.addEventListener('mouseout', stopDraw);
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-    canvas.addEventListener('touchend', stopDraw);
+    canvas.addEventListener('touchend', handleTouchEnd);
 
     // 3. 监听模式切换 (自定义事件)
     window.addEventListener('mode-change', (e) => {
@@ -37,7 +55,7 @@ export function setupCanvas() {
         const dpr = window.devicePixelRatio || 1;
         if (mode === 'draw') {
             ctx.globalCompositeOperation = 'destination-over';
-            ctx.fillStyle = "#FFFFFF";
+            ctx.fillStyle = getCanvasBgColor();
             ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
             ctx.globalCompositeOperation = 'source-over';
         } else {
@@ -153,7 +171,7 @@ export function resizeCanvas() {
     const isUploadMode = preview && preview.style.display !== 'none' && preview.getAttribute('src');
 
     if (!isUploadMode) {
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = getCanvasBgColor();
         ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     } else {
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
@@ -177,17 +195,46 @@ function getPos(e) {
 }
 
 function handleTouchStart(e) {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const mouseEvent = new MouseEvent("mousedown", { clientX: touch.clientX, clientY: touch.clientY });
-    canvas.dispatchEvent(mouseEvent);
+    if (!e.touches.length) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchCommittedToDraw = false;
+    // 不 preventDefault，先让浏览器可以滚动；在 touchmove 里再根据移动方向决定是画还是滚
 }
 
 function handleTouchMove(e) {
-    e.preventDefault();
+    if (!e.touches.length) return;
     const touch = e.touches[0];
-    const mouseEvent = new MouseEvent("mousemove", { clientX: touch.clientX, clientY: touch.clientY });
-    canvas.dispatchEvent(mouseEvent);
+    const x = touch.clientX;
+    const y = touch.clientY;
+
+    if (touchCommittedToDraw) {
+        e.preventDefault();
+        canvas.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y }));
+        return;
+    }
+
+    const dx = x - touchStartX;
+    const dy = y - touchStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < TOUCH_COMMIT_DIST) return;
+
+    // 以移动方向区分：明显偏垂直视为滚动，否则视为书写
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    if (absDy > absDx * TOUCH_SCROLL_VERTICAL_RATIO) {
+        return;
+    }
+
+    touchCommittedToDraw = true;
+    e.preventDefault();
+    canvas.dispatchEvent(new MouseEvent("mousedown", { clientX: touchStartX, clientY: touchStartY }));
+    canvas.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y }));
+}
+
+function handleTouchEnd(e) {
+    if (touchCommittedToDraw) stopDraw();
+    touchCommittedToDraw = false;
 }
 
 function startDraw(e) {
@@ -235,7 +282,7 @@ function getBrushSize() {
 }
 
 function getBrushColor() {
-    return window.currentToolType === 'eraser' ? '#FFFFFF' : '#000000';
+    return window.currentToolType === 'eraser' ? getCanvasBgColor() : getPenColor();
 }
 
 function saveState() {
@@ -270,7 +317,7 @@ function restoreState() {
     img.onload = () => {
         const dpr = window.devicePixelRatio || 1;
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = getCanvasBgColor();
         ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -287,7 +334,7 @@ export function clearCanvas() {
     const isUploadMode = preview && preview.style.display !== 'none';
 
     if (!isUploadMode) {
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = getCanvasBgColor();
         ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     } else {
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
@@ -297,6 +344,14 @@ export function clearCanvas() {
 
 export function setTool(tool) {
     window.currentToolType = tool;
+}
+
+/** 笔刷粗细增减（供快捷键调用），delta 为 +1 或 -1 */
+export function setBrushSizeDelta(delta) {
+    const el = document.getElementById('brush-size');
+    if (!el) return;
+    const v = Math.max(1, Math.min(20, parseInt(el.value, 10) + delta));
+    el.value = String(v);
 }
 
 export function getCanvasBlob() {

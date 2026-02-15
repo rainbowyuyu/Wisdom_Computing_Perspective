@@ -1,9 +1,15 @@
 // static/js/auth.js
 
-import { toggleAuthModal } from './ui.js';
+import { toggleAuthModal, showToast } from './ui.js';
 import * as Formulas from "./formulas.js";
 
-let currentCaptchaId = '';
+// 登录、注册各自保存验证码 ID，避免并行刷新时互相覆盖导致第一次总报错
+let currentCaptchaIdLogin = '';
+let currentCaptchaIdRegister = '';
+
+// 用户名查重：最近一次检查结果（用于禁用注册按钮）
+let lastUsernameAvailable = null;
+let usernameCheckDebounceTimer = 0;
 
 // --- 初始化：检查服务端 Session ---
 export async function initAuth() {
@@ -25,6 +31,82 @@ export async function initAuth() {
     } catch (e) {
         console.log("Not logged in or session expired");
     }
+    setupUsernameCheck();
+}
+
+/** 请求后端检查用户名是否可用 */
+export async function checkUsername(username) {
+    const raw = (username || '').trim();
+    if (!raw) return { available: false };
+    const res = await fetch(`/api/user/check-username?username=${encodeURIComponent(raw)}`);
+    const data = await res.json();
+    return { available: data.available === true };
+}
+
+function setUsernameHint(text, state) {
+    const hint = document.getElementById('reg-username-hint');
+    if (!hint) return;
+    hint.textContent = text;
+    hint.className = 'username-hint username-hint--' + (state || 'idle');
+}
+
+function setupUsernameCheck() {
+    const input = document.getElementById('reg-user');
+    const hint = document.getElementById('reg-username-hint');
+    const submitBtn = document.getElementById('btn-reg-submit');
+    if (!input || !hint) return;
+
+    function doCheck() {
+        const raw = input.value.trim();
+        if (!raw) {
+            lastUsernameAvailable = null;
+            setUsernameHint('', 'idle');
+            updateRegisterButtonState();
+            return;
+        }
+        setUsernameHint('正在检查…', 'loading');
+        lastUsernameAvailable = null;
+        updateRegisterButtonState();
+        checkUsername(raw).then(({ available }) => {
+            lastUsernameAvailable = available;
+            if (available) setUsernameHint('用户名可用', 'ok');
+            else setUsernameHint('用户名已被占用', 'bad');
+            updateRegisterButtonState();
+        }).catch(() => {
+            setUsernameHint('检查失败，请稍后再试', 'bad');
+            lastUsernameAvailable = false;
+            updateRegisterButtonState();
+        });
+    }
+
+    function updateRegisterButtonState() {
+        if (!submitBtn) return;
+        if (lastUsernameAvailable === false) submitBtn.disabled = true;
+        else submitBtn.disabled = false;
+    }
+
+    input.addEventListener('blur', () => doCheck());
+    input.addEventListener('input', () => {
+        const raw = input.value.trim();
+        if (!raw) {
+            setUsernameHint('', 'idle');
+            lastUsernameAvailable = null;
+            updateRegisterButtonState();
+            if (usernameCheckDebounceTimer) clearTimeout(usernameCheckDebounceTimer);
+            usernameCheckDebounceTimer = 0;
+            return;
+        }
+        if (usernameCheckDebounceTimer) clearTimeout(usernameCheckDebounceTimer);
+        usernameCheckDebounceTimer = setTimeout(doCheck, 400);
+    });
+}
+
+/** 切换回注册 Tab 时清空用户名提示（由 main 在 switchAuthMode('register') 时调用） */
+export function clearUsernameHint() {
+    setUsernameHint('', 'idle');
+    lastUsernameAvailable = null;
+    const submitBtn = document.getElementById('btn-reg-submit');
+    if (submitBtn) submitBtn.disabled = false;
 }
 
 // ... (refreshCaptcha 保持不变) ...
@@ -36,7 +118,11 @@ export async function refreshCaptcha(type) {
     try {
         const res = await fetch('/api/captcha');
         const newId = res.headers.get('X-Captcha-ID');
-        if (newId) currentCaptchaId = newId;
+        if (type === 'login') {
+            if (newId) currentCaptchaIdLogin = newId;
+        } else {
+            if (newId) currentCaptchaIdRegister = newId;
+        }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         imgEl.src = url;
@@ -55,13 +141,13 @@ export async function handleLogin() {
     const agree = document.getElementById('login-agree').checked; // 获取复选框状态
 
     if(!u || !p || !c) {
-        alert("请填写完整信息");
+        showToast("请填写完整信息", "error");
         return;
     }
 
     // 新增：隐私协议校验
     if (!agree) {
-        alert("请阅读并同意服务协议与隐私政策");
+        showToast("请阅读并同意服务协议与隐私政策", "error");
         return;
     }
 
@@ -78,7 +164,7 @@ export async function handleLogin() {
                 username: u,
                 password: p,
                 captcha: c,
-                captcha_id: currentCaptchaId
+                captcha_id: currentCaptchaIdLogin
             })
         });
 
@@ -91,15 +177,15 @@ export async function handleLogin() {
             if (Formulas && Formulas.loadMyFormulas) {
                 Formulas.loadMyFormulas();
             }
-            alert("登录成功！");
+            showToast("登录成功！", "success");
         }  else {
-            alert(data.message || "登录失败");
+            showToast(data.message || "登录失败", "error");
             refreshCaptcha('login');
             document.getElementById('login-captcha').value = '';
         }
     } catch(e) {
         console.error(e);
-        alert("网络错误");
+        showToast("网络错误", "error");
         refreshCaptcha('login');
     } finally {
         btn.innerText = originalText;
@@ -116,19 +202,19 @@ export async function handleRegister() {
     const agree = document.getElementById('reg-agree').checked; // 获取复选框
 
     if(!u || !p || !pConfirm || !c) {
-        alert("请填写完整信息");
+        showToast("请填写完整信息", "error");
         return;
     }
 
     // 新增：密码一致性校验
     if (p !== pConfirm) {
-        alert("两次输入的密码不一致，请重新输入");
+        showToast("两次输入的密码不一致，请重新输入", "error");
         return;
     }
 
     // 新增：隐私协议校验
     if (!agree) {
-        alert("请阅读并同意服务协议与隐私政策");
+        showToast("请阅读并同意服务协议与隐私政策", "error");
         return;
     }
 
@@ -145,24 +231,24 @@ export async function handleRegister() {
                 username: u,
                 password: p,
                 captcha: c,
-                captcha_id: currentCaptchaId
+                captcha_id: currentCaptchaIdRegister
             })
         });
 
         const data = await res.json();
 
         if(data.status === 'success') {
-            alert("注册成功，请登录");
+            showToast("注册成功，请登录", "success");
             if(window.switchAuthMode) window.switchAuthMode('login');
             refreshCaptcha('login'); // 切换后刷新登录验证码
         } else {
-            alert(data.message || "注册失败");
+            showToast(data.message || "注册失败", "error");
             refreshCaptcha('register');
             document.getElementById('reg-captcha').value = '';
         }
     } catch(e) {
         console.error(e);
-        alert("网络错误");
+        showToast("网络错误", "error");
         refreshCaptcha('register');
     } finally {
         btn.innerText = originalText;
@@ -197,15 +283,12 @@ function updateUserDisplay(username) {
     }
 }
 
-// --- 登出 ---
-// 需要挂载到 window，因为 HTML 中 onclick="logout()" 直接调用
-window.logout = async function() {
+// --- 登出：调用接口清除服务端 session 与 cookie，再刷新 ---
+export async function logout() {
     try {
         await fetch('/api/logout', { method: 'POST' });
-        // 刷新页面以清除状态
-        location.reload();
     } catch (e) {
         console.error("Logout failed", e);
-        location.reload();
     }
+    location.reload();
 }

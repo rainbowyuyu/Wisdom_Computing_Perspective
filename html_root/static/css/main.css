@@ -13,6 +13,7 @@
 @import url('pages/help.css');
 @import url('pages/formulas.css');
 @import url('pages/devtools.css');
+@import url('pages/mathlive.css');
 
 /* 通用 section 控制 (这部分必须保留在 main.css 或 layout.css 中) */
 .section {

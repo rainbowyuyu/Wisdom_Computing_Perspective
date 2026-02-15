@@ -1,0 +1,98 @@
+/* MathLive 虚拟键盘关闭按钮 + 键盘与输入框内部布局美化 */
+
+/* --- 键盘右上角关闭按钮 --- */
+.mathlive-keyboard-close {
+    position: fixed;
+    z-index: 10000;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    background: var(--bg-surface);
+    color: var(--text-main);
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: background 0.2s, transform 0.15s;
+}
+.mathlive-keyboard-close:hover {
+    background: var(--primary-color);
+    color: var(--text-inverse);
+    transform: scale(1.05);
+}
+.mathlive-keyboard-close:active {
+    transform: scale(0.98);
+}
+
+/* --- 虚拟键盘整体样式（通过 body 上的变量影响键盘容器）--- */
+body {
+    --keyboard-zindex: 9999;
+    --keyboard-border: 1px solid var(--border-color);
+    --keyboard-horizontal-rule: 1px solid var(--border-color);
+    --keyboard-toolbar-background: var(--bg-surface);
+    --keyboard-toolbar-background-hover: var(--bg-input);
+    --keyboard-toolbar-background-selected: rgba(37, 99, 235, 0.15);
+    --keyboard-toolbar-text: var(--text-secondary);
+    --keyboard-toolbar-text-active: var(--primary-color);
+    --keyboard-toolbar-font-size: 14px;
+    --keyboard-padding-top: 10px;
+    --keyboard-padding-bottom: 12px;
+    --keyboard-padding-horizontal: 12px;
+    --keycap-background: var(--bg-input);
+    --keycap-background-hover: var(--bg-surface);
+    --keycap-background-active: rgba(37, 99, 235, 0.2);
+    --keycap-background-pressed: var(--primary-color);
+    --keycap-border: 1px solid var(--border-color);
+    --keycap-text: var(--text-main);
+    --keycap-text-active: var(--text-main);
+    --keycap-text-hover: var(--text-main);
+    --keycap-text-pressed: var(--text-inverse);
+    --keycap-primary-background: var(--primary-color);
+    --keycap-primary-text: var(--text-inverse);
+    --keycap-primary-background-hover: var(--primary-hover);
+    --keycap-height: 44px;
+    --keycap-gap: 4px;
+    --keycap-font-size: 15px;
+    --keycap-small-font-size: 12px;
+    --keycap-shift-font-size: 10px;
+    --variant-panel-background: var(--bg-surface);
+    --variant-keycap-background-active: rgba(37, 99, 235, 0.2);
+}
+
+/* --- math-field 内部容器统一美化（所有页面的 MathLive 输入框）--- */
+math-field::part(container) {
+    border-radius: 10px;
+    padding: 0.5rem 0.75rem;
+    min-height: 2.5em;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+math-field:focus-within::part(container) {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+
+/* 深色模式下的键盘与关闭按钮已通过变量适配，无需重复写 */
+[data-theme="dark"] .mathlive-keyboard-close {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* --- 公式颜色/背景色选择面板：边框统一、柔和，避免电脑端加粗框突兀 --- */
+math-field {
+    --menu-border: 1px solid var(--border-color);
+    --menu-border-radius: 8px;
+}
+/* MathLive 菜单/颜色面板常渲染在 body 下，类名含 ML__ 或 mathfield */
+[class*="ML__popover"],
+[class*="ML__panel"],
+[class*="mathfield"][class*="popover"] {
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: var(--shadow-md) !important;
+}
+[class*="ML__popover"] [class*="color"],
+[class*="ML__panel"] [class*="color"] {
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+}

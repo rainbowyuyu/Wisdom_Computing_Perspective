@@ -8,7 +8,7 @@ import json
 import asyncio
 import sys
 import subprocess  # 引入 subprocess 用于同步调用
-from fastapi import FastAPI, UploadFile, File, HTTPException, Response, Request, Cookie
+from fastapi import FastAPI, UploadFile, File, HTTPException, Response, Request, Cookie, Query
 from typing import Optional # 新增
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
@@ -263,6 +263,30 @@ async def get_current_user(auth_session: Optional[str] = Cookie(None)):
     return {"status": "success", "username": username}
 
 
+# --- 用户名查重：注册前检查是否已被占用 ---
+@app.get("/api/user/check-username")
+async def check_username(username: str = Query(..., max_length=64)):
+    """检查用户名是否可用，用于注册前提示。"""
+    raw = username.strip()
+    if not raw:
+        return {"available": False}
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id FROM users WHERE username = %s", (raw,))
+        exists = cursor.fetchone() is not None
+        return {"available": not exists}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"available": False, "message": str(e)})
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 # --- 新增：登出接口 ---
 @app.post("/api/logout")
 async def logout(response: Response, auth_session: Optional[str] = Cookie(None)):
@@ -456,7 +480,7 @@ async def generate_animation_stream(data: CalcModel):
             try:
                 # capture_output=True 捕获输出，text=True 返回字符串
                 # Windows 下这个同步调用是最稳定的
-                return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=180)
+                return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=300)
             except subprocess.TimeoutExpired:
                 return None
             except Exception as ex:
@@ -508,9 +532,15 @@ async def generate_animation_stream(data: CalcModel):
         else:
             err_msg = result.stderr if result else "Unknown Error or Timeout"
             logger.error(f"Manim Error: {err_msg}")
-            # 截取部分错误信息展示
-            short_err = err_msg.split('\n')[-5:] if result else ["Timeout"]
-            error_msg = "渲染失败:\n" + "\n".join(short_err)
+            # 超时时给出友好提示：让用户知道是服务器性能与算式复杂度导致
+            if result is None:
+                error_msg = (
+                    "渲染超时：当前算式或动画较复杂，受服务器性能与算力限制，处理时间超过了允许上限。"
+                    "请尝试简化算式或稍后再试。"
+                )
+            else:
+                short_err = err_msg.split('\n')[-5:]
+                error_msg = "渲染失败:\n" + "\n".join(short_err)
 
             payload = {
                 "step": "error",
