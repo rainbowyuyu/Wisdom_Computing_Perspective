@@ -3,6 +3,7 @@ import asyncio
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -17,10 +18,34 @@ if sys.platform == "win32":
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app):
+    from app.config import db_pool
+    from app.database import apply_migrations
+    if db_pool:
+        await asyncio.to_thread(apply_migrations)
+    else:
+        logger.warning('数据库不可用，账户存储功能暂不可用')
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+@app.middleware("http")
+async def revalidate_site_code(request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    # Revalidate first-party code after deployment without disabling media caching.
+    if path == '/' or path.startswith(('/js/', '/css/', '/static/js/', '/static/css/')):
+        response.headers['Cache-Control'] = 'no-cache'
+    if path.startswith(('/api/search', '/api/wrongbook', '/api/examples/course-packs', '/api/formulas/solutions')):
+        response.headers['Cache-Control'] = 'private, no-store'
+    return response
+
 
 # 注册路由（各功能模块在 app 包内）
 from app.routers import auth, user, formulas, animation_scripts, detect, examples, devtools, agent, agent_templates, achievements, wrongbook, search
+from app.routers import solve
+from app.routers import solution_library
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(user.router, prefix="/api")
@@ -34,6 +59,10 @@ app.include_router(agent_templates.router, prefix="/api")
 app.include_router(achievements.router, prefix="/api")
 app.include_router(wrongbook.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+app.include_router(solve.router, prefix="/api")
+app.include_router(solution_library.router, prefix="/api")
+from app.routers import course_packs
+app.include_router(course_packs.router, prefix="/api")
 
 # 静态资源
 app.mount("/css", StaticFiles(directory="static/css"), name="css")

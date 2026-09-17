@@ -21,3 +21,13 @@ html_root/.env
 .idea/animate_cal.iml
 /intro-video/node_modules
 /vue_root/node_modules
+
+/vue_root/dist/
+/html_root/tests/artifacts/
+/html_root/tests/*-result.json
+/html_root/.env.local
+.pytest_cache/
+
+# Local runtime logs and disposable build/export files
+/html_root/tmp/
+/html_root/scripts/achievement-holo/_gallery_extra_backup.js

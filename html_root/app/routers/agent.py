@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from ..config import client, api_key
 from ..models import AgentRequest
+from ..llm_errors import llm_error_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -17,7 +18,6 @@ def sanitize_latex_for_mathlive(latex: str) -> str:
     if not latex or not isinstance(latex, str):
         return ""
     s = latex.strip()
-    s = s.replace("\\\\", "\\")
     s = re.sub(r"^```(?:latex)?\s*", "", s)
     s = re.sub(r"\s*```\s*$", "", s)
     s = re.sub(r"^\\\[\s*", "", s)
@@ -32,7 +32,7 @@ def sanitize_latex_for_mathlive(latex: str) -> str:
     s = re.sub(r"\s*\\end\s*\{\s*displaymath\s*\}\s*$", "", s, flags=re.IGNORECASE)
     s = re.sub(r"^\\begin\s*\{\s*equation\s*\}\s*", "", s, flags=re.IGNORECASE)
     s = re.sub(r"\s*\\end\s*\{\s*equation\s*\}\s*$", "", s, flags=re.IGNORECASE)
-    s = s.replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
+    s = s.replace("\r\n", "\n").replace("\r", "\n")
     s = re.sub(r"\s+", " ", s)
     s = "".join(c for c in s if c != "\x00" and (ord(c) >= 32 or c in "\n\t"))
     return s.strip()
@@ -187,6 +187,8 @@ KNOWLEDGE_GRAPH_HINT = (
 
 # 网站对外可调用的工具列表，供智能体或外部 Agent（如 function calling）按名称调用
 AGENT_TOOLS = [
+    {"name": "solve_steps", "description": "分步解题，自动选择 SymPy、AI 推导及交互图形，流式返回每一步。", "method": "POST", "path": "/api/solve/stream", "body": {"problem": "完整题目", "context": "可选图像描述"}},
+    {"name": "render_solution", "description": "将结构化解答渲染为带章节的 Manim 动画。", "method": "POST", "path": "/api/solve/render", "body": {"solution": "solve_steps 返回的 solution 对象"}},
     {
         "name": "detect",
         "description": "上传图片识别公式，返回 LaTeX。需先登录，请求时带图片。",
@@ -232,21 +234,37 @@ async def agent_tools():
 
 
 @router.post("/execute")
-async def agent_execute(data: AgentRequest):
+def agent_execute(data: AgentRequest):
     """智能体：理解用户意图，返回要跳转的页面与预填/触发的动作。"""
+    if not data.image_base64:
+        teaching={
+            '打开错题本':{'examples_filter':'wrongbook'},'错题本':{'examples_filter':'wrongbook'},
+            '复习错题':{'examples_action':'review'},'开始复习':{'examples_action':'review'},
+            '创建课包':{'examples_action':'create_pack'},'打开教案':{'examples_action':'lesson'},
+            '编辑教案':{'examples_action':'lesson'},'打开备课工作台':{'examples_action':'lesson'},
+            '打开我的课件':{'examples_filter':'courseware'},'我的课包':{'examples_filter':'courseware'},
+            '打开播放器弹幕':{'examples_action':'danmaku'},'打开时间戳笔记':{'examples_action':'notes'},
+        }
+        action=teaching.get((data.prompt or '').strip())
+        if action:
+            return {'status':'success','steps':[{'section':'examples',**action,'reply':'打开教学工作台。'}]}
+        direct={'打开我的算式':'my-formulas','打开教学案例':'examples','打开帮助':'help','打开 Manim 工作台':'devtools','打开 Manim 开发者工作台':'devtools'}
+        section=direct.get((data.prompt or '').strip())
+        if section:
+            return {'status':'success','steps':[{'section':section,'devtool':'manim' if section=='devtools' else None,'reply':'正在打开对应工具。'}]}
     latex_from_image = None
     if data.image_base64:
         try:
             base64_image = re.sub(r"^data:image/[^;]+;base64,", "", data.image_base64.strip())
             if not api_key:
-                latex_from_image = r"E = mc^2"
+                return {"status": "error", "message": "图片识别需要配置 ALIYUN_KEY，请先输入文字题目。"}
             else:
-                completion = client.chat.completions.create(
+                completion = client.with_options(timeout=70, max_retries=0).chat.completions.create(
                     model="qwen-vl-max",
                     messages=[{
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": "识别图片中的公式，只输出LaTeX代码，不要任何解释。"},
+                            {"type": "text", "text": "完整转写图片中的数学题目：保留题干、所有已知条件、选项和问题，公式使用LaTeX；如有几何图，描述标注与关系。只转写，不求解，不猜测看不清的内容。"},
                             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
                         ],
                     }],
@@ -255,7 +273,7 @@ async def agent_execute(data: AgentRequest):
                 latex_from_image = latex_from_image.replace("```latex", "").replace("```", "").replace("\\[", "").replace("\\]", "").strip()
         except Exception as e:
             logger.error(f"Agent image recognition: {e}")
-            return JSONResponse(status_code=200, content={"status": "error", "message": "图片识别失败：" + str(e)})
+            return JSONResponse(status_code=200, content={"status": "error", "message": llm_error_message(e)})
 
     context_prefix = ""
     if data.last_user_message or data.last_assistant_message:
@@ -265,6 +283,18 @@ async def agent_execute(data: AgentRequest):
             + (f"助手回复：{data.last_assistant_message}。" if data.last_assistant_message else "")
             + "\n\n"
         )
+
+    # Supported local math tasks can immediately dispatch real tools without a model round trip.
+    if not data.image_base64:
+        try:
+            from logic.solution_engine import local_solution
+            local = local_solution(data.prompt or "")
+        except (ValueError, SyntaxError, TypeError, OverflowError):
+            local = None
+        if local is not None:
+            return {"status": "success", "prompt": data.prompt, "steps": [{"section": "calculate", "operation": "solution", "trigger": "generate", "formula": data.prompt, "reply": "将调用符号计算、交互图形和 Manim，逐步展示这道题的解答。"}]}
+    if not api_key:
+        return {"status": "error", "message": "复杂题目与自然语言调度需要在服务端配置 ALIYUN_KEY。可先输入：解方程 x^2-5*x+6=0。"}
 
     intent_hint = _classify_intent(data.prompt or "")
     intent_hint_json = json.dumps(intent_hint, ensure_ascii=False)
@@ -276,7 +306,7 @@ async def agent_execute(data: AgentRequest):
         + f"{KNOWLEDGE_GRAPH_HINT}\n\n"
         + context_prefix
         + "当前用户说：" + data.prompt + "\n\n"
-        + ("用户上传了图片，识别到的公式为：" + latex_from_image + "。若需用到公式请以此为准。" if latex_from_image else "用户未上传图片，若需公式请从描述或题目中提取 LaTeX。")
+        + ("用户上传了图片，完整题面与图形条件为：" + latex_from_image + "。计算步骤的 formula 必须保留完整题面和所有条件，不添加未验证的答案。" if latex_from_image else "用户未上传图片，若需公式请从描述或题目中提取 LaTeX。")
         + '\n\n【解析要求】当用户给出题目、算式或图片时，请先将题目解析为可编辑的 LaTeX 或可渲染的 Manim 算式（可拆解为步骤），在 formula、fill_latex 或 fill_manim_code 中体现该解析结果；若有拆解说明可放在 reply 中简要写出。'
         '\n\n【智能区分整题与单公式】必须根据用户给的是「整道题」还是「单个公式」决定 operation 和 formula 的内容：'
         ' (整题) 选择题、多选项、求完整解答、问「哪个是无穷小量/等价无穷小」、题目截图等：operation=solution，formula=整题的结构化文字（题目描述+各选项 LaTeX+极限或结论+正确答案），输入到计算页的也必须是这段整题内容，不要只填一个公式。'
@@ -286,12 +316,13 @@ async def agent_execute(data: AgentRequest):
         ' (1b) 若用户说「打开设置」「修改xx设置」「把xx改成xx」等，section=settings；可选 settings_section 定位（appearance/profile/agent/detect/shortcuts/calc/devtools/examples）；若要直接改某项，加 setting_key 与 setting_value，如 setting_key="theme" setting_value="dark" 表示切换到深色模式。'
         ' (2) 若用户说"在 LaTeX 编辑器填入 xxx""打开 LaTeX 并填入质能方程"等，则 section=devtools, devtool=latex, fill_latex 为 LaTeX。'
         '     **常见数学概念转换**：质能方程→E=mc^2；勾股定理→a^2+b^2=c^2；欧拉公式→e^{i\\pi}+1=0 等，转为标准内联 LaTeX。'
-        ' (3) 若用户说"打开云端渲染工作台/开发者工具并写一段 Manim 示例代码填入""打开 Manim 工作台并填入代码"等，则 section=devtools, devtool=manim, fill_manim_code 为一段完整的 Manim Python 代码（from manim import * 开头，含 class Scene 的 construct）。'
+        ' (3) 若用户说"打开云端渲染工作台/开发者工具并写一段 Manim 示例代码填入""打开 Manim 工作台并填入代码"等，则 section=devtools, devtool=manim, fill_manim_code 为一段完整的 Manim Python 代码（from manim import * 开头，含 class GenScene(Scene) 的 construct）。'
         ' (3b) Manim 工作台工具栏动作：用户说「运行/渲染 Manim」「运行代码」「执行」→ devtool_action=run；「关键帧预览」「预览关键帧」→ devtool_action=keyframe；「导入脚本」「打开导入面板」→ devtool_action=import；「保存脚本」「保存到脚本库」→ devtool_action=save；「生成视频文案」「总结脚本」→ devtool_action=summary；「打开 AI 编辑」「用 AI 改代码」→ devtool_action=ai_edit。这些与 fill_manim_code 可同时存在（先填入再执行动作）。'
         ' (4) 若用户说"只识别""识别这张图（不跳转）"，则 section=detect, trigger=recognize。'
         ' (5) 若用户说"识别公式并保存到我的算式""识别并保存"等，则先识别再保存：输出 steps 数组，第一步 section=detect, trigger=recognize；第二步 section=my-formulas 且 save_to_formulas=true（表示把上一步识别结果保存到我的算式）。'
         ' (6) 其他多步需求（如先打开工作台再填入代码、先识别再去计算等）：用 steps 数组按顺序列出每一步。单步则只输出一个 JSON 对象（不含 steps）。'
         ' (6b) 教学案例子功能：用户说「收藏」「我的收藏」「稍后看」「我的课件」「全部案例」时，section=examples，并设置 examples_filter：收藏→favorites；稍后看→watch_later；我的课件→courseware；全部→all。'
+        ' 错题本用 section=examples, examples_filter=wrongbook；开始复习用 section=examples, examples_action=review。备课、填写教案用 section=examples, examples_action=lesson；创建课包用 examples_action=create_pack；播放器弹幕用 examples_action=danmaku；时间戳笔记用 examples_action=notes。教案编辑器由用户填写并保存，不要声称已经生成或保存了教案。'
         ' (7) **解题类（调用网站工具）**：当用户给出数学题（选择题、判断题、求极限、问「哪个是无穷小量/等价无穷小」等）或上传题目截图时，请：'
         ' ① 先判断是**整题**还是**单公式**：整题则 operation=solution 且 formula 为整题结构化文字；单公式则 **默认 operation=normal**，仅当用户明确说「画图」「函数图像」「可视化」时才用 visualization，formula 为该公式 LaTeX。'
         ' ② 从题目/图片中提取各选项或待比较的式子，转为标准 LaTeX（如 A: \\frac{x+\\cos x}{x}, B: \\frac{\\sin x}{x}, C: \\frac{\\sin x}{\\sqrt{x}}, D: \\frac{1}{2^x-1}）。'
@@ -311,7 +342,7 @@ async def agent_execute(data: AgentRequest):
         " trigger：立刻生成动画填 generate；仅识别填 recognize；只跳转填 none。"
     )
     try:
-        completion = client.chat.completions.create(model="qwen-plus", messages=[{"role": "user", "content": prompt_for_llm}])
+        completion = client.with_options(timeout=70, max_retries=0).chat.completions.create(model="qwen-plus", response_format={"type":"json_object"}, temperature=0.2, messages=[{"role": "user", "content": prompt_for_llm}])
         raw = completion.choices[0].message.content.strip()
         if "```" in raw:
             raw = raw.split("```")[1].replace("json", "").strip()
@@ -322,9 +353,9 @@ async def agent_execute(data: AgentRequest):
             section = str(obj.get("section") or "chat").strip()
             if section not in ("detect", "calculate", "devtools", "my-formulas", "examples", "help", "chat", "settings"):
                 section = "chat"
-            reply = (str(obj.get("reply") or "")).replace("\\n", "\n").replace("\\\\", "\\").strip()
+            reply = str(obj.get("reply") or "").strip()
             devtool = obj.get("devtool") or None
-            formula = str(obj.get("formula") or (latex_from_image or "")).replace("\\\\", "\\").strip()
+            formula = str(obj.get("formula") or (latex_from_image or "")).strip()
             if not formula and latex_from_image:
                 formula = latex_from_image
             operation = str(obj.get("operation") or "normal")
@@ -333,6 +364,9 @@ async def agent_execute(data: AgentRequest):
             # 服务器预判：若明显是整道题，更倾向使用 solution 模式
             if section == "calculate" and intent_hint.get("prefer_solution_mode"):
                 operation = "solution"
+            if section == "calculate" and latex_from_image:
+                operation = "solution"
+                formula = (data.prompt + "\n图片题面：\n" + latex_from_image).strip()
             # 整题（solution）时 formula 为结构化题目文字，不做 LaTeX 清洗；单公式时再做清洗供 MathLive
             if operation != "solution":
                 formula = sanitize_latex_for_mathlive(formula)
@@ -343,9 +377,9 @@ async def agent_execute(data: AgentRequest):
                     up = user_prompt.strip()
                     if len(up) > len(formula.strip()) + 8:
                         formula = up
-            fill_latex = str(obj.get("fill_latex") or "").replace("\\\\", "\\").strip()
+            fill_latex = str(obj.get("fill_latex") or "").strip()
             fill_latex = sanitize_latex_for_mathlive(fill_latex) if fill_latex else ""
-            fill_manim_code = str(obj.get("fill_manim_code") or "").replace("\\n", "\n").replace("\\\\", "\\").strip()
+            fill_manim_code = str(obj.get("fill_manim_code") or "").strip()
             save_to_formulas = obj.get("save_to_formulas") is True
             trigger = str(obj.get("trigger") or "none")
             if trigger not in ("generate", "recognize", "none"):
@@ -354,8 +388,11 @@ async def agent_execute(data: AgentRequest):
             if devtool_action not in ("run", "keyframe", "import", "save", "summary", "ai_edit"):
                 devtool_action = None
             examples_filter = str(obj.get("examples_filter") or "").strip()
-            if examples_filter not in ("all", "favorites", "watch_later", "courseware"):
+            if examples_filter not in ("all", "favorites", "watch_later", "courseware", "wrongbook"):
                 examples_filter = None
+            examples_action = obj.get('examples_action')
+            if examples_action not in ('create_pack','lesson','danmaku','notes','review'):
+                examples_action = None
             settings_section = str(obj.get("settings_section") or "").strip()
             if settings_section not in ("appearance", "profile", "agent", "detect", "shortcuts", "calc", "devtools", "examples"):
                 settings_section = None
@@ -367,6 +404,7 @@ async def agent_execute(data: AgentRequest):
                 "devtool": devtool,
                 "devtool_action": devtool_action,
                 "examples_filter": examples_filter,
+                "examples_action": examples_action,
                 "settings_section": settings_section,
                 "setting_key": setting_key,
                 "setting_value": setting_value,
@@ -381,10 +419,10 @@ async def agent_execute(data: AgentRequest):
         try:
             parsed = json.loads(raw)
         except Exception:
-            parsed = {}
+            raise ValueError("模型返回了无效的执行计划")
 
         if isinstance(parsed.get("steps"), list) and len(parsed["steps"]) > 0:
-            steps_arr = [normalize_step(s) if isinstance(s, dict) else normalize_step({}) for s in parsed["steps"]]
+            steps_arr = [normalize_step(s) if isinstance(s, dict) else normalize_step({}) for s in parsed["steps"][:12]]
         else:
             steps_arr = [normalize_step(parsed)]
 
@@ -397,8 +435,8 @@ async def agent_execute(data: AgentRequest):
         return {
             "status": "success",
             "steps": steps_arr,
-            "message": "已按步骤执行" if len(steps_arr) > 1 else ("已为您跳转到对应步骤" if steps_arr and steps_arr[0].get("section") != "chat" else ""),
+            "message": "已生成工具执行计划" if len(steps_arr) > 1 else ("已准备对应步骤" if steps_arr and steps_arr[0].get("section") != "chat" else ""),
         }
     except Exception as e:
         logger.error(f"Agent LLM parse: {e}")
-        return JSONResponse(status_code=200, content={"status": "error", "message": "理解您的描述时出错：" + str(e)})
+        return JSONResponse(status_code=200, content={"status": "error", "message": llm_error_message(e)})

@@ -775,3 +775,6 @@
     .role-flow-step { flex-direction: column; }
     .role-flow-arrow { transform: rotate(90deg); }
 }
+/* Versioned feature announcement */
+.agent-update-banner{flex-wrap:wrap;gap:10px 16px}.agent-update-text{flex:1;min-width:200px;line-height:1.7}.agent-update-detail{width:auto;height:auto;flex-shrink:0;border-radius:8px;padding:6px 10px;white-space:nowrap;font-size:12px;text-decoration:none}.agent-update-close{flex-shrink:0}
+@media(max-width:600px){.agent-update-banner{padding:12px 16px}.agent-update-text{font-size:12px;flex-basis:calc(100% - 40px);order:0}.agent-update-close{order:1}.agent-update-detail{order:2}}

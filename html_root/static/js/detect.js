@@ -1,7 +1,8 @@
+import { normalizeLatex } from './math-text.js';
 // static/js/detect.js
 import { getCanvasBlob } from './canvas.js';
 import { showSection } from './ui.js';
-import * as DevTools from './devtools.js';
+import * as DevTools from '/static/js/devtools.js?v=20260917-creator-2';
 
 // 辅助：设置按钮可用状态
 function setButtonsState(enabled) {
@@ -146,8 +147,13 @@ export async function processRecognition() {
 
         if (data.status === 'success') {
             // 2. 成功：填充内容并激活按钮
+            data.latex=normalizeLatex(data.latex);
             if (mathField.setValue) mathField.setValue(data.latex);
             if (codeArea) codeArea.value = data.latex;
+            try {
+                sessionStorage.setItem('last_detect_latex', String(data.latex));
+                sessionStorage.setItem('last_detect_problem', String(data.problem_text || data.latex));
+            } catch {}
 
             setButtonsState(true); // <--- 关键：激活按钮
 
@@ -196,22 +202,16 @@ export async function copyToCalc() {
     // 再次校验（虽然按钮禁用时点不了，但为了健壮性保留）
     if(checkContent(detected)) {
         // 跳转到计算页面
-        showSection('calculate');
-
-        // 延时一点点以确保 DOM 可见，然后填充
-        setTimeout(() => {
-            // 填充到计算页面的矩阵(MathLive 组件)
-            const targetField = document.getElementById('math-field-main');
-            if (targetField && targetField.setValue) {
-                targetField.setValue(detected);
+        (window.showSection || showSection)('calculate');
+        let problem = detected, context = '';
+        try {
+            if (sessionStorage.getItem('last_detect_latex') === detected) {
+                problem = sessionStorage.getItem('last_detect_problem') || detected;
+                context = sessionStorage.getItem('last_detect_vision_prompt') || '';
             }
+        } catch {}
+        window.StepTutor?.prefill(problem, context);
 
-            // 同时更新隐藏的 textarea，保持数据同步
-            const targetCode = document.getElementById('latex-code-main');
-            if(targetCode) {
-                targetCode.value = detected;
-            }
-        }, 100);
 
     } else {
         if (typeof showAlert === 'function') await showAlert("请先进行识别或输入有效公式", "提示");

@@ -1,18 +1,6 @@
-export function renderMathIn(container: HTMLElement | null | undefined) {
+export async function renderMathIn(container: HTMLElement | null | undefined) {
   if (!container) return;
-  const anyWindow = window as any;
-  const render = anyWindow.renderMathInElement;
-  if (typeof render === "function") {
-    const opts =
-      (anyWindow.App &&
-        anyWindow.App.config &&
-        anyWindow.App.config.KATEX_RENDER_OPTS) ||
-      {};
-    try {
-      render(container, opts);
-    } catch (e) {
-      console.warn("KaTeX render error", e);
-    }
-  }
+  const path = "/static/js/math-text.js";
+  const math = await import(/* @vite-ignore */ path);
+  math.renderMathIn(container);
 }
-

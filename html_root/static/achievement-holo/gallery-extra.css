@@ -1,0 +1,182 @@
+
+:root {
+  --gallery-ink: #e8eef8;
+  --gallery-muted: #8fa0b8;
+  --gallery-line: rgba(148, 163, 184, 0.28);
+  --gallery-accent: #5eead4;
+  --gallery-bg: #0b1220;
+}
+body {
+  background: radial-gradient(1200px 800px at 20% -10%, #1a2a44, transparent),
+    radial-gradient(900px 700px at 100% 0%, #123048, transparent),
+    var(--gallery-bg) !important;
+  color: var(--gallery-ink);
+}
+.masthead,
+.panel,
+.stage-note {
+  color: var(--gallery-ink);
+}
+.wordmark-cn { color: #f8fafc; }
+.wordmark-en, .collection-label, .stage-note { color: var(--gallery-muted); }
+
+/* 深色展台：工具条/图标按钮必须深底浅标，避免白底叠浅色图标 */
+.icon-button {
+  color: var(--gallery-ink);
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid var(--gallery-line);
+}
+.icon-button svg {
+  stroke: currentColor;
+  fill: none;
+  color: inherit;
+}
+.icon-button:hover:not(:disabled) {
+  background: rgba(30, 41, 59, 0.95);
+  color: #f8fafc;
+  border-color: rgba(94, 234, 212, 0.45);
+}
+.icon-button[aria-pressed="true"] {
+  color: var(--gallery-accent);
+  background: rgba(15, 118, 110, 0.28);
+  border-color: rgba(94, 234, 212, 0.55);
+}
+.save-button {
+  background: var(--gallery-accent);
+  color: #0b1220;
+  border-color: transparent;
+}
+.save-button:hover:not(:disabled) {
+  background: #99f6e4;
+  color: #0b1220;
+}
+.tools {
+  color: var(--gallery-ink);
+  background: rgba(11, 18, 32, 0.88);
+  border: 1px solid var(--gallery-line);
+  border-radius: 999px;
+  padding: 0 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.45);
+}
+.tools .icon-button {
+  background: transparent;
+  border-color: transparent;
+}
+.tools .icon-button:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.7);
+}
+.tool-divider {
+  background: var(--gallery-line);
+}
+.parameter-panel,
+.about {
+  background: rgba(15, 23, 42, 0.96);
+  color: var(--gallery-ink);
+  border: 1px solid var(--gallery-line);
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.5);
+}
+.parameter-panel .panel-heading,
+.parameter-panel .range-row,
+.parameter-panel .foil-row,
+.about {
+  color: var(--gallery-ink);
+}
+.loading {
+  color: var(--gallery-muted);
+}
+.loading-line {
+  background: var(--gallery-accent);
+}
+.gallery-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 1rem;
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
+  align-items: start;
+}
+.card-rail {
+  border: 1px solid var(--gallery-line);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(10px);
+  padding: 0.85rem;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  position: sticky;
+  top: 84px;
+}
+.card-rail h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gallery-accent);
+  font-weight: 600;
+}
+.card-rail p {
+  margin: 0 0 0.85rem;
+  font-size: 0.82rem;
+  color: var(--gallery-muted);
+  line-height: 1.45;
+}
+#card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.card-chip {
+  appearance: none;
+  border: 1px solid var(--gallery-line);
+  background: rgba(30, 41, 59, 0.7);
+  color: inherit;
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+.card-chip:hover {
+  border-color: rgba(94, 234, 212, 0.55);
+  transform: translateY(-1px);
+}
+.card-chip.active {
+  border-color: var(--gallery-accent);
+  background: linear-gradient(135deg, rgba(20, 80, 90, 0.55), rgba(30, 41, 59, 0.85));
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.2);
+}
+.card-chip-edition {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--gallery-muted);
+}
+.card-chip-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.card-chip-tier {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gallery-accent);
+}
+.gallery-main .gallery {
+  min-height: 70vh;
+}
+@media (max-width: 900px) {
+  .gallery-shell {
+    grid-template-columns: 1fr;
+  }
+  .card-rail {
+    position: static;
+    max-height: none;
+  }
+  #card-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}

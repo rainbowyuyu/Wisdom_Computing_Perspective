@@ -16,6 +16,7 @@ from logic.prompt import return_prompt
 from ..config import client, api_key, VIDEOS_DIR
 from ..models import CalcModel
 from .agent import sanitize_latex_for_mathlive
+from ..llm_errors import llm_error_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["detect"])
@@ -128,15 +129,15 @@ async def detect_image(file: UploadFile = File(...)):
         image_content = await file.read()
         base64_image = base64.b64encode(image_content).decode("utf-8")
         if not api_key:
-            # 未配置大模型时，降级为仅返回一个简单公式，不提供视觉描述
-            return {"status": "success", "latex": r"E = mc^2"}
+            return {"status": "error", "message": "图片识别需要配置 ALIYUN_KEY；也可以直接输入文字题目进行分步解答。"}
 
         # 使用多模态大模型一次性返回：
         # - latex: 识别出的 LaTeX 公式
         # - vision_prompt: 面向后续 Manim 代码生成的几何/结构自然语言描述
         prompt_text = (
             "你是一名数学视觉理解助手。请仔细、逐符号比对图片中的公式和几何/图像结构，只根据图片内容输出一个 JSON 对象：\n"
-            '{ "latex": "...", "vision_prompt": "..." }\n\n'
+            '{ "latex": "...", "problem_text": "...", "vision_prompt": "..." }\n\n'
+            "- problem_text：完整转写题面文字、所有条件、选项和问题，不求解；如果只有公式则与 latex 相同。\n"
             "- latex：只包含主要的数学表达式或题目中的核心公式，使用标准 LaTeX，不要任何解释或多余文字；\n"
             "- 严格按照图片中的公式抄写，**不要自行添加/删除/修改任何数字、系数、上下标或积分上下限**，看不清时用 ? 占位而不要猜测；\n"
             "- 特别注意区分 **1 与 \\infty、0 与 6/9** 等相似符号：例如图片为 “∫_0^1 x^2 dx”，则 latex 必须是 `\\\\int_0^1 x^{2} \\\\, dx`，绝不能写成 `\\\\int_0^\\\\infty 3x^{2} dx` 之类；\n"
@@ -147,7 +148,7 @@ async def detect_image(file: UploadFile = File(...)):
         loop = asyncio.get_event_loop()
         completion = await loop.run_in_executor(
             None,
-            lambda: client.chat.completions.create(
+            lambda: client.with_options(timeout=70, max_retries=0).chat.completions.create(
                 model="qwen-vl-max",
                 messages=[{
                     "role": "user",
@@ -166,9 +167,11 @@ async def detect_image(file: UploadFile = File(...)):
                 raw = parts[1]
             raw = raw.replace("json", "").strip()
         vision_prompt = None
+        problem_text = ""
         try:
             parsed = json.loads(raw)
             latex = str(parsed.get("latex", "")).strip()
+            problem_text = str(parsed.get("problem_text", latex)).strip()
             vision_prompt = str(parsed.get("vision_prompt", "")).strip() or None
         except Exception:
             # JSON 解析失败则退化到旧逻辑：整个内容视为 LaTeX，仅做简单清洗
@@ -177,9 +180,10 @@ async def detect_image(file: UploadFile = File(...)):
 
         # 统一对识别出的 LaTeX 做规范化处理，去掉 $$、\[ \]、```latex 等包裹，便于 MathLive 正确解析
         latex = sanitize_latex_for_mathlive(latex)
-        return {"status": "success", "latex": latex, "vision_prompt": vision_prompt}
+        return {"status": "success", "latex": latex, "problem_text": problem_text or latex, "vision_prompt": vision_prompt}
     except Exception as e:
-        return {"status": "success", "latex": r"\text{Error}"}
+        logger.warning("Image recognition failed: %s", type(e).__name__)
+        return {"status": "error", "message": llm_error_message(e)}
 
 
 @router.post("/animate")

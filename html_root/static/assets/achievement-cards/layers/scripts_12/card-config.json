@@ -1,0 +1,35 @@
+{
+  "title": "可视化导演",
+  "subtitle": "动画大师",
+  "technique": "十二场执导",
+  "tagline": "可视化叙事成局",
+  "edition": "007 / 013",
+  "collection": "智算星云 · 成就典藏",
+  "description": "累计创建 12 个动画脚本",
+  "tier": "gold",
+  "achievementId": "scripts_12",
+  "assets": {
+    "model": "./assets/card.glb",
+    "subject": "./assets/subject.png",
+    "background": "./assets/background.png",
+    "text": "./assets/text.png",
+    "lineart": "./assets/lineart.png"
+  },
+  "parameters": {
+    "subjectScale": 1.25,
+    "subjectDepth": 0.28,
+    "backgroundDepth": -0.2,
+    "foil": 0.78
+  },
+  "safeArea": {
+    "scale": 1.12,
+    "offset": [
+      -0.06,
+      -0.085
+    ]
+  },
+  "appearance": {
+    "background": "#0b1220"
+  },
+  "defaultFinish": "gold"
+}

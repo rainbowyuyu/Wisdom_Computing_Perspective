@@ -17,9 +17,9 @@
       </p>
 
       <div class="hero-btns">
-        <button class="cta-btn primary" @click="goSection('agent')">
+        <button class="cta-btn primary" @click="goSection('calculate')">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
-          试试智能体
+          开始分步解题
         </button>
         <button class="cta-btn secondary" @click="goSection('detect')">
           立即体验
@@ -74,21 +74,7 @@
         <h2 id="role-start-title">全站知识图谱</h2>
         <p class="role-start-subtitle">点击任意节点跳转功能，探索网站全部能力</p>
       </div>
-      <div class="role-graph-wrap">
-        <div id="role-graph-3d" class="role-graph-3d"></div>
-        <p class="role-graph-hint">左键旋转 · 右键平移 · 滚轮缩放</p>
-        <div class="role-graph-controls" aria-label="图谱控制">
-          <button type="button" id="role-graph-zoom-in" title="放大">
-            <i class="fa-solid fa-plus"></i>
-          </button>
-          <button type="button" id="role-graph-zoom-out" title="缩小">
-            <i class="fa-solid fa-minus"></i>
-          </button>
-          <button type="button" id="role-graph-reset" title="还原视图">
-            <i class="fa-solid fa-rotate-left"></i>
-          </button>
-        </div>
-      </div>
+      <RoleGraph3D />
       <div id="role-flow-panel" class="role-flow-panel">
         <div class="role-flow-panel-inner">
           <button
@@ -143,8 +129,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
 import { useRouter } from "vue-router";
+import RoleGraph3D from "../components/home/RoleGraph3D.vue";
 
 const router = useRouter();
 
@@ -184,25 +170,5 @@ function scrollToSelector(selector: string) {
 function startTutorial() {
   (window as any).startTutorial?.();
 }
-
-// 在首页挂载后初始化 3D 知识图谱，确保 DOM 与全局脚本均就绪
-onMounted(() => {
-  const tryInit = () => {
-    const g = (window as any).RoleGraph;
-    if (g && typeof g.initRoleGraph === "function") {
-      g.initRoleGraph();
-      return true;
-    }
-    return false;
-  };
-
-  if (!tryInit()) {
-    const timer = setInterval(() => {
-      if (tryInit()) {
-        clearInterval(timer);
-      }
-    }, 300);
-  }
-});
 </script>
 

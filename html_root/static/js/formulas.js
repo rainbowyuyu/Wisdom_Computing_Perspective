@@ -1,7 +1,12 @@
+import { normalizeLatex, renderMathIn } from './math-text.js';
+export { normalizeLatex } from './math-text.js';
 // static/js/formulas.js
 import { showSection, toggleAuthModal, toggleModal } from './ui.js';
-import * as DevTools from './devtools.js';
+import * as DevTools from '/static/js/devtools.js?v=20260917-creator-2';
 import { sanitizeMarkdownHtml } from './sanitize.js';
+import { escapeText as escapeHtml } from './solution-visual.js';
+import { openSavedSolution } from './solution-library.js';
+window.addEventListener('formula-library-updated',()=>{if(document.getElementById('my-formulas')?.classList.contains('active-section'))loadMyFormulas();});
 
 // 获取当前登录用户名
 function getCurrentUser() {
@@ -30,26 +35,7 @@ async function performSave(user, latex, note) {
 }
 
 // --- 新增：LaTeX 规范化函数 ---
-export function normalizeLatex(latex) {
-    if (!latex) return "";
-    let clean = latex.trim();
 
-    // 去除开头和结尾的 $$
-    if (clean.startsWith('$$') && clean.endsWith('$$')) {
-        clean = clean.substring(2, clean.length - 2);
-    }
-    // 去除开头和结尾的 $
-    else if (clean.startsWith('$') && clean.endsWith('$')) {
-        clean = clean.substring(1, clean.length - 1);
-    }
-
-    // 去除 \[ \]
-    if (clean.startsWith('\\[') && clean.endsWith('\\]')) {
-        clean = clean.substring(2, clean.length - 2);
-    }
-
-    return clean.trim();
-}
 
 let isEditListenersInit = false;
 
@@ -206,6 +192,9 @@ function renderList(formulas) {
 
     // 有公式时，新建卡片放在第一个
     const listHtml = formulas.map(f => {
+        if(f.solution_title) return `<div class="formula-card solution-card">
+            <div class="solution-card-body"><span class="solution-card-kind"><i class="fa-solid fa-layer-group"></i> 分步题解 ${f.video_url?'<i class="fa-solid fa-film" title="含动画"></i>':''}</span><h3>${escapeHtml(f.solution_title)}</h3><p>${escapeHtml(f.latex)}</p><span class="solution-card-detail">${Number(f.step_count)} 个步骤${f.video_url?' · 含动画':''}</span></div>
+            <div class="formula-meta"><button class="solution-card-open" data-solution-read="${Number(f.id)}">阅读题解 <i class="fa-solid fa-arrow-right"></i></button><button class="btn-icon delete" title="删除题解" data-solution-delete="${Number(f.id)}"><i class="fa-regular fa-trash-can"></i></button></div></div>`;
         const displayLatex = normalizeLatex(f.latex);
         // ... (转义逻辑保持不变)
         const safeLatex = f.latex.replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -214,15 +203,15 @@ function renderList(formulas) {
         return `
         <div class="formula-card">
             <div class="formula-preview">
-                \\[ ${displayLatex} \\]
+                \\[ ${escapeHtml(displayLatex)} \\]
             </div>
             <div class="formula-meta">
-                <span class="formula-note" title="${f.note}">${f.note || "未命名"}</span>
+                <span class="formula-note" title="${escapeHtml(f.note)}">${escapeHtml(f.note || "未命名")}</span>
                 <div class="formula-actions">
-                    <button class="btn-icon" title="使用" onclick="useFormula('${encodeURIComponent(displayLatex)}')">
+                    <button class="btn-icon" title="使用" onclick="useFormula('${encodeURIComponent(displayLatex).replace(/'/g,'%27')}')">
                         <i class="fa-solid fa-share-from-square"></i>
                     </button>
-                    <button class="btn-icon" title="编辑" onclick="openEditModal(${f.id}, '${encodeURIComponent(f.latex)}', '${encodeURIComponent(f.note || '')}')">
+                    <button class="btn-icon" title="编辑" onclick="openEditModal(${f.id}, '${encodeURIComponent(f.latex).replace(/'/g,'%27')}', '${encodeURIComponent(f.note || '').replace(/'/g,'%27')}')">
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>
                     <button class="btn-icon delete" title="删除" onclick="deleteFormula(${f.id})">
@@ -234,18 +223,16 @@ function renderList(formulas) {
     `}).join('');
 
     container.innerHTML = addCardHtml + listHtml;
+    container.querySelectorAll('[data-solution-read]').forEach(button=>button.addEventListener('click',()=>openSavedSolution(button.dataset.solutionRead).catch(()=>{})));
+    container.querySelectorAll('[data-solution-delete]').forEach(button=>button.addEventListener('click',()=>deleteFormula(Number(button.dataset.solutionDelete))));
 
-    if (typeof renderMath === 'function') renderMath(container);
+    renderMathIn(container);
 }
 
 // 4. 使用公式
 export function useFormula(latexEncoded) {
     const latex = decodeURIComponent(latexEncoded);
-    const targetA = document.getElementById('latex-code-a');
-    if (targetA) {
-        targetA.value = latex;
-        showSection('calculate');
-    }
+    window.showSection?.('calculate');window.StepTutor?.prefill(latex);
 }
 
 // 5. 删除公式
@@ -254,7 +241,9 @@ export async function deleteFormula(id) {
     if (!confirmed) return;
     const user = getCurrentUser();
     try {
-        await fetch(`/api/formulas/delete?id=${id}&username=${user}`, { method: 'DELETE' });
+        const response=await fetch(`/api/formulas/delete?id=${id}&username=${encodeURIComponent(user)}`, { method: 'DELETE' });
+        if(!response.ok)throw new Error('删除失败');
+        window.dispatchEvent(new CustomEvent('formula-library-deleted',{detail:{id}}));
         loadMyFormulas();
     } catch(e) {
         if (typeof showAlert === 'function') await showAlert("删除失败", "错误");
@@ -351,7 +340,7 @@ async function refreshKnowledgeSummary() {
 // --- 6. 新增：编辑相关函数 ---
 
 export function openEditModal(id, encodedLatex, encodedNote) {
-    const latex = decodeURIComponent(encodedLatex);
+    const latex = normalizeLatex(decodeURIComponent(encodedLatex));
     const note = decodeURIComponent(encodedNote);
 
     // 填充数据

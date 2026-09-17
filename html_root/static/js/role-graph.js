@@ -4,7 +4,10 @@
  * 使用 site-graph 数据，依赖全局 THREE / ForceGraph3D / SpriteText（ES 模块）
  */
 
-import { getGraphDataFor3D, ROLE_FLOWS, ROLE_LABELS, executeNodeAction } from './site-graph.js';
+import { getGraphDataFor3D, ROLE_FLOWS, ROLE_LABELS, executeNodeAction, getOutNeighbors, getInNeighbors } from './site-graph.js?v=20260917-ecosystem-6';
+import { escapeText } from './solution-visual.js';
+
+const graphInstances = new WeakMap();
 
 /** 图标映射 */
 const ICON_MAP = {
@@ -223,27 +226,73 @@ function buildGraphData() {
 }
 
 export function initRoleGraph() {
-  const container = document.getElementById('role-graph-3d');
+    const container = document.getElementById('role-graph-3d');
   const flowPanel = document.getElementById('role-flow-panel');
   const flowTitle = document.getElementById('role-flow-title');
   const flowChain = document.getElementById('role-flow-chain');
   const flowBack = document.getElementById('role-flow-back');
 
   const ForceGraph3D = window.ForceGraph3D;
-  if (!container || !flowPanel || !ForceGraph3D) return;
+  if (!container || !flowPanel) return;
+  if (graphInstances.has(container)) return graphInstances.get(container);
+  let Graph, retryTimer, resizeFrame = 0, navigationTimer = 0;
+  const cleanups = [];
+  const events = new AbortController();
+  const listen = (el, type, fn, options = {}) => el?.addEventListener(type, fn, {...options, signal: events.signal});
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let disposed = false;
+  const cleanup = () => {
+    disposed = true;
+    events.abort(); clearInterval(retryTimer); clearTimeout(navigationTimer); cancelAnimationFrame(resizeFrame);
+    cleanups.forEach(fn => fn());
+    Graph?.pauseAnimation?.();
+    Graph?.scene?.().traverse(obj => {obj.geometry?.dispose(); const mats = Array.isArray(obj.material) ? obj.material : [obj.material]; mats.filter(Boolean).forEach(m => {m.map?.dispose();m.dispose();});});
+    Graph?._destructor?.();
+    Graph?.renderer?.().dispose();
+    container.replaceChildren();
+    graphInstances.delete(container);
+  };
+  graphInstances.set(container, cleanup);
 
   const wrap = container.closest('.role-graph-wrap');
+  const explorer = document.createElement('div');
+  explorer.className = 'graph-explorer';
+  explorer.innerHTML = '<label>查找功能 <input type="search" placeholder="搜索解题、Manim、识别…" aria-label="搜索知识图谱节点"><button type="button" class="graph-fullscreen" aria-label="全屏知识图谱">⛶</button></label><div class="graph-search-results"></div><p class="graph-fallback" hidden>3D 图谱暂不可用，可以通过上方节点继续导航。</p>';
+  container.before(explorer);
+  cleanups.push(() => explorer.remove());
+  const allNodes = getGraphDataFor3D().nodes;
+  const search = explorer.querySelector('input');
+  const results = explorer.querySelector('.graph-search-results');
+  const detail=document.createElement('section');detail.className='graph-node-detail';detail.hidden=true;explorer.append(detail);
+  function inspectNode(node){
+    detail.hidden=false;
+    selectedNodeId=node.id;highlightSelection();
+    const next=getOutNeighbors(node.id),previous=getInNeighbors(node.id).filter(n=>n.id!=='center');
+    const descriptions={'errorbook':'收录视频时间点或分步题解，整理错因、标签和订正；按计划复习，记录掌握程度。','examples-lesson':'填写教学目标、重难点、课堂过程与练习，支持 LaTeX，保存后可继续编辑。','examples-create-course':'命名课包、挑选案例、调整播放顺序，与教案一起保存到你的账户。','examples-courseware':'阅读已保存教案，按顺序播放视频，导出教案或课包。','examples-danmaku':'选择案例后发送带时间点、颜色与位置的弹幕，暂停和拖动进度时保持同步。','examples-notes':'在视频时间点记录笔记，点击笔记回到对应片段。','examples-export':'打开已保存课包导出 Markdown 教案或 JSON 课包，也可以导入本站课包。'};
+    detail.innerHTML=`<h3>${escapeText(node.name)}</h3><p>${escapeText(descriptions[node.id]||'打开对应功能，或沿关联节点继续探索学习流程。')}</p><button type="button" data-node-open="${escapeText(node.id)}">打开此功能 ↗</button><button type="button" data-node-close>收起</button><p>前置与关联入口</p><div class="graph-node-related">${previous.map(n=>`<button type="button" data-related="${escapeText(n.id)}">${escapeText(n.name)}</button>`).join('')||'<span>可直接使用</span>'}</div><p>接下来可以</p><div class="graph-node-related">${next.map(n=>`<button type="button" data-related="${escapeText(n.id)}">${escapeText(n.name)}</button>`).join('')||'<span>在当前页面完成操作</span>'}</div>`;
+  }
+  listen(detail,'click',e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-node-close'))detail.hidden=true;const related=allNodes.find(n=>n.id===b.dataset.related);if(related)inspectNode(related);const node=allNodes.find(n=>n.id===b.dataset.nodeOpen);if(node)executeNodeAction(node);});
+  const searchNodes = () => {
+    const q = search.value.trim().toLowerCase();
+    const found = allNodes.filter(n => n.id !== 'center' && (q ? [n.name, ...(n.keywords || [])].join(' ').toLowerCase().includes(q) : n.type === 'section' || n.type === 'role')).slice(0, q ? 10 : 7);
+    results.innerHTML = found.map(n => `<button type="button" data-graph-node="${escapeText(n.id)}">${escapeText(n.name)}</button>`).join('') || '<span>没有匹配的节点，请换个关键词。</span>';
+  };
+  listen(search, 'input', searchNodes);
+  listen(explorer.querySelector('.graph-fullscreen'), 'click', async () => {try {if(document.fullscreenElement)await document.exitFullscreen();else await wrap.requestFullscreen();}catch {explorer.querySelector('.graph-fallback').textContent='浏览器暂不支持全屏，仍可使用缩放按钮探索图谱。';explorer.querySelector('.graph-fallback').hidden=false;}});
+  listen(results, 'click', e => {const id = e.target.closest('button')?.dataset.graphNode;const node=allNodes.find(n=>n.id===id);if(node)inspectNode(node);});
+  searchNodes();
+  container.setAttribute('aria-label', '三维知识图谱，亦可使用上方搜索按钮导航');
   if (wrap) {
-    wrap.addEventListener('contextmenu', (e) => {
+    listen(wrap, 'contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
-    }, true);
-    wrap.addEventListener('mousedown', (e) => {
+    }, {capture:true});
+    listen(wrap, 'mousedown', (e) => {
       if (e.button === 1) {
         e.preventDefault();
         e.stopPropagation();
       }
-    }, true);
+    }, {capture:true});
   }
 
   const openFlow = (role) => {
@@ -265,8 +314,8 @@ export function initRoleGraph() {
     flowChain.querySelectorAll('.role-flow-enter').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const section = btn.dataset.section;
-        if (typeof window.showSection === 'function') window.showSection(section);
+        const step=flow[Number(btn.closest('[data-step]').dataset.step)];
+        executeNodeAction(step);
         flowPanel.classList.remove('visible');
       });
     });
@@ -274,16 +323,22 @@ export function initRoleGraph() {
   window.RoleGraph = window.RoleGraph || {};
   window.RoleGraph.openFlow = openFlow;
 
-  if (flowBack) flowBack.addEventListener('click', () => flowPanel.classList.remove('visible'));
-  flowPanel.addEventListener('click', (e) => { if (e.target === flowPanel) flowPanel.classList.remove('visible'); });
-  document.addEventListener('keydown', (e) => {
+  if (flowBack) listen(flowBack, 'click', () => flowPanel.classList.remove('visible'));
+  listen(flowPanel, 'click', (e) => { if (e.target === flowPanel) flowPanel.classList.remove('visible'); });
+  listen(document, 'keydown', (e) => {
     if (e.key === 'Escape' && flowPanel.classList.contains('visible')) flowPanel.classList.remove('visible');
   });
 
-  let Graph;
   const highlightNodes = new Set();
   const highlightLinks = new Set();
   let hoverNode = null;
+  let selectedNodeId=null;
+  function highlightSelection(){
+    highlightNodes.clear();highlightLinks.clear();
+    const node=Graph?.graphData().nodes.find(n=>n.id===selectedNodeId);
+    if(node){highlightNodes.add(node);(node.neighbors||[]).forEach(n=>highlightNodes.add(n));(node.links||[]).forEach(l=>highlightLinks.add(l));}
+    updateHighlight();
+  }
 
   function updateHighlight() {
     if (!Graph) return;
@@ -305,17 +360,17 @@ export function initRoleGraph() {
   }
 
   function doInit() {
-    const w = Math.max(container.offsetWidth, container.clientWidth, 400);
+    const w = Math.max(container.offsetWidth, container.clientWidth, 1);
     const h = Math.max(container.offsetHeight, container.clientHeight, 360);
     const data = buildGraphData();
-    const colors = getThemeColors();
+    let colors = getThemeColors();
 
     const useCustomNodes = typeof window.THREE !== 'undefined';
     const getLinkColor = (l) => (highlightLinks.has(l) ? colors.linkHighlight : colors.link);
     const getLinkWidth = (l) => (highlightLinks.has(l) ? 2.5 : 1.5);
-    const getLinkParticles = (l) => (highlightLinks.has(l) ? 5 : 0);
+    const getLinkParticles = (l) => (highlightLinks.has(l) && !reducedMotion ? 2 : 0);
 
-    let g = new ForceGraph3D(container, {
+    let g = new window.ForceGraph3D(container, {
       controlType: 'orbit',
       rendererConfig: { antialias: true, alpha: true },
     })
@@ -353,7 +408,8 @@ export function initRoleGraph() {
       .linkDirectionalParticleWidth(1.5)
       .linkDirectionalParticleSpeed(0.008)
       .linkCurvature(0.12)
-      .linkResolution(48)
+      .linkResolution(8)
+      .cooldownTicks(120)
       .onNodeHover((node, prev) => {
         if (container) container.style.cursor = node ? 'pointer' : 'grab';
         if ((!node && !highlightNodes.size) || (node && hoverNode === node)) return;
@@ -364,6 +420,7 @@ export function initRoleGraph() {
           (node.neighbors || []).forEach((nb) => highlightNodes.add(nb));
           (node.links || []).forEach((lk) => highlightLinks.add(lk));
         }
+        if(!node)highlightSelection();
         hoverNode = node || null;
         updateHighlight();
       })
@@ -375,6 +432,7 @@ export function initRoleGraph() {
           highlightNodes.add(link.source);
           highlightNodes.add(link.target);
         }
+        if(!link)highlightSelection();
         hoverNode = null;
         updateHighlight();
       })
@@ -392,16 +450,17 @@ export function initRoleGraph() {
           ? { x: x * distRatio, y: y * distRatio, z: z * distRatio }
           : { x: 0, y: 0, z: distance };
         const lookAt = { x, y, z };
-        Graph.cameraPosition(newPos, lookAt, 1200);
-        const TRANSITION_MS = 1200;
-        setTimeout(() => {
-          executeNodeAction(node);
+        clearTimeout(navigationTimer);
+        const TRANSITION_MS = reducedMotion ? 0 : 350;
+        Graph.cameraPosition(newPos, lookAt, TRANSITION_MS);
+        navigationTimer = setTimeout(() => {
+          if (!disposed) inspectNode(node);
         }, TRANSITION_MS + 80);
       })
       .showNavInfo(false);
 
     const renderer = Graph.renderer();
-    if (renderer) renderer.setClearColor(0x000000, 0);
+    if (renderer) { renderer.setClearColor(0x000000, 0); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); }
 
     Graph.cameraPosition({ z: 400 });
     Graph.d3Force('charge').strength(-220);
@@ -415,6 +474,10 @@ export function initRoleGraph() {
       const PAN = M?.PAN ?? 2;
       ctrl.mouseButtons = { LEFT: ROTATE, RIGHT: PAN };
       ctrl.enablePan = true;
+      ctrl.enableDamping = !reducedMotion;
+      ctrl.dampingFactor = 0.12;
+      ctrl.minDistance = 35;
+      ctrl.maxDistance = 1400;
     }
 
     const zoomIn = () => {
@@ -443,34 +506,55 @@ export function initRoleGraph() {
         200
       );
     };
-    const zoomReset = () => Graph.cameraPosition({ x: 0, y: 0, z: 400 }, { x: 0, y: 0, z: 0 }, 300);
+    const zoomReset = () => Graph.zoomToFit(reducedMotion ? 0 : 300, 40);
+    let fitted = false;
+    Graph.onEngineStop(() => { if (!fitted) {fitted = true;zoomReset();} });
     const zoomInBtn = document.getElementById('role-graph-zoom-in');
     const zoomOutBtn = document.getElementById('role-graph-zoom-out');
     const zoomResetBtn = document.getElementById('role-graph-reset');
-    if (zoomInBtn) zoomInBtn.addEventListener('click', zoomIn);
-    if (zoomOutBtn) zoomOutBtn.addEventListener('click', zoomOut);
-    if (zoomResetBtn) zoomResetBtn.addEventListener('click', zoomReset);
+    if (zoomInBtn) listen(zoomInBtn, 'click', zoomIn);
+    if (zoomOutBtn) listen(zoomOutBtn, 'click', zoomOut);
+    if (zoomResetBtn) listen(zoomResetBtn, 'click', zoomReset);
 
     const applyResize = () => {
       if (!container?.offsetParent) return;
-      const cw = Math.max(container.offsetWidth, container.clientWidth, 300);
+      const cw = Math.max(container.offsetWidth, container.clientWidth, 1);
       const ch = Math.max(container.offsetHeight, container.clientHeight, 280);
       Graph.width(cw).height(ch);
     };
-    window.addEventListener('resize', applyResize);
-    const ro = new ResizeObserver(() => requestAnimationFrame(applyResize));
+    const queueResize = () => {if (!resizeFrame) resizeFrame = requestAnimationFrame(() => {resizeFrame = 0;applyResize();});};
+    listen(window, 'resize', queueResize);
+    const ro = new ResizeObserver(queueResize);
     ro.observe(container);
+    cleanups.push(() => ro.disconnect());
+    let inView = false;
+    const updateVisibility = () => {
+      const active = inView && !document.hidden && container.getClientRects().length > 0;
+      container.dataset.graphState = active ? 'active' : 'paused';
+      if(active) {Graph.resumeAnimation();queueResize();} else Graph.pauseAnimation();
+    };
+    const visibility = new IntersectionObserver(entries => {inView = entries[0].isIntersecting;updateVisibility();}, {threshold:0});
+    visibility.observe(container);
+    listen(document, 'visibilitychange', updateVisibility);
+    cleanups.push(() => visibility.disconnect());
+    listen(renderer.domElement, 'webglcontextlost', e => {e.preventDefault();Graph.pauseAnimation();explorer.querySelector('.graph-fallback').hidden=false;});
 
     const applyTheme = () => {
       const c = getThemeColors();
+      colors = c;
       Graph.backgroundColor('rgba(0,0,0,0)');
       Graph.linkColor(Graph.linkColor());
-      Graph.nodeColor(Graph.nodeColor());
+      Graph.nodeColor(colors.node);
+      if (useCustomNodes) {
+        Graph.graphData().nodes.forEach(node => node.__threeObj?.traverse(obj => {obj.geometry?.dispose();obj.material?.map?.dispose();obj.material?.dispose();}));
+        Graph.nodeThreeObject(node => createSphereNodeWithText(node, colors.theme));
+      }
       const wrap = container.closest('.role-graph-wrap');
       if (wrap) wrap.dataset.graphTheme = c.theme;
     };
     const themeObs = new MutationObserver(applyTheme);
     themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    cleanups.push(() => themeObs.disconnect());
   }
 
   function ensureDimensions() {
@@ -481,15 +565,30 @@ export function initRoleGraph() {
   function ready() {
     return ensureDimensions() && window.ForceGraph3D && window.THREE;
   }
-  if (ready()) doInit();
-  else {
-    let tries = 0;
-    const t = setInterval(() => {
-      tries++;
-      if (ready() || tries > 80) {
-        clearInterval(t);
-        if (ready()) doInit();
-      }
-    }, 100);
-  }
+  let initialized = false;
+  const initialize = () => {
+    if (initialized || disposed || !ready()) return;
+    initialized = true;
+    clearInterval(retryTimer);
+    try { doInit(); } catch (error) {
+      console.warn('3D graph unavailable', error);
+      explorer.querySelector('.graph-fallback').hidden = false;
+    }
+  };
+  const lazy = new IntersectionObserver(entries => {
+    if (entries.some(entry => entry.isIntersecting)) initialize();
+  }, {rootMargin:'100px'});
+  lazy.observe(container);
+  cleanups.push(() => lazy.disconnect());
+  let tries = 0;
+  retryTimer = setInterval(() => {
+    if (++tries > 80 || disposed || initialized) {
+      clearInterval(retryTimer);
+      if (!initialized && (!window.ForceGraph3D || !window.THREE)) explorer.querySelector('.graph-fallback').hidden = false;
+      return;
+    }
+    const rect=container.getBoundingClientRect();
+    if (rect.bottom > 0 && rect.top < innerHeight + 100) initialize();
+  }, 200);
+  return cleanup;
 }

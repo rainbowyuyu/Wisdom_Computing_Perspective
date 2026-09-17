@@ -1,27 +1,30 @@
+import { initNavSearch } from './site-search.js';
 // static/js/main.js
 import * as UI from './ui.js';
 import * as Canvas from './canvas.js';
-import * as Detect from './detect.js';
+import * as Detect from './detect.js?v=20260917-creator-2';
 import * as Calculate from './calculate.js';
 import * as Auth from './auth.js';
 import * as Settings from './settings.js';
 import * as Tutorial from './tutorial.js';
-import * as Formulas from './formulas.js';
+import * as Formulas from './formulas.js?v=20260917-creator-2';
 import * as Examples from './examples.js';
-import * as Docs from './docs.js';
+import * as Docs from './docs.js?v=20260917-release-044';
 import * as Theme from './theme.js';
-import * as DevTools from './devtools.js';
+import * as DevTools from '/static/js/devtools.js?v=20260917-creator-2';
 import * as Agent from './agent.js';
 import * as Profile from './profile.js';
 import * as ImageEditor from './image-editor.js';
-import * as KnowledgePanel from './knowledge-panel.js';
+import * as KnowledgePanel from './knowledge-panel.js?v=20260917-ecosystem-6';
 import * as ContextMenu from './context-menu.js';
-import * as RoleGraph from './role-graph.js';
+import * as RoleGraph from './role-graph.js?v=20260917-ecosystem-6';
 import * as Tooltip from './tooltip.js';
 import * as SectionHistory from './section-history.js';
 import * as MathLiveKeyboard from './mathlive/mathlive-keyboard.js';
 import * as MathLiveMenu from './mathlive/mathlive-menu.js';
 import * as MathLiveLocale from './mathlive/mathlive-locale.js';
+import { initStepTutor } from './step-tutor.js';
+import { initFloatingPanel } from './floating-panel.js?v=20260917-nebula-math-7';
 
 // 将常用 UI 能力挂到 window，便于各处统一使用（如 Toast）
 window.showToast = UI.showToast;
@@ -68,80 +71,6 @@ function getUrlParams() {
     }
   });
   return params;
-}
-
-let navSearchTimer = null;
-function initNavSearch() {
-  const input = document.getElementById('nav-search-input');
-  const dropdown = document.getElementById('nav-search-dropdown');
-  if (!input || !dropdown) return;
-  const wrap = input.closest('.nav-search-wrap');
-  if (wrap) wrap.style.position = 'relative';
-  input.addEventListener('input', () => {
-    clearTimeout(navSearchTimer);
-    const q = (input.value || '').trim();
-    dropdown.style.display = 'none';
-    dropdown.innerHTML = '';
-    if (q.length < 1) return;
-    navSearchTimer = setTimeout(() => {
-      fetch('/api/search?q=' + encodeURIComponent(q), { credentials: 'include' })
-        .then(r => r.json())
-        .then(data => {
-          if (data.status !== 'success') return;
-          const parts = [];
-          if (Array.isArray(data.formulas) && data.formulas.length) {
-            parts.push('<div class="nav-search-group"><span class="nav-search-group-title">我的算式</span>');
-            data.formulas.slice(0, 5).forEach(f => {
-              const note = (f.note || '').slice(0, 30);
-              parts.push('<div class="nav-search-item" data-type="formula" data-id="' + (f.id || '') + '" data-latex="' + escapeAttr((f.latex || '').slice(0, 200)) + '"><i class="fa-solid fa-square-root-variable"></i> ' + escapeHtml(note || (f.latex || '').slice(0, 40)) + '</div>');
-            });
-            parts.push('</div>');
-          }
-          if (Array.isArray(data.scripts) && data.scripts.length) {
-            parts.push('<div class="nav-search-group"><span class="nav-search-group-title">动画脚本</span>');
-            data.scripts.slice(0, 5).forEach(s => {
-              parts.push('<div class="nav-search-item" data-type="script" data-id="' + (s.id || '') + '"><i class="fa-brands fa-python"></i> ' + escapeHtml((s.note || '脚本').slice(0, 40)) + '</div>');
-            });
-            parts.push('</div>');
-          }
-          if (Array.isArray(data.examples) && data.examples.length) {
-            parts.push('<div class="nav-search-group"><span class="nav-search-group-title">教学案例</span>');
-            data.examples.slice(0, 5).forEach(e => {
-              parts.push('<div class="nav-search-item" data-type="example" data-video-id="' + escapeAttr(e.video_id || '') + '"><i class="fa-solid fa-film"></i> ' + escapeHtml((e.title || '').slice(0, 40)) + '</div>');
-            });
-            parts.push('</div>');
-          }
-          if (parts.length === 0) {
-            dropdown.innerHTML = '<div class="nav-search-empty">未找到相关结果</div>';
-          } else {
-            dropdown.innerHTML = parts.join('');
-            dropdown.querySelectorAll('.nav-search-item').forEach(el => {
-              el.addEventListener('click', () => {
-                const type = el.dataset.type;
-                if (type === 'formula') {
-                  const latex = el.dataset.latex || '';
-                  if (latex) { window.showSection('calculate'); setTimeout(() => { const field = document.getElementById('math-field-main'); if (field) field.setValue(latex); }, 150); }
-                } else if (type === 'script') {
-                  window.showSection('devtools');
-                  if (window.switchDevTool) window.switchDevTool('manim');
-                } else if (type === 'example') {
-                  const vid = el.dataset.videoId;
-                  if (vid) { window.showSection('examples'); setTimeout(() => Examples.playExampleByVideoId(vid), 300); }
-                }
-                dropdown.style.display = 'none';
-                input.value = '';
-              });
-            });
-          }
-          dropdown.style.display = 'block';
-        })
-        .catch(() => {});
-    }, 280);
-  });
-  input.addEventListener('blur', () => { setTimeout(() => { dropdown.style.display = 'none'; }, 180); });
-  document.addEventListener('click', (e) => { if (dropdown && input && !dropdown.contains(e.target) && !input.contains(e.target)) dropdown.style.display = 'none'; });
-  function escapeHtml(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-  function escapeAttr(s) { if (!s) return ''; return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 }
 
 // 帮助页面内搜索：在当前页面内过滤/展开问答
@@ -226,13 +155,15 @@ function isMobileDevice() {
 document.addEventListener('DOMContentLoaded', async () => {
     Canvas.setupCanvas();
     if (typeof window.currentToolType === 'undefined') window.currentToolType = 'pen';
-    window.showSection('home');
+    initStepTutor();
+    DevTools.initDevTools();
+    window.showSection(getUrlParams().section || 'home');
     await Auth.initAuth();  // 等待鉴权完成，确保首屏时已登录用户的信息已写入 DOM
     Settings.initSettings();
     initCanvasLockButton();
     Detect.initDetectListeners();
-    Tutorial.checkAutoPlay();
-    Examples.loadExamples(); // 加载案例
+    // The tutorial remains available on demand; never interrupt a user entering a problem.
+    // Examples and their video metadata load on first entry.
     Theme.initTheme();
 
     // 全设备初始化开发者工具工作台（含手机端）
@@ -300,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // 新增功能条：若用户曾关闭则不再显示
-    if (localStorage.getItem('agent_banner_closed')) {
+    if (localStorage.getItem('wisdom.release.dismissed')==='0.4.4') {
       const el = document.getElementById('agent-update-banner');
       if (el) el.style.display = 'none';
     }
@@ -314,163 +245,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 星云内渲染进度：展开态进度条，折叠态水面填满小球
     KnowledgePanel.initRenderProgressInNebula?.();
 
-    // 知识星云浮动面板：关闭、展开、全屏拖动
-    (function initKnowledgePanelToggle() {
-      const panel = document.getElementById('knowledge-panel');
-      const header = document.getElementById('knowledge-panel-header');
-      const closeBtn = document.getElementById('knowledge-panel-close-btn');
-      const bubble = document.getElementById('knowledge-panel-bubble');
-      const content = document.getElementById('knowledge-panel-content');
-      if (!panel || !header || !closeBtn || !bubble || !content) return;
-
-      const STORAGE_KEY = 'knowledge_panel_bubble_pos';
-
-      function applyBubblePosition() {
-        try {
-          const s = localStorage.getItem(STORAGE_KEY);
-          if (s) {
-            const { left, top } = JSON.parse(s);
-            if (typeof left === 'number' && typeof top === 'number') {
-              panel.style.left = left + 'px';
-              panel.style.top = top + 'px';
-              panel.style.right = 'auto';
-              panel.style.bottom = 'auto';
-              panel.classList.add('has-bubble-pos');
-              return;
-            }
-          }
-        } catch (_) {}
-        panel.style.left = '';
-        panel.style.top = '';
-        panel.style.right = '1.5rem';
-        panel.style.bottom = '1.5rem';
-        panel.classList.remove('has-bubble-pos');
-      }
-
-      function expandPanel() {
-        panel.classList.remove('collapsed');
-        panel.style.width = '320px';
-        panel.style.height = '';
-        const rect = panel.getBoundingClientRect();
-        const onLeft = rect.left + rect.width / 2 < window.innerWidth / 2;
-        panel.style.left = onLeft ? '1.5rem' : '';
-        panel.style.top = '';
-        panel.style.right = onLeft ? '' : '1.5rem';
-        panel.style.bottom = '1.5rem';
-        panel.classList.remove('has-bubble-pos');
-        bubble.style.display = 'none';
-        content.style.display = 'flex';
-        panel.title = '';
-      }
-
-      function collapsePanel() {
-        panel.classList.add('collapsed');
-        panel.style.display = 'block';
-        panel.style.width = '64px';
-        panel.style.height = '64px';
-        content.style.display = 'none';
-        bubble.style.display = 'flex';
-        panel.title = '拖动移动位置，松手打开星云';
-        applyBubblePosition();
-      }
-
-      // 按下即拖动，释放时：若未移动则打开，若已移动则保存位置
-      let dragStart = null;
-      let baseLeft = 0, baseTop = 0;
-      let lastLeft = 0, lastTop = 0;
-      let hasMoved = false;
-      let panelW = 64, panelH = 64;
-      const MOVE_THRESHOLD_SQ = 36;  // 6px^2，超过视为拖动
-
-      function getPointer(e) {
-        const t = e.touches ? e.touches[0] : e.changedTouches ? e.changedTouches[0] : e;
-        return t ? { x: t.clientX, y: t.clientY } : null;
-      }
-
-      function onPointerDown(e) {
-        if (!panel.classList.contains('collapsed')) return;
-        e.stopPropagation();
-        if (e.touches) e.preventDefault();
-        const p = getPointer(e);
-        if (!p) return;
-        const rect = panel.getBoundingClientRect();
-        panelW = rect.width;
-        panelH = rect.height;
-        baseLeft = rect.left;
-        baseTop = rect.top;
-        lastLeft = baseLeft;
-        lastTop = baseTop;
-        hasMoved = false;
-        // 用 left/top 固定基准，避免从 right/bottom 切过来时跳到左上角
-        panel.style.left = baseLeft + 'px';
-        panel.style.top = baseTop + 'px';
-        panel.style.right = 'auto';
-        panel.style.bottom = 'auto';
-        panel.style.transform = 'translate(0, 0)';
-        panel.classList.add('has-bubble-pos', 'is-dragging');
-        dragStart = { x: p.x - rect.left, y: p.y - rect.top };
-      }
-
-      function onPointerMove(e) {
-        if (!dragStart) return;
-        const p = getPointer(e);
-        if (!p) return;
-        e.preventDefault();
-        const left = Math.max(0, Math.min(p.x - dragStart.x, window.innerWidth - panelW));
-        const top = Math.max(0, Math.min(p.y - dragStart.y, window.innerHeight - panelH));
-        const dx = left - baseLeft, dy = top - baseTop;
-        if (dx * dx + dy * dy > MOVE_THRESHOLD_SQ) hasMoved = true;
-        lastLeft = left;
-        lastTop = top;
-        // 仅更新 transform，不碰 left/top，GPU 合成更跟手
-        panel.style.transform = `translate(${left - baseLeft}px, ${top - baseTop}px)`;
-      }
-
-      function onPointerUp(e) {
-        if (!dragStart) return;
-        const p = getPointer(e);
-        panel.style.transform = '';
-        panel.classList.remove('is-dragging');
-        if (hasMoved) {
-          panel.style.left = lastLeft + 'px';
-          panel.style.top = lastTop + 'px';
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({ left: lastLeft, top: lastTop }));
-        } else {
-          expandPanel();
-        }
-        dragStart = null;
-      }
-
-      bubble.addEventListener('dragstart', (e) => e.preventDefault());
-      bubble.addEventListener('mousedown', onPointerDown);
-      bubble.addEventListener('touchstart', onPointerDown, { passive: false });
-      document.addEventListener('mousemove', onPointerMove);
-      document.addEventListener('touchmove', onPointerMove, { passive: false });
-      document.addEventListener('mouseup', onPointerUp);
-      document.addEventListener('touchend', onPointerUp);
-      document.addEventListener('touchcancel', onPointerUp);
-
-      closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        collapsePanel();
-      });
-
-      panel.addEventListener('click', (e) => {
-        if (e.target === bubble || bubble.contains(e.target)) return;
-        if (panel.classList.contains('collapsed')) expandPanel();
-      });
-
-      // 若初始为折叠态则应用保存的位置（首次加载时默认展开，此处仅作初始化）
-      if (panel.classList.contains('collapsed')) applyBubblePosition();
-    })();
+    initStepTutor();
+    initFloatingPanel();
 });
 
-// 关闭顶部“新功能：智能体”条，并记住选择
+// 按版本记住公告关闭状态，新版本仍会展示。
 window.closeAgentBanner = function () {
   const el = document.getElementById('agent-update-banner');
   if (el) {
     el.style.display = 'none';
-    localStorage.setItem('agent_banner_closed', '1');
+    localStorage.setItem('wisdom.release.dismissed', '0.4.4');
   }
 };
 
@@ -791,6 +575,11 @@ window.showSection = (sectionId, opts = {}) => {
 
     UI.closeAllModals?.();
     UI.showSection(sectionId);
+    if (sectionId === 'examples' && !document.getElementById('examples')?.dataset.loadedOnce) {
+        document.getElementById('examples').dataset.loadedOnce = '1';
+        Examples.loadExamples();
+    }
+    document.querySelectorAll('video').forEach(video => { if (!video.closest('.section')?.classList.contains('active-section')) video.pause(); });
     if (sectionId === 'detect') {
         setTimeout(() => Canvas.resizeCanvas(), 50);
         const inputMode = Settings.getDetectDefaultInput();
@@ -800,16 +589,17 @@ window.showSection = (sectionId, opts = {}) => {
         Formulas.loadMyFormulas();
         Formulas.switchFormulasSubTab('formulas');
     }
-    if (sectionId === 'calculate') {
-        const mode = Settings.getCalcDefaultMode();
-        const el = document.getElementById('calc-method');
-        if (el && ['normal', 'formular', 'visualization', 'solution'].includes(mode)) el.value = mode;
-    }
     if (sectionId === 'devtools') {
         const tab = Settings.getDevtoolsDefaultTab();
         if (window.switchDevTool) window.switchDevTool(tab);
     }
     if (sectionId === 'agent' && Agent.refreshAgentGate) Agent.refreshAgentGate();
+    // A section switch reuses the document: do not carry the previous page's
+    // scroll offset into the assistant and hide its header behind the navbar.
+    // The conversation keeps its own independent scroll position.
+    if (sectionId === 'agent' && !opts.fromHistory) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
 
     // 智算星云：全局浮动，按页面切换内容
     KnowledgePanel.refreshKnowledgePanel(sectionId);
@@ -836,7 +626,7 @@ window.setTool = (tool) => {
 window.processRecognition = Detect.processRecognition;
 window.copyToCalc = Detect.copyToCalc;
 window.openInDevLatexFromDetect = Detect.editInDevtoolsFromDetect;
-window.startAnimation = Calculate.startAnimation;
+window.startAnimation = () => window.StepTutor?.solve(window.StepTutor.getState().draftProblem);
 window.handleLogin = Auth.handleLogin;
 window.handleRegister = Auth.handleRegister;
 window.refreshCaptcha = Auth.refreshCaptcha;
@@ -867,7 +657,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ... (其他挂载)
 
 // 挂载 Calculate 新增函数
-window.startAnimation = Calculate.startAnimation;
+window.startAnimation = () => window.StepTutor?.solve(window.StepTutor.getState().draftProblem);
 window.openFormulaSelector = Calculate.openFormulaSelector;
 window.closeFormulaSelector = Calculate.closeFormulaSelector;
 window.clearCalcInput = Calculate.clearCalcInput; // 新增
@@ -879,12 +669,7 @@ window.useFormula = (latexEncoded) => {
     const latex = decodeURIComponent(latexEncoded);
     // 切换到计算页
     window.showSection('calculate');
-    // 延时填充，确保页面可见
-    setTimeout(() => {
-        // 改为填充新的主输入框
-        const field = document.getElementById('math-field-main');
-        if(field) field.setValue(latex);
-    }, 100);
+    window.StepTutor?.prefill(latex);
 };
 
 
@@ -892,8 +677,7 @@ window.useFormula = (latexEncoded) => {
 window.playExample = Examples.playExample;
 window.closeVideoModal = Examples.closeVideoModal;
 window.loadExamples = Examples.loadExamples;
-window.Examples = window.Examples || {};
-window.Examples.switchExamplesFilter = Examples.switchExamplesFilter;
+window.Examples = Examples;
 
 // --- Docs 挂载 ---
 window.openDoc = Docs.openDoc;

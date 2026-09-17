@@ -11,17 +11,17 @@
           <label>工具箱</label>
           <div class="tools-list">
             <button
-              class="tab-btn active"
+              class="tab-btn active" data-tool="latex"
               @click="switchDevTool('latex')"
             >
               <i class="fa-solid fa-square-root-variable"></i>
               LaTeX 可视化编辑器
             </button>
-            <button class="tab-btn" @click="switchDevTool('manim')">
+            <button class="tab-btn" data-tool="manim" @click="switchDevTool('manim')">
               <i class="fa-brands fa-python"></i>
               Manim 代码云端渲染工作台
             </button>
-            <button class="tab-btn" @click="switchDevTool('rainbow')">
+            <button class="tab-btn" data-tool="rainbow" @click="switchDevTool('rainbow')">
               <i class="fa-solid fa-layer-group"></i>
               rainbow鱼的扩展库
               <span
@@ -370,93 +370,7 @@
           </div>
 
           <!-- AI 编辑独立浮动面板 -->
-          <div
-            id="manim-ai-edit-float"
-            class="manim-ai-edit-float"
-            style="display: none"
-          >
-            <div
-              id="manim-ai-edit-float-header"
-              class="manim-ai-edit-float-header"
-              title="拖动可调整位置"
-            >
-              <i class="fa-solid fa-grip-vertical"></i>
-              <span>AI 编辑助手</span>
-              <button
-                type="button"
-                class="manim-ai-edit-close"
-                @click="toggleAiEditPanel"
-                aria-label="关闭"
-              >
-                <i class="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-            <div class="manim-ai-edit-body">
-              <div class="manim-ai-input-wrap">
-                <input
-                  id="manim-ai-edit-input"
-                  class="manim-ai-edit-input"
-                  type="text"
-                  placeholder="用自然语言描述修改，如：把圆的颜色改成红色"
-                  maxlength="300"
-                />
-                <button
-                  id="manim-ai-edit-btn"
-                  type="button"
-                  class="manim-ai-edit-btn"
-                  title="发送指令"
-                >
-                  <i class="fa-solid fa-paper-plane"></i>
-                </button>
-              </div>
-              <div
-                id="manim-ai-edit-conversation"
-                class="manim-ai-edit-conversation"
-              >
-                <div
-                  id="manim-ai-preview-block"
-                  class="manim-ai-edit-preview-block"
-                  style="display: none"
-                >
-                  <div class="manim-ai-edit-keyframe-wrap">
-                    <div class="manim-ai-edit-keyframe-header">效果预览</div>
-                    <div class="manim-ai-edit-keyframe-img-wrap">
-                      <img
-                        id="manim-ai-edit-keyframe-img"
-                        src=""
-                        alt="关键帧"
-                      />
-                    </div>
-                  </div>
-                  <div class="manim-ai-edit-diff-wrap">
-                    <div class="manim-ai-edit-diff-header">代码变更对比</div>
-                    <div
-                      id="manim-ai-edit-diff-container"
-                      class="manim-ai-edit-diff-container"
-                    ></div>
-                  </div>
-                  <div class="manim-ai-edit-diff-actions">
-                    <button
-                      id="manim-ai-edit-accept"
-                      type="button"
-                      class="manim-ai-edit-accept"
-                    >
-                      <i class="fa-solid fa-check"></i>
-                      接受
-                    </button>
-                    <button
-                      id="manim-ai-edit-reject"
-                      type="button"
-                      class="manim-ai-edit-reject"
-                    >
-                      <i class="fa-solid fa-xmark"></i>
-                      拒绝
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div id="manim-ai-edit-float" class="manim-ai-edit-float" style="display: none;"><p class="code-assistant-status" role="status">正在准备创作助手…</p></div>
         </div>
 
         <!-- [新增] Rainbow 扩展库面板 -->
@@ -474,6 +388,48 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onBeforeUnmount } from "vue";
+import { useAgentRunnerStore } from "../stores/agentRunner";
+
+const runner = useAgentRunnerStore();
+
+let tools: any;
+let active = true;
+onBeforeUnmount(()=>{ active = false; tools?.disposeDevTools(); });
+onMounted(async () => {
+  const url='/static/js/devtools.js?v=20260917-creator-2';tools=await import(/* @vite-ignore */ url);
+  if (!active) return;
+  const g:any=window;g.DevTools=tools;g.switchDevTool=tools.switchDevTool;g.runDevManim=tools.runDevManim;g.openManimWorkbenchWithCode=tools.openManimWorkbenchWithCode;g.copyDevLatex=tools.copyDevLatex;
+  tools.initDevTools();
+
+  // detect 页预填：从 sessionStorage 读取一次
+  try {
+    const pending = sessionStorage.getItem("pending_devtools_latex");
+    if (pending) {
+      sessionStorage.removeItem("pending_devtools_latex");
+      tools.switchDevTool("latex");
+      tools.fillLatexInDevtools(pending);
+    }
+  } catch (_) {}
+
+  // 我的算式脚本库预填 Manim 代码
+  try {
+    const code = sessionStorage.getItem("pending_devtools_manim_code");
+    if (code) {
+      sessionStorage.removeItem("pending_devtools_manim_code");
+      const autoRun = sessionStorage.getItem("pending_devtools_manim_autorun") === "1";
+      sessionStorage.removeItem("pending_devtools_manim_autorun");
+      await tools.openManimWorkbenchWithCode(code, { autoRun });
+    }
+  } catch (_) {}
+
+  if (!active) return;
+  runner.consumeIfCurrent("devtools", async (step) => {
+    const url='/static/js/agent-workspace.js';
+    const agent=await import(/* @vite-ignore */ url);
+    await agent.performDevtool(step);
+  });
+});
 function switchDevTool(tool: "latex" | "manim" | "rainbow") {
   (window as any).switchDevTool?.(tool);
 }
@@ -521,17 +477,5 @@ function previewKeyframes() {
 function runDevManim() {
   (window as any).runDevManim?.();
 }
-</script>
-
-<template>
-  <section id="devtools" class="section">
-    <div class="placeholder-section">
-      <h2>开发者工具</h2>
-      <p>这里将迁移为 Vue 化的开发者工具工作区。</p>
-    </div>
-  </section>
-</template>
-
-<script setup lang="ts">
 </script>
 

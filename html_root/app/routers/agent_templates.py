@@ -2,11 +2,12 @@
 import asyncio
 import json
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Cookie, HTTPException
 from fastapi.responses import JSONResponse
 
 from ..config import get_db_connection
 from ..models import AgentTemplateCreate
+from .solution_library import username_for_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent_templates", tags=["agent_templates"])
@@ -32,7 +33,9 @@ def _ensure_table(cursor):
 
 
 @router.post("/save")
-async def save_agent_template(data: AgentTemplateCreate):
+async def save_agent_template(data: AgentTemplateCreate, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != data.username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的模板")
     conn = None
     cursor = None
     try:
@@ -93,7 +96,9 @@ def _list_agent_templates_sync(username: str):
 
 
 @router.get("/list")
-async def list_agent_templates(username: str):
+async def list_agent_templates(username: str, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的模板")
     try:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _list_agent_templates_sync, username)
@@ -103,7 +108,9 @@ async def list_agent_templates(username: str):
 
 
 @router.get("/get")
-async def get_agent_template(id: int, username: str):
+async def get_agent_template(id: int, username: str, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的模板")
     conn = None
     cursor = None
     try:
@@ -142,7 +149,9 @@ async def get_agent_template(id: int, username: str):
 
 
 @router.delete("/delete")
-async def delete_agent_template(id: int, username: str):
+async def delete_agent_template(id: int, username: str, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的模板")
     conn = None
     cursor = None
     try:

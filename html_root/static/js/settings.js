@@ -100,8 +100,7 @@ export function setCalcMathFontSize(value) {
 
 /** 将数学表达式字号应用到页面 #math-field-main（若存在） */
 export function applyCalcMathFontSizeToPage() {
-    const mf = document.getElementById('math-field-main');
-    if (mf) mf.style.fontSize = getCalcMathFontSize() + 'rem';
+    document.documentElement.style.setProperty('--math-reading-size',getCalcMathFontSize()+'rem');
 }
 
 export function getDevtoolsDefaultTab() {

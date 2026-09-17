@@ -83,17 +83,10 @@
         ],
         throwOnError: false
       };
-      function renderMath(container) {
-        if (container && window.renderMathInElement) {
-          var opts =
-            (window.App && window.App.config && window.App.config.KATEX_RENDER_OPTS) || {};
-          try {
-            window.renderMathInElement(container, opts);
-          } catch (e) {
-            console.warn("KaTeX render", e);
-          }
-        }
-      }
+    function renderMath(container) {
+        const path='/static/js/math-text.js';
+        return import(/* @vite-ignore */ path).then(m => m.renderMathIn(container));
+    }
     </script>
 
     <!-- Driver.js (用于新手引导) -->
@@ -125,14 +118,18 @@
 
     <!-- 核心样式：沿用原有 main.css 与静态资源路径 -->
     <link rel="stylesheet" href="/static/css/main.css" />
+    <link rel="stylesheet" href="/static/css/pages/achievement-cards.css?v=20260917-artwork-3" />
+    <link rel="stylesheet" href="/static/css/pages/step-tutor.css" />
+    <link rel="stylesheet" href="/static/css/refinements.css" />
 
     <!-- 3d-force-graph：全站知识图谱 3D 渲染（内部自带 THREE） -->
     <script>
       window.process = { env: { NODE_ENV: "production" } };
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.79.1/dist/3d-force-graph.min.js"></script>
     <!-- 仅引入知识图谱模块，不再加载旧站点 main.js -->
-    <script type="module" src="/static/js/role-graph-bootstrap.js"></script>
+
 
     <!-- 结构化数据：WebSite + SearchAction -->
     <script type="application/ld+json">
@@ -148,7 +145,10 @@
         }
       }
     </script>
-  </head>
+  <link rel="stylesheet" href="/static/css/pages/assistant-workspace.css">
+<link rel="stylesheet" href="/static/css/pages/teaching-workspace.css">
+<link rel="stylesheet" href="/static/css/pages/wrongbook.css">
+</head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>

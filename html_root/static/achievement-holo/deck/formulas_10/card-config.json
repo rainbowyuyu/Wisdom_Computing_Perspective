@@ -1,0 +1,35 @@
+{
+  "title": "算式积累",
+  "subtitle": "公式进阶",
+  "technique": "十式成册",
+  "tagline": "算式开始成林",
+  "edition": "003 / 013",
+  "collection": "智算星云 · 成就典藏",
+  "description": "累计保存 10 条算式",
+  "tier": "silver",
+  "achievementId": "formulas_10",
+  "assets": {
+    "model": "./assets/card.glb",
+    "subject": "./assets/subject.png",
+    "background": "./assets/background.png",
+    "text": "./assets/text.png",
+    "lineart": "./assets/lineart.png"
+  },
+  "parameters": {
+    "subjectScale": 1.25,
+    "subjectDepth": 0.28,
+    "backgroundDepth": -0.2,
+    "foil": 0.62
+  },
+  "safeArea": {
+    "scale": 1.12,
+    "offset": [
+      -0.06,
+      -0.085
+    ]
+  },
+  "appearance": {
+    "background": "#0b1220"
+  },
+  "defaultFinish": "silver"
+}

@@ -1,4 +1,5 @@
 import { ref, computed } from "vue";
+import { useAgentRunnerStore } from "../../stores/agentRunner";
 
 export type AgentRole = "user" | "assistant";
 
@@ -72,155 +73,7 @@ function sanitizeLatexForMathlive(latex: string | undefined | null): string {
   return s;
 }
 
-/** 执行单步：跳转并填入/触发（直接沿用旧站点行为，通过全局函数与 DOM 协作） */
-async function applyStepContent(step: AgentStep) {
-  const section = step.section || "calculate";
-  const g: any = window;
-
-  if (typeof g.showSection === "function") {
-    g.showSection(section);
-  }
-
-  // 开发者工具：LaTeX / Manim
-  if (section === "devtools" && step.devtool) {
-    await delay(100);
-    if (typeof g.switchDevTool === "function") {
-      g.switchDevTool(step.devtool);
-    }
-
-    const toFill =
-      (step.formula && step.formula.trim()) ||
-      (step.reply && step.reply.trim()) ||
-      "";
-
-    if (step.devtool === "latex" && toFill) {
-      await delay(150);
-      const mf: any = document.getElementById("dev-latex-mathfield");
-      const source = document.getElementById(
-        "dev-latex-source"
-      ) as HTMLTextAreaElement | null;
-      const sanitized = sanitizeLatexForMathlive(toFill);
-      if (mf && typeof mf.setValue === "function") mf.setValue(sanitized);
-      if (source) source.value = sanitized;
-      const preview = document.getElementById("dev-latex-preview");
-      if (preview && typeof g.renderMath === "function") {
-        preview.innerHTML = `\\[ ${sanitized} \\]`;
-        g.renderMath(preview);
-      }
-    }
-
-    if (
-      step.devtool === "manim" &&
-      step.fill_manim_code &&
-      typeof g.openManimWorkbenchWithCode === "function"
-    ) {
-      await delay(200);
-      g.openManimWorkbenchWithCode(step.fill_manim_code.trim());
-    }
-  }
-
-  // 动态计算页
-  if (section === "calculate") {
-    await delay(200);
-    const mf: any = document.getElementById("math-field-main");
-    const code = document.getElementById(
-      "latex-code-main"
-    ) as HTMLTextAreaElement | null;
-    const method = document.getElementById(
-      "calc-method"
-    ) as HTMLSelectElement | null;
-
-    if (step.formula) {
-      const toFill = sanitizeLatexForMathlive(step.formula);
-      if (mf && typeof mf.setValue === "function") mf.setValue(toFill);
-      if (code) code.value = toFill;
-    }
-    if (method && step.operation) {
-      method.value = step.operation;
-    }
-    if (step.trigger === "generate" && typeof g.startAnimation === "function") {
-      await delay(400);
-      g.startAnimation();
-    }
-  }
-
-  // 识别页
-  if (section === "detect" && step.formula) {
-    await delay(200);
-    const mathField: any = document.getElementById("latex-output");
-    const codeArea = document.getElementById(
-      "latex-code-detect"
-    ) as HTMLTextAreaElement | null;
-    const btnSave = document.getElementById(
-      "btn-save-check"
-    ) as HTMLButtonElement | null;
-    const btnCalc = document.getElementById(
-      "btn-copy-calc"
-    ) as HTMLButtonElement | null;
-    const sanitized = sanitizeLatexForMathlive(step.formula);
-    if (mathField && typeof mathField.setValue === "function") {
-      mathField.setValue(sanitized);
-    }
-    if (codeArea) codeArea.value = sanitized;
-    if (btnSave) btnSave.disabled = false;
-    if (btnCalc) btnCalc.disabled = false;
-  }
-
-  // 示例过滤
-  if (section === "examples" && step.examples_filter) {
-    const ex = g.Examples;
-    if (ex && typeof ex.switchExamplesFilter === "function") {
-      await delay(200);
-      ex.switchExamplesFilter(step.examples_filter);
-    }
-  }
-
-  // 设置
-  if (section === "settings") {
-    if (typeof g.openSettings === "function") {
-      await delay(100);
-      g.openSettings(step.settings_section || undefined);
-    }
-    if (
-      step.setting_key &&
-      step.setting_value != null &&
-      g.Settings &&
-      typeof g.Settings.applySingleSetting === "function"
-    ) {
-      await delay(250);
-      g.Settings.applySingleSetting(step.setting_key, step.setting_value);
-      if (typeof g.showToast === "function") {
-        g.showToast("已修改设置：" + step.setting_key, "success");
-      }
-    }
-  }
-
-  // 保存到我的算式
-  if (step.save_to_formulas && typeof g.saveAndShowFormula === "function") {
-    await delay(500);
-    g.saveAndShowFormula();
-  }
-}
-
-async function applyAgentResult(data: AgentExecuteResponse) {
-  const steps: AgentStep[] =
-    Array.isArray(data.steps) && data.steps.length > 0
-      ? data.steps
-      : ([] as AgentStep[]);
-  if (!steps.length) return;
-
-  if (steps.length === 1) {
-    await applyStepContent(steps[0]);
-    return;
-  }
-
-  for (let i = 0; i < steps.length; i++) {
-    await applyStepContent(steps[i]);
-    if (i < steps.length - 1) {
-      await delay(400);
-    }
-  }
-}
+// steps 的“跨页执行”交给 agentRunnerStore（避免智能体直接操作其它页面 DOM）
 
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -231,12 +84,17 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export function useAgentChat() {
   const messages = ref<AgentMessage[]>([]);
   const loading = ref(false);
   const attachedImage = ref<File | null>(null);
   const imagePreviewUrl = ref<string | null>(null);
   const sidebarCollapsed = ref(false);
+let activeRequest: AbortController | null = null;
+let requestVersion = 0;
+
+export function useAgentChat() {
+  const runner = useAgentRunnerStore();
+
 
   const hasMessages = computed(() => messages.value.length > 0);
 
@@ -256,6 +114,10 @@ export function useAgentChat() {
   }
 
   function clearChat() {
+    requestVersion++;
+    activeRequest?.abort();
+    activeRequest = null;
+    loading.value = false;
     messages.value = [];
   }
 
@@ -297,6 +159,7 @@ export function useAgentChat() {
   }
 
   async function execute(promptInput: string) {
+    if (loading.value) return;
     const g: any = window;
     // 登录检查依旧走旧逻辑，避免与现有鉴权重复实现
     if (typeof g.getCurrentUser === "function" && !g.getCurrentUser()) {
@@ -333,6 +196,9 @@ export function useAgentChat() {
       }
     }
 
+    const ctx = getLastContext();
+    const version = ++requestVersion;
+    activeRequest = new AbortController();
     appendUserMessage(prompt);
     loading.value = true;
 
@@ -341,11 +207,10 @@ export function useAgentChat() {
       `<div class="agent-loading-dots"><span></span><span></span><span></span></div>`
     );
 
-    const ctx = getLastContext();
-
     try {
       const res = await fetch("/api/agent/execute", {
         method: "POST",
+        signal: activeRequest.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt,
@@ -353,7 +218,9 @@ export function useAgentChat() {
           ...ctx,
         }),
       });
+      if (!res.ok) throw new Error(`请求失败（${res.status}）`);
       const data: AgentExecuteResponse = await res.json();
+      if (version !== requestVersion) return;
 
       // 替换 loading
       messages.value.pop();
@@ -376,7 +243,7 @@ export function useAgentChat() {
             appendAssistantRawHtml(escapeHtml(replyText), data);
           } else {
             appendAssistantRawHtml(
-              "已为你在站内执行了一系列操作。",
+              "已生成执行计划，将依次调用对应工具。",
               data
             );
           }
@@ -386,8 +253,8 @@ export function useAgentChat() {
             if (typeof g.showToast === "function") {
               g.showToast("即将跳转并调用工具，请稍候…", "info");
             }
-            await delay(1200);
-            await applyAgentResult(data);
+            await delay(150);
+            await runner.start(steps);
           }
         }
       } else {
@@ -399,6 +266,7 @@ export function useAgentChat() {
         );
       }
     } catch (e: any) {
+      if (version !== requestVersion || e?.name === "AbortError") return;
       messages.value.pop();
       appendAssistantRawHtml(
         `<p class="agent-error">网络错误：${escapeHtml(
@@ -407,9 +275,12 @@ export function useAgentChat() {
         { isError: true, prompt, image_base64: imageBase64 }
       );
     } finally {
+      if (version === requestVersion) {
+      activeRequest = null;
       loading.value = false;
       // 发送后清空图片
       setAttachedImage(null);
+      }
     }
   }
 

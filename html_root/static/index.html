@@ -46,10 +46,8 @@
         throwOnError: false
     };
     function renderMath(container) {
-        if (container && window.renderMathInElement) {
-            var opts = window.App && window.App.config && window.App.config.KATEX_RENDER_OPTS;
-            try { window.renderMathInElement(container, opts || {}); } catch (e) { console.warn('KaTeX render', e); }
-        }
+        const path='/static/js/math-text.js';
+        return import(/* @vite-ignore */ path).then(m => m.renderMathIn(container));
     }
     </script>
     <!-- Driver.js (用于新手引导) -->
@@ -83,6 +81,12 @@
       }
     }
     </script>
+    <link rel="stylesheet" href="/static/css/pages/step-tutor.css">
+    <link rel="stylesheet" href="/static/css/refinements.css">
+<link rel="stylesheet" href="/static/css/pages/assistant-workspace.css">
+<link rel="stylesheet" href="/static/css/pages/teaching-workspace.css">
+<link rel="stylesheet" href="/static/css/pages/wrongbook.css">
+<link rel="stylesheet" href="/static/css/pages/achievement-cards.css?v=20260917-artwork-3">
 </head>
 <body>
     <!-- 占位：main.js 为 type=module 异步加载，此前点击导航不报错。全局能力挂到 window 供 onclick 使用，尽量通过 ES Modules 管理。 -->
@@ -97,7 +101,7 @@
         <!-- 全站搜索（桌面端） -->
         <div id="nav-search-wrap" class="nav-search-wrap desktop-nav" style="margin-right:8px;">
             <i class="fa-solid fa-search nav-search-icon" aria-hidden="true" title="全站搜索"></i>
-            <input type="text" id="nav-search-input" class="nav-search-input" placeholder="搜索算式、脚本、案例…" maxlength="200" autocomplete="off">
+            <input type="text" id="nav-search-input" class="nav-search-input" placeholder="搜索题解、课包、错题、案例…" maxlength="200" autocomplete="off">
             <div id="nav-search-dropdown" class="nav-search-dropdown" style="display:none;"></div>
         </div>
         <!-- 桌面端导航链接 (添加 desktop-nav 类) -->
@@ -154,10 +158,10 @@
         </div>
     </div>
 
-    <!-- 顶部更新消息：智能体 -->
+    <!-- 顶部更新消息：v0.4.4 -->
     <div class="agent-update-banner" id="agent-update-banner">
-        <span class="agent-update-text">新功能：智能体已上线 — 用自然语言调用识别、计算、开发者工具等</span>
-        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志', 'update-v-0.3.5')" class="agent-update-detail" title="查看更新详情（定位到 v0.3.5）">?</a>
+        <span class="agent-update-text">新功能：分步解题、教学课包与错题复习已打通，让学习与创作连起来</span>
+        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志', 'update-v-0.4.4')" class="agent-update-detail" title="查看更新详情（定位到 v0.4.4）">v0.4.4 更新详情</a>
         <button type="button" class="agent-update-close" onclick="closeAgentBanner()" title="关闭" aria-label="关闭"><i class="fa-solid fa-times"></i></button>
     </div>
 
@@ -185,8 +189,8 @@
                 </p>
 
                 <div class="hero-btns">
-                    <button class="cta-btn primary" onclick="showSection('agent')">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> 试试智能体
+                    <button class="cta-btn primary" onclick="showSection('calculate')">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 开始分步解题
                     </button>
                     <button class="cta-btn secondary" onclick="showSection('detect')">
                         立即体验 <i class="fa-solid fa-arrow-right"></i>
@@ -277,118 +281,7 @@
         </section>
 
         <!-- 2. 智能体 Section：侧边栏 + 主聊天区布局 -->
-        <section id="agent" class="section agent-section">
-            <!-- 移动端遮罩层 -->
-            <div id="agent-sidebar-overlay" class="agent-sidebar-overlay" onclick="Agent.closeSidebarMobile()"></div>
-            <div class="agent-layout">
-                <!-- 左侧边栏 -->
-                <aside id="agent-sidebar" class="agent-sidebar">
-                    <div class="agent-sidebar-header">
-                        <button type="button" class="agent-sidebar-toggle" id="agent-sidebar-toggle" onclick="Agent.toggleSidebar()" title="折叠/展开侧边栏">
-                            <i class="fa-solid fa-bars"></i>
-                        </button>
-                        <h2 class="agent-sidebar-title">智能体</h2>
-                    </div>
-                    <div class="agent-sidebar-content">
-                        <!-- 打开功能与示例按钮 - 放在顶部醒目位置 -->
-                        <div class="agent-sidebar-section agent-section-examples-top">
-                            <button type="button" class="agent-features-examples-btn" id="agent-features-examples-btn" onclick="Agent.toggleFeaturesExamples()">
-                                <i class="fa-solid fa-sparkles"></i> 打开功能与示例
-                            </button>
-                        </div>
-                        
-                        <div class="agent-sidebar-section">
-                            <span class="agent-badge"><i class="fa-solid fa-crown"></i> 会员功能</span>
-                            <p class="agent-sidebar-desc">用自然语言描述你想做的事，智能体会自动调用识别、计算、动画、LaTeX 编辑等能力，一步到位完成复杂任务。</p>
-                        </div>
-                        <div class="agent-sidebar-section agent-section-features">
-                            <span class="agent-section-badge"><i class="fa-solid fa-wand-magic-sparkles"></i> 功能</span>
-                            <h3 class="agent-sidebar-section-title">功能特性</h3>
-                            <ul class="agent-features-list">
-                                <li><i class="fa-solid fa-check"></i> 一句话生成动画、打开编辑器或识别公式</li>
-                                <li><i class="fa-solid fa-check"></i> 支持上传公式图片，自动识别并跳转计算</li>
-                                <li><i class="fa-solid fa-check"></i> 与本站所有功能无缝联动</li>
-                            </ul>
-                        </div>
-                        <div class="agent-sidebar-section">
-                            <h3 class="agent-sidebar-section-title">快捷操作</h3>
-                            <div class="agent-sidebar-actions">
-                                <button type="button" class="agent-sidebar-action-btn" onclick="Agent.clearChat()">
-                                    <i class="fa-solid fa-trash"></i> 清空对话
-                                </button>
-                                <button type="button" class="agent-sidebar-action-btn" onclick="openSettings('agent')">
-                                    <i class="fa-solid fa-gear"></i> 设置
-                                </button>
-                                <button type="button" class="agent-sidebar-action-btn" onclick="Agent.openTemplatesModal()">
-                                    <i class="fa-solid fa-bookmark"></i> 从模板运行
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </aside>
-                <!-- 主聊天区 -->
-                <div class="agent-main">
-                    <!-- 未登录时显示：引导登录 -->
-                    <div id="agent-gate" class="agent-gate">
-                        <div class="agent-gate-card">
-                            <div class="agent-gate-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-                            <h3 class="agent-gate-title">登录后即可使用智能体</h3>
-                            <p class="agent-gate-desc">智能体为登录用户专属功能，登录后可享受一句话调度识别、计算与动画等全部能力。</p>
-                            <button type="button" class="agent-gate-btn" onclick="toggleAuthModal(true)">
-                                <i class="fa-solid fa-right-to-bracket"></i> 登录 / 注册
-                            </button>
-                        </div>
-                    </div>
-                    <!-- 已登录时显示：聊天式工作区 -->
-                    <div id="agent-workspace-wrap" class="agent-workspace-wrap agent-chat-wrap" style="display: none;">
-                        <!-- 移动端菜单按钮 -->
-                        <button type="button" class="agent-mobile-menu-btn" onclick="Agent.openSidebarMobile()" title="打开侧边栏">
-                            <i class="fa-solid fa-bars"></i>
-                        </button>
-                        <!-- 桌面端侧边栏打开按钮（侧边栏折叠时显示） -->
-                        <button type="button" class="agent-sidebar-open-btn" id="agent-sidebar-open-btn" onclick="Agent.toggleSidebar()" title="打开侧边栏">
-                            <i class="fa-solid fa-bars"></i>
-                        </button>
-                        <div class="agent-chat-container">
-                            <div id="agent-messages" class="agent-messages">
-                                <div class="agent-message agent-message-assistant">
-                                    <div class="agent-avatar agent-avatar-bot"><img src="assets/智算视界_avatar.svg" alt="智算视界" class="agent-avatar-logo"></div>
-                                    <div class="agent-bubble agent-bubble-assistant">
-                                        <p>你好，我是智能体。你可以用自然语言让我帮你：
-                                            <li>把公式做成动画、打开 LaTeX 编辑器并填入内容</li>
-                                            <li>只进行识别、识别图片后去计算页生成动画</li>
-                                            <li>上传或粘贴图片后说「识别这张图」</li>
-                                        <p>直接输入需求，支持粘贴剪贴板图片后发送。</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="agent-input-bar">
-                                        <div id="agent-image-preview-wrap" class="agent-image-preview-wrap" style="display:none;">
-                                    <div class="agent-image-preview-container">
-                                        <img id="agent-image-preview" alt="预览" class="agent-image-preview" onclick="ImageEditor.openEditor('agent-image-preview', 'agent')">
-                                        <div class="agent-image-edit-hint">点击编辑</div>
-                                    </div>
-                                    <button type="button" class="agent-preview-remove" onclick="Agent.clearAttachedImage()" title="移除图片"><i class="fa-solid fa-times"></i></button>
-                                </div>
-                                <div class="agent-input-row">
-                                    <label class="agent-upload-btn" for="agent-image-upload" title="上传或粘贴图片">
-                                        <i class="fa-solid fa-image"></i>
-                                    </label>
-                                    <input type="file" id="agent-image-upload" accept="image/*" multiple style="display:none;">
-                                    <div class="agent-prompt-wrap">
-                                        <label for="agent-prompt" class="agent-input-label">说说你想做什么</label>
-                                        <textarea id="agent-prompt" class="agent-textarea agent-chat-input tech-input" placeholder="例如：填入 sin(x)=1/2、识别这张图、把公式做成动画… 支持粘贴图片" rows="1"></textarea>
-                                    </div>
-                                    <button type="button" id="agent-submit-btn" class="agent-send-btn" onclick="Agent.execute()" title="发送">
-                                        <i class="fa-solid fa-paper-plane"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <section id="agent" class="section agent-section"></section>
 
         <!-- 3. 识别与画板 Section (重构版布局) -->
         <section id="detect" class="section">
@@ -544,7 +437,7 @@
                 <!-- 算式库面板 -->
                 <div id="formulas-panel" class="formulas-panel glass-panel">
                     <div class="formulas-panel-header">
-                        <h3 class="formulas-panel-title">已保存的公式</h3>
+                        <h3 class="formulas-panel-title">公式与题解</h3>
                         <button class="action-btn secondary formulas-refresh-btn" onclick="loadMyFormulas()">
                             <i class="fa-solid fa-rotate"></i> 刷新列表
                         </button>
@@ -613,205 +506,7 @@
         <!-- 4. 动态计算 Section (核心重构：支持分屏与Tab切换) -->
         <section id="calculate" class="section">
             <h2 class="section-title">数学运算可视化</h2>
-            <div class="calc-layout">
-                <!-- 左侧配置区 -->
-                <div class="calc-sidebar glass-panel calc-sidebar-panel">
-                    <div class="calc-mode-block">
-                        <label class="calc-block-label">
-                            <i class="fa-solid fa-layer-group"></i> 演示模式
-                        </label>
-                        <select id="calc-method" class="tech-select calc-select">
-                            <option value="normal">通用公式推演+可视化 (推荐)</option>
-                            <option value="formular">公式推演</option>
-                            <option value="visualization">可视化演示</option>
-                            <option value="solution">完整解题演示</option>
-                            <option value="det" disabled>矩阵专项</option>
-                            <option value="int" disabled>微积分专项</option>
-                        </select>
-                        <p class="calc-block-hint">* "通用模式"下，将自动分析您输入的算式并生成对应动画。</p>
-                    </div>
-
-                    <!-- 核心：单一大公式输入区 -->
-                    <div class="formula-input-wrapper calc-input-card">
-                        <div class="input-header">
-                            <label class="calc-input-label"><i class="fa-solid fa-calculator"></i> 数学表达式</label>
-                            <div class="header-actions">
-                                <button class="btn-import" onclick="openFormulaSelector('A')" title="从库中导入">
-                                    <i class="fa-solid fa-book-bookmark"></i> 导入
-                                </button>
-                                <button class="btn-import btn-import-danger" onclick="clearCalcInput()" title="清空">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- MathLive 可视化编辑（可滚动，长题看全） -->
-                        <div class="math-field-container main-input" id="math-field-container-main">
-                            <math-field id="math-field-main" virtual-keyboard-mode="manual" placeholder="例如 \int_0^{\frac{\pi}{2}}\frac{\sin x}{1+x^2}\,dx&lt;\int_0^{\frac{\pi}{2}}\frac{\cos x}{1+x^2}\,dx">
-                                \int_{0}^{\frac{\pi}{2}} \frac{\sin x}{1 + x^{2}} \, dx < \int_{0}^{\frac{\pi}{2}} \frac{\cos x}{1 + x^{2}} \, dx
-                            </math-field>
-                        </div>
-
-                        <!-- 代码折叠区 -->
-                        <details class="code-details">
-                            <summary>
-                                <span><i class="fa-solid fa-code"></i> 编辑 LaTeX 源码</span>
-                            </summary>
-                            <textarea id="latex-code-main" placeholder="\int_0^{\frac{\pi}{2}}\frac{\sin x}{1+x^2}\,dx<\int_0^{\frac{\pi}{2}}\frac{\cos x}{1+x^2}\,dx"></textarea>
-                        </details>
-                    </div>
-
-                    <!-- 底部操作按钮 -->
-                    <div class="calc-cta-wrap">
-                        <button type="button" class="calc-cta-btn action-btn full-width" onclick="startAnimation()">
-                            <i class="fa-solid fa-clapperboard"></i> 生成可视化动画
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 右侧显示区 (重构：分屏布局) -->
-                <div class="calc-display glass-panel" style="display: flex; flex-direction: column; overflow: hidden; padding: 0;">
-
-                    <!-- 1. 顶部：视频切换选项卡 (JS动态控制显示) -->
-                    <div id="video-tabs" style="display: none; background: #0f172a; border-bottom: 1px solid #334155; padding: 0 10px;">
-                        <!-- JS 注入 -->
-                    </div>
-
-                    <!-- 2. 上半部分：视频播放区（背景与右侧区统一深色） -->
-                    <div id="calc-video-wrapper" class="calc-video-wrapper-bg" style="flex: 3; position: relative; display: flex; flex-direction: column; border-bottom: 1px solid #334155; min-height: 300px; overflow: hidden;">
-                        <!-- 默认占位符（初始状态） -->
-                        <div id="video-placeholder-content" class="calc-video-placeholder">
-                            <i class="fa-solid fa-cube"></i>
-                            <p>等待指令...</p>
-                            <span>配置左侧参数后点击生成</span>
-                        </div>
-                        <!-- 单阶段模式双窗口：解题步骤 | 视频（同级标签，与通用模式一致） -->
-                        <div id="calc-single-wrap" class="calc-stack-wrap" style="display:none;">
-                            <div class="calc-stack-tabs">
-                                <button type="button" class="calc-stack-tab" data-tab="steps" aria-label="解题步骤">解题步骤</button>
-                                <button type="button" class="calc-stack-tab active" data-tab="video" aria-label="视频">视频</button>
-                            </div>
-                            <div class="calc-stack-windows">
-                                <div class="calc-stack-window calc-stack-window-steps" id="calc-window-steps-single">
-                                    <div class="calc-window-inner calc-steps-window-inner">
-                                        <div id="calc-steps-content-single" class="calc-steps-content markdown-body calc-steps-waiting">
-                                            <span>等待解题步骤</span>
-                                            <span class="loading-dots">
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="calc-stack-window calc-stack-window-video active" id="calc-window-video-single">
-                                    <div class="calc-window-inner">
-                                        <div id="calc-window-loading-single" class="calc-window-loading" style="display:none;" aria-hidden="true">
-                                            <i class="fa-solid fa-circle-notch fa-spin calc-window-loading-spinner"></i>
-                                            <p class="calc-window-loading-text">正在渲染</p>
-                                        </div>
-                                        <video id="result-video-player" controls style="display:none; outline:none;"></video>
-                                        <div id="calc-placeholder-single" class="calc-window-placeholder">
-                                            <span>等待渲染</span>
-                                            <span class="loading-dots">
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                            </span>
-                                        </div>
-                                        <div id="calc-save-script-wrap" class="calc-window-save" style="display:none;">
-                                            <button type="button" class="action-btn secondary" id="btn-save-to-scripts" onclick="Calculate.saveLastCodeToScripts()" style="font-size:0.85rem; padding:8px 14px;">
-                                                <i class="fa-solid fa-bookmark"></i> 保存到动画脚本库
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- 渲染中加载层（单阶段模式初始加载时显示，显示后会被单阶段窗口替代） -->
-                        <div id="calc-render-loading" class="calc-render-loading" style="display: none;">
-                            <i class="fa-solid fa-circle-notch fa-spin calc-render-loading-spinner"></i>
-                            <p class="calc-render-loading-text">正在生成与渲染...</p>
-                        </div>
-                        <!-- 通用模式三窗口：解题步骤 | 计算 | 可视化（同级标签） -->
-                        <div id="calc-dual-videos-wrap" class="calc-stack-wrap" style="display:none;">
-                            <div class="calc-stack-tabs">
-                                <button type="button" class="calc-stack-tab" data-tab="steps" aria-label="解题步骤">解题步骤</button>
-                                <button type="button" class="calc-stack-tab active" data-tab="calc" aria-label="计算">计算</button>
-                                <button type="button" class="calc-stack-tab" data-tab="vis" aria-label="可视化">可视化</button>
-                            </div>
-                            <div class="calc-stack-windows">
-                                <div class="calc-stack-window calc-stack-window-steps" id="calc-window-steps">
-                                    <div class="calc-window-inner calc-steps-window-inner">
-                                        <div id="calc-steps-content" class="calc-steps-content markdown-body calc-steps-waiting">
-                                            <span>等待解题步骤</span>
-                                            <span class="loading-dots">
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="calc-stack-window calc-stack-window-calc active" id="calc-window-calc">
-                                    <div class="calc-window-inner">
-                                        <div id="calc-window-loading-calc" class="calc-window-loading" style="display:none;" aria-hidden="true">
-                                            <i class="fa-solid fa-circle-notch fa-spin calc-window-loading-spinner"></i>
-                                            <p class="calc-window-loading-text">正在计算</p>
-                                        </div>
-                                        <video id="result-video-player-calc" controls style="display:none; outline:none;"></video>
-                                        <div id="calc-placeholder-calc" class="calc-window-placeholder">
-                                            <span>等待「计算」渲染</span>
-                                            <span class="loading-dots">
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                            </span>
-                                        </div>
-                                        <div id="calc-save-calc-wrap" class="calc-window-save" style="display:none;">
-                                            <button type="button" class="action-btn secondary" onclick="Calculate.saveLastCodeToScripts('calc')"><i class="fa-solid fa-bookmark"></i> 保存计算脚本</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="calc-stack-window calc-stack-window-vis" id="calc-window-vis">
-                                    <div class="calc-window-inner">
-                                        <div id="calc-window-loading-vis" class="calc-window-loading" style="display:none;" aria-hidden="true">
-                                            <i class="fa-solid fa-circle-notch fa-spin calc-window-loading-spinner"></i>
-                                            <p class="calc-window-loading-text">正在可视化</p>
-                                        </div>
-                                        <video id="result-video-player-vis" controls style="display:none; outline:none;"></video>
-                                        <div id="calc-placeholder-vis" class="calc-window-placeholder">
-                                            <span>等待「可视化」渲染</span>
-                                            <span class="loading-dots">
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                                <span class="dot">.</span>
-                                            </span>
-                                        </div>
-                                        <div id="calc-save-vis-wrap" class="calc-window-save" style="display:none;">
-                                            <button type="button" class="action-btn secondary" onclick="Calculate.saveLastCodeToScripts('vis')"><i class="fa-solid fa-bookmark"></i> 保存可视化脚本</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. 下半部分：代码/日志控制台 -->
-                    <div id="calc-terminal-wrapper" class="calc-terminal-wrapper">
-                        <div class="calc-terminal-header">
-                            <span class="calc-terminal-title"><i class="fa-solid fa-terminal"></i> <span id="console-title">系统日志</span></span>
-                            <span id="gen-percent" class="calc-terminal-percent">0%</span>
-                        </div>
-                        <div class="calc-terminal-progress-track">
-                            <div id="gen-progress" class="calc-terminal-progress-bar"></div>
-                        </div>
-                        <div id="gen-log" class="calc-terminal-log">
-                            <div class="log-entry">> 系统就绪，等待输入...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <p class="section-subtitle">从问题到理解，让每一步推导清晰可见</p>
         </section>
 
         <!-- 4. 教学案例 Section -->
@@ -829,7 +524,7 @@
                     <button type="button" class="examples-filter-tab" data-filter="watch_later" title="登录后可用"><i class="fa-regular fa-clock"></i> 稍后看</button>
                     <button type="button" class="examples-filter-tab" data-filter="courseware" title="教师：我的课件包"><i class="fa-solid fa-chalkboard-user"></i> 我的课件</button>
                 </div>
-                <button type="button" class="action-btn secondary examples-create-course-btn" id="examples-create-course-btn" title="创建课包功能开发中，敬请期待" disabled>
+                <button type="button" class="action-btn secondary examples-create-course-btn" id="examples-create-course-btn" title="创建教案、选择视频并保存课包">
                     <i class="fa-solid fa-folder-plus"></i> 创建课包
                 </button>
                 <div class="examples-tag-filter">
@@ -1024,35 +719,7 @@
                         </div>
 
                         <!-- AI 编辑独立浮动面板：固定长度，含预览+对比+接受/拒绝一体化 -->
-                        <div id="manim-ai-edit-float" class="manim-ai-edit-float" style="display: none;">
-                            <div class="manim-ai-edit-float-header" id="manim-ai-edit-float-header" title="拖动可调整位置">
-                                <i class="fa-solid fa-grip-vertical"></i>
-                                <span>AI 编辑助手</span>
-                                <button type="button" class="manim-ai-edit-close" onclick="DevTools.toggleAiEditPanel()" aria-label="关闭"><i class="fa-solid fa-xmark"></i></button>
-                            </div>
-                            <div class="manim-ai-edit-body">
-                                <div class="manim-ai-input-wrap">
-                                    <input type="text" id="manim-ai-edit-input" class="manim-ai-edit-input" placeholder="用自然语言描述修改，如：把圆的颜色改成红色" maxlength="300" />
-                                    <button type="button" id="manim-ai-edit-btn" class="manim-ai-edit-btn" title="发送指令"><i class="fa-solid fa-paper-plane"></i></button>
-                                </div>
-                                <div class="manim-ai-edit-conversation" id="manim-ai-edit-conversation">
-                                    <div class="manim-ai-edit-preview-block" id="manim-ai-preview-block" style="display: none;">
-                                        <div class="manim-ai-edit-keyframe-wrap">
-                                            <div class="manim-ai-edit-keyframe-header">效果预览</div>
-                                            <div class="manim-ai-edit-keyframe-img-wrap"><img id="manim-ai-edit-keyframe-img" src="" alt="关键帧"></div>
-                                        </div>
-                                        <div class="manim-ai-edit-diff-wrap">
-                                            <div class="manim-ai-edit-diff-header">代码变更对比</div>
-                                            <div id="manim-ai-edit-diff-container" class="manim-ai-edit-diff-container"></div>
-                                        </div>
-                                        <div class="manim-ai-edit-diff-actions">
-                                            <button type="button" class="manim-ai-edit-accept" id="manim-ai-edit-accept"><i class="fa-solid fa-check"></i> 接受</button>
-                                            <button type="button" class="manim-ai-edit-reject" id="manim-ai-edit-reject"><i class="fa-solid fa-xmark"></i> 拒绝</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <div id="manim-ai-edit-float" class="manim-ai-edit-float" style="display: none;"><p class="code-assistant-status" role="status">正在准备创作助手…</p></div>
                     </div>
 
                     <!-- [新增] Rainbow 扩展库面板 -->
@@ -1478,40 +1145,7 @@
                 <!-- 动态计算 -->
                 <div id="settings-calc" class="settings-section">
                     <h4 class="settings-section-title">动态计算</h4>
-                    <div class="settings-item">
-                        <label class="settings-select-label">默认演示模式</label>
-                        <div class="settings-select-cards">
-                            <label class="settings-select-card">
-                                <input type="radio" name="calc-default-mode" value="normal" id="calc-mode-normal" onchange="Settings.setCalcDefaultMode('normal')">
-                                <div class="settings-select-card-content">
-                                    <div class="settings-select-card-title">通用模式</div>
-                                    <div class="settings-select-card-desc">公式推演+可视化 (推荐)</div>
-                                </div>
-                            </label>
-                            <label class="settings-select-card">
-                                <input type="radio" name="calc-default-mode" value="formular" id="calc-mode-formular" onchange="Settings.setCalcDefaultMode('formular')">
-                                <div class="settings-select-card-content">
-                                    <div class="settings-select-card-title">公式推演</div>
-                                    <div class="settings-select-card-desc">仅显示公式推导过程</div>
-                                </div>
-                            </label>
-                            <label class="settings-select-card">
-                                <input type="radio" name="calc-default-mode" value="visualization" id="calc-mode-visualization" onchange="Settings.setCalcDefaultMode('visualization')">
-                                <div class="settings-select-card-content">
-                                    <div class="settings-select-card-title">可视化演示</div>
-                                    <div class="settings-select-card-desc">仅显示动画可视化</div>
-                                </div>
-                            </label>
-                            <label class="settings-select-card">
-                                <input type="radio" name="calc-default-mode" value="solution" id="calc-mode-solution" onchange="Settings.setCalcDefaultMode('solution')">
-                                <div class="settings-select-card-content">
-                                    <div class="settings-select-card-title">完整解题演示</div>
-                                    <div class="settings-select-card-desc">题目+各选项分屏展示与答案</div>
-                                </div>
-                            </label>
-                        </div>
-                        <p class="settings-item-description">进入【动态计算】时预选的模式；选择后计算页状态栏会同步。</p>
-                    </div>
+                    <p class="settings-item-description">输入题目后，系统会自动选择推导与图形。动画可在解题页按需开启，完成后可保存到我的算式。</p>
                     <div class="settings-item">
                         <label class="settings-select-label">数学表达式字号</label>
                         <div class="settings-slider-row">
@@ -1847,63 +1481,23 @@
 
     <!-- 自定义对话框（替换原生 alert/confirm/prompt） -->
     <!-- 教师：创建课包入口（智能体 或 手动流程） -->
-    <div id="course-pack-modal" class="modal">
-        <div class="modal-content glass-panel course-pack-modal-content">
-            <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
-                <h3 style="margin:0;"><i class="fa-solid fa-chalkboard-user"></i> 创建课包</h3>
-                <span class="close-modal" onclick="typeof closeCoursePackModal==='function'&&closeCoursePackModal()">&times;</span>
-            </div>
-            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem;">可以通过<strong>智能体</strong>一键完成：上传 PPT / 板书照片或输入教学目标，由智能体帮你梳理知识点、生成公式动画脚本，并整理成课堂案例；也可以<strong>手动</strong>按步骤完成同一流程。</p>
-            <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-bottom: 1rem;">
-                <button type="button" class="action-btn tertiary" onclick="typeof closeCoursePackModal==='function'&&closeCoursePackModal()">取消</button>
-                <button type="button" class="action-btn primary" id="course-pack-modal-agent-btn"><i class="fa-solid fa-robot"></i> 用智能体创建课包</button>
-            </div>
-            <div class="course-pack-modal-divider"><span>或使用手动流程</span></div>
-            <div class="course-pack-manual-steps">
-                <p class="course-pack-manual-intro">按以下步骤将公式变为课堂案例并加入课包：</p>
-                <ol class="course-pack-manual-list">
-                    <li>在 <a href="javascript:void(0)" data-course-pack-step="detect" class="course-pack-step-link">智能识别</a> 或 <a href="javascript:void(0)" data-course-pack-step="my-formulas" class="course-pack-step-link">我的算式</a> 中添加/识别公式</li>
-                    <li>在 <a href="javascript:void(0)" data-course-pack-step="devtools" class="course-pack-step-link">Manim 工作台</a> 中生成动画并渲染为视频</li>
-                    <li>回到 <a href="javascript:void(0)" data-course-pack-step="examples" class="course-pack-step-link">教学案例</a>，在视频播放页点击「加入课件包」</li>
-                </ol>
-                <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
-                    <button type="button" class="action-btn secondary" id="course-pack-modal-manual-btn"><i class="fa-solid fa-hand-pointer"></i> 开始手动创建</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- 成就统计面板（点击星云成就横线打开） -->
     <div id="achievement-panel-modal" class="modal">
-        <div class="modal-content glass-panel achievement-panel-content">
+        <div class="modal-content glass-panel achievement-panel-content achievement-panel-content--holo">
             <div class="achievement-panel-header">
-                <h3><i class="fa-solid fa-trophy"></i> 成就统计</h3>
+                <h3><i class="fa-solid fa-trophy"></i> 成就闪卡</h3>
                 <span class="close-modal" onclick="typeof window.toggleModal==='function'&&window.toggleModal('achievement-panel-modal',false)">&times;</span>
             </div>
             <div class="achievement-panel-list"></div>
         </div>
     </div>
 
-    <!-- 成就解锁弹窗：首次解锁时展示立体徽章 -->
+    <!-- 成就解锁弹窗：首次解锁时展示闪卡 -->
     <div id="achievement-unlock-modal" class="modal achievement-unlock-modal">
         <div class="modal-content glass-panel achievement-unlock-content">
             <button type="button" class="close-modal achievement-unlock-close" id="achievement-unlock-close-x" aria-label="关闭">&times;</button>
             <div class="achievement-unlock-body">
-                <div class="achievement-unlock-badge-wrap">
-                    <div class="achievement-unlock-badge" id="achievement-unlock-badge">
-                        <div class="achievement-unlock-badge-inner" id="achievement-unlock-badge-inner">
-                            <div class="achievement-unlock-badge-ring"></div>
-                            <div class="achievement-unlock-badge-core">
-                                <i id="achievement-unlock-icon" class="fa-solid fa-trophy achievement-unlock-icon"></i>
-                            </div>
-                            <div class="achievement-unlock-badge-glow"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="achievement-unlock-text">
-                    <h3 id="achievement-unlock-title">解锁新成就</h3>
-                    <p id="achievement-unlock-desc"></p>
-                </div>
+                <div id="achievement-unlock-holo" class="achievement-unlock-holo"></div>
                 <div class="achievement-unlock-actions">
                     <button type="button" class="action-btn secondary" id="achievement-unlock-close-btn">稍后再看</button>
                     <button type="button" class="action-btn" id="achievement-unlock-open-panel-btn"><i class="fa-solid fa-trophy"></i> 查看所有成就</button>
@@ -2133,7 +1727,7 @@
                             查看本视频错题记录
                         </button>
                     </div>
-                    <p class="video-study-hint">登录后错题记录会同步到云端；未登录时仅保存在当前浏览器。可配合时间戳笔记一起复习。</p>
+                    <p class="video-study-hint">错题与复习记录保存在当前账户，可在教学案例的「错题本」中统一管理。</p>
                 </div>
             </div>
             <!-- 创作者 / 教师：导出发布包 & 加入课件包 -->
@@ -2269,6 +1863,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.79.1/dist/3d-force-graph.min.js"></script>
     <!-- 模块化 JS 入口 -->
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="/static/js/main.js?v=20260917-ecosystem-6"></script>
 </body>
 </html>

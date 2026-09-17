@@ -1,279 +1,147 @@
-// static/js/docs.js
-
 import { toggleModal } from './ui.js';
 import { sanitizeMarkdownHtml } from './sanitize.js';
+import { renderMathIn } from './math-text.js';
 
-const MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
-const LOAD_TIMEOUT_MS = 6000;   // 文档/Marked 加载超时（毫秒），超时后不再等待
-
-function escapeDocHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-function scrollToAndHighlight(container, targetEl) {
-    targetEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    targetEl.classList.add('docs-highlight');
-    clearTimeout(targetEl._highlightTimer);
-    targetEl._highlightTimer = setTimeout(() => targetEl.classList.remove('docs-highlight'), 2500);
-}
-
-/** 更新日志：同步「跳转到版本」按钮的 active 高亮 */
-function setUpdateJumpActive(contentEl, headingId) {
-    const jumpBar = contentEl.querySelector('.docs-update-jump');
-    if (!jumpBar || !headingId) return;
-    jumpBar.querySelectorAll('.docs-update-jump-btn').forEach((btn) => {
-        btn.classList.toggle('active', btn.dataset.id === headingId);
-    });
-}
-
-function timeout(ms, msg = '加载超时') {
-    return new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(msg)), ms)
-    );
-}
-
-/** 确保 window.marked 已加载，未加载则动态插入脚本并等待，超时则放弃 */
-function ensureMarked() {
-    if (window.marked && typeof window.marked.parse === 'function') {
-        return Promise.resolve();
+let requestVersion=0,controller,disposeView=()=>{};
+const behavior=()=>matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth';
+function ensureModal(){
+    let modal=document.getElementById('docs-modal');
+    if(!modal){
+        modal=document.createElement('div');modal.id='docs-modal';modal.className='modal';
+        modal.innerHTML='<div class="modal-content glass-panel"><div class="docs-header"><h3 id="docs-title">文档</h3><button class="close-modal" type="button" aria-label="关闭文档" data-doc-close>×</button></div><div id="docs-content" class="markdown-body"></div><div class="docs-footer"><button class="action-btn" type="button" data-doc-close>关闭</button></div></div>';
+        document.body.append(modal);
     }
-    const load = new Promise((resolve, reject) => {
-        if (document.querySelector('script[src*="marked"]')) {
-            const start = Date.now();
-            const check = () => {
-                if (window.marked && typeof window.marked.parse === 'function') {
-                    resolve();
-                } else if (Date.now() - start >= LOAD_TIMEOUT_MS) {
-                    reject(new Error('Marked.js 加载超时'));
-                } else {
-                    setTimeout(check, 80);
-                }
-            };
-            check();
-            return;
-        }
-        const script = document.createElement('script');
-        script.src = MARKED_CDN;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Marked.js 加载失败'));
-        document.head.appendChild(script);
-    });
-    return Promise.race([load, timeout(LOAD_TIMEOUT_MS, 'Marked.js 加载超时')]);
+    modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','docs-title');
+    if(!modal.dataset.docsBound){
+        modal.dataset.docsBound='true';
+        modal.querySelectorAll('[data-doc-close],.close-modal,.docs-footer button').forEach(b=>{b.onclick=closeDocsModal;b.setAttribute('aria-label','关闭文档');});
+        modal.addEventListener('click',e=>{if(e.target===modal)closeDocsModal();});
+        modal.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();closeDocsModal();}});
+    }
+    return modal;
 }
-
-// 打开文档模态框并加载内容；可选第三参数 scrollToId，打开 update.md 时滚动到该 id（如 'update-v-0.3.5'）
-export async function openDoc(fileName, title, scrollToId) {
-    const modal = document.getElementById('docs-modal');
-    const titleEl = document.getElementById('docs-title');
-    const contentEl = document.getElementById('docs-content');
-
-    if (!modal || !contentEl) return;
-
-    // 1. 设置标题和 Loading 状态
-    if (titleEl) titleEl.innerText = title;
-
-    // 重置内容区域并显示 Loading (使用 CSS 类)
-    contentEl.scrollTop = 0;
-    contentEl.innerHTML = `
-        <div class="docs-loading">
-            <i class="fa-solid fa-spinner fa-spin"></i>
-            <p>正在加载文档...</p>
-        </div>
-    `;
-
-    // 2. 显示模态框
-    toggleModal('docs-modal', true);
-
-    try {
-        // 3. 请求 Markdown 文件（带超时，避免一直加载）
-        const fetchPromise = fetch(`docs/${fileName}?t=${new Date().getTime()}`);
-        const res = await Promise.race([
-            fetchPromise,
-            timeout(LOAD_TIMEOUT_MS, '文档加载超时').then(() => { throw new Error('文档加载超时'); })
-        ]);
-
-        if (!res.ok) throw new Error(`File not found: ${fileName}`);
-
-        const markdownText = await res.text();
-
-        // 4. 确保 Marked 已加载后转换为 HTML
-        try {
-            await ensureMarked();
-        } catch (_) {
-            contentEl.style.whiteSpace = 'pre-wrap';
-            contentEl.innerText = markdownText;
+async function ensureMarked(){
+    if(window.marked?.parse)return;
+    let script=document.querySelector('script[src*="marked"]');
+    if(!script){script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/marked/marked.min.js';document.head.append(script);}
+    for(let i=0;i<75;i++){if(window.marked?.parse)return;await new Promise(resolve=>setTimeout(resolve,80));}
+    throw new Error('文档排版组件加载超时');
+}
+function highlight(el){
+    el.classList.add('docs-highlight');clearTimeout(el.docsHighlightTimer);
+    el.docsHighlightTimer=setTimeout(()=>el.classList.remove('docs-highlight'),2200);
+}
+function scrollWithin(container,target,animated=true){
+    const offset=24;
+    container.scrollTo({top:container.scrollTop+target.getBoundingClientRect().top-container.getBoundingClientRect().top-offset,behavior:animated?behavior():'instant'});
+    highlight(target);
+}
+const targets={
+    'section-formulas':{node:'my-formulas'},'section-my-formulas':{node:'my-formulas'},
+    'section-calculate-input':{node:'calc-normal'},
+    'section-examples-filter':{node:'examples-filter-all',selector:'#examples-filter'},
+    'section-examples-courseware':{node:'examples-courseware',selector:'#examples-filter'},
+    'section-examples-wrongbook':{node:'errorbook',selector:'.wrongbook-host'},
+    'section-examples-review':{node:'wrongbook-review'},
+    'section-examples-create-course':{node:'examples-create-course'},
+    'section-devtools-assistant':{node:'devtools-ai-edit'},
+    'section-devtools-rainbow':{node:'devtools-rainbow'},
+    'section-devtools-manim':{node:'devtools-manim'},
+    'section-devtools-latex':{node:'devtools-latex'},
+    'section-home-roles':{node:'home',selector:'.role-graph-wrap'},
+    'section-search':{node:'search',selector:'#nav-search-input'},
+    'section-nebula':{nebula:true},
+};
+async function waitFor(find){
+    for(let i=0;i<100;i++){const el=find();if(el?.checkVisibility())return el;await new Promise(resolve=>setTimeout(resolve,80));}
+    throw new Error('目标区域仍在加载，请稍后重试');
+}
+export async function navigateDocLink(id){
+    closeDocsModal();window.closeSettings?.();
+    const target=targets[id]||{node:id.slice('section-'.length)};
+    if(target.nebula){
+        const panel=await waitFor(()=>document.getElementById('knowledge-panel'));
+        if(panel.classList.contains('collapsed'))panel.querySelector('#knowledge-panel-bubble')?.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+        highlight(panel);return;
+    }
+    const G=await import('./site-graph.js?v=20260917-ecosystem-6');
+    const node=G.getNodeById(target.node);
+    if(!node)throw new Error('此历史入口已调整，请从导航栏进入相应功能');
+    if(!await G.executeNodeAction(node))return;
+    if(document.querySelector('dialog[open]'))return;
+    if(target.node==='search'){
+        const wrap=document.getElementById('nav-search-input')?.closest('.nav-search-wrap');
+        if(wrap&&!wrap.checkVisibility()){
+            const previous=wrap.getAttribute('style');
+            wrap.style.setProperty('display','flex','important');Object.assign(wrap.style,{position:'fixed',top:((document.querySelector('.navbar')?.getBoundingClientRect().bottom||72)+8)+'px',left:'16px',right:'16px',width:'auto',zIndex:'2300',background:'var(--bg-surface)',padding:'10px',borderRadius:'12px'});
+            const events=new AbortController();const dismiss=()=>{events.abort();if(previous===null)wrap.removeAttribute('style');else wrap.setAttribute('style',previous);};
+            document.addEventListener('pointerdown',e=>{if(!wrap.contains(e.target))dismiss();},{signal:events.signal});
+            wrap.addEventListener('click',e=>{if(e.target.closest('[data-search-result]'))dismiss();},{signal:events.signal});
+            wrap.addEventListener('keydown',e=>{if(e.key==='Escape')dismiss();},{signal:events.signal});
         }
-
-        if (window.marked && typeof window.marked.parse === 'function') {
-            window.marked.use({
-                gfm: true,
-                breaks: true
-            });
-
-            const rawHtml = window.marked.parse(markdownText);
-            const html = sanitizeMarkdownHtml(rawHtml);
-            contentEl.innerHTML = html;
-
-            // 5. 代码高亮
-            if (window.hljs) {
-                contentEl.querySelectorAll('pre code').forEach((block) => {
-                    window.hljs.highlightElement(block);
-                });
-            }
-
-            // 6. 链接：内部锚点不新开页，其余新标签页打开
-            contentEl.querySelectorAll('a').forEach((link) => {
-                const href = (link.getAttribute('href') || '').trim();
-                if (href.startsWith('#')) return;
-                link.setAttribute('target', '_blank');
-                link.setAttribute('rel', 'noopener noreferrer');
-            });
-
-            // 7. 更新日志：为每个版本 h2 注入 id、生成跳转按钮、支持锚点高亮与跳转网页区块
-            if (fileName === 'update.md') {
-                const h2s = contentEl.querySelectorAll('h2');
-                const versionHeadings = [];
-                h2s.forEach((h2) => {
-                    const text = (h2.textContent || '').trim();
-                    const slug = text.replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fa5\-\.]/g, '');
-                    const id = 'update-' + (slug || 'h2-' + versionHeadings.length);
-                    h2.id = id;
-                    h2.setAttribute('data-update-heading', 'true');
-                    versionHeadings.push({ id, text });
-                });
-
-                // 辅助：根据 id 或版本号模糊查找对应 h2（容错 update-v-0.3.5 等写法）
-                const findUpdateHeading = (headingId) => {
-                    if (!headingId) return null;
-                    // 使用属性选择器避免 id 中的 "." 等特殊字符导致 querySelector 报错
-                    const safeId = headingId.replace(/"/g, '\\"');
-                    try {
-                        const direct = contentEl.querySelector('[id="' + safeId + '"]');
-                        if (direct) return direct;
-                    } catch (_) {
-                        // 忽略 selector 解析错误，继续尝试按版本号匹配
-                    }
-                    // 若传入 update-v-0.3.5 等形式，尝试按版本号匹配
-                    if (headingId.startsWith('update-v-')) {
-                        const verStr = headingId.replace(/^update-/, '').toLowerCase().replace(/\s+/g, '');
-                        const match = versionHeadings.find(v => {
-                            const norm = (v.text || '').toLowerCase().replace(/\s+/g, '');
-                            return norm.includes(verStr);
-                        });
-                        if (match && match.id) {
-                            const safeMatchId = match.id.replace(/"/g, '\\"');
-                            try {
-                                return contentEl.querySelector('[id="' + safeMatchId + '"]');
-                            } catch (_) {
-                                return null;
-                            }
-                        }
-                    }
-                    return null;
-                };
-                const versionRegex = /^v\s*0\.\d+\.\d+/i;
-                const jumpHeadings = versionHeadings.filter((v) => versionRegex.test(v.text));
-                if (jumpHeadings.length > 0) {
-                    const jumpBar = document.createElement('div');
-                    jumpBar.className = 'docs-update-jump';
-                    jumpBar.innerHTML = '<span class="docs-update-jump-label">跳转到版本：</span>' +
-                        jumpHeadings.map((v) => '<button type="button" class="docs-update-jump-btn" data-id="' + v.id + '">' + escapeDocHtml(v.text) + '</button>').join('');
-                    contentEl.insertBefore(jumpBar, contentEl.firstChild);
-                    jumpBar.querySelectorAll('.docs-update-jump-btn').forEach((btn) => {
-                        btn.addEventListener('click', () => {
-                            const id = btn.dataset.id;
-                            const target = findUpdateHeading(id);
-                            if (target) {
-                                scrollToAndHighlight(contentEl, target);
-                                setUpdateJumpActive(contentEl, target.id);
-                            }
-                        });
-                    });
-                }
-                // 文档内锚点：#section-xxx 跳转到网页对应区块并关闭弹窗，#section-xxx-yyy 并高亮页面内元素
-                contentEl.querySelectorAll('a[href^="#"]').forEach((link) => {
-                    const href = link.getAttribute('href');
-                    if (href === '#') return;
-                    const id = href.slice(1);
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (id.startsWith('section-')) {
-                            // 结构: #section-<section>[-子定位]，例如：
-                            // - #section-examples           → sectionId=examples，高亮 #section-examples
-                            // - #section-examples-filter    → sectionId=examples，高亮 #section-examples-filter
-                            // - #section-devtools-rainbow   → sectionId=devtools，高亮 #section-devtools-rainbow（若存在）
-                            const rest = id.slice('section-'.length); // 去掉前缀 'section-'
-                            const parts = rest.split('-');
-                            const sectionId = parts[0] || 'home';
-                            const highlightId = id; // 始终尝试高亮锚点对应的元素
-                            closeDocsModal();
-                            if (typeof window.closeSettings === 'function') window.closeSettings();
-                            if (typeof window.showSection === 'function') {
-                                window.showSection(sectionId);
-                                if (highlightId) {
-                                    const scrollToHighlight = () => {
-                                        const el = document.getElementById(highlightId);
-                                        if (el) {
-                                            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                                            el.classList.add('page-highlight');
-                                            clearTimeout(el._pageHighlightTimer);
-                                            el._pageHighlightTimer = setTimeout(() => el.classList.remove('page-highlight'), 2500);
-                                        }
-                                    };
-                                    requestAnimationFrame(() => {
-                                        setTimeout(scrollToHighlight, 350);
-                                    });
-                                }
-                            }
-                            return;
-                        }
-                        const target = findUpdateHeading(id) || contentEl.querySelector('#' + id);
-                        if (target) {
-                            scrollToAndHighlight(contentEl, target);
-                            if (target.getAttribute('data-update-heading') === 'true' && target.id.startsWith('update-')) {
-                                setUpdateJumpActive(contentEl, target.id);
-                            }
-                        }
-                    });
-                    link.classList.add('docs-internal-link');
-                });
-                // 滚动：若传入 scrollToId 则定位到该处，否则定位到最新版本
-                const scrollTarget = scrollToId ? (findUpdateHeading(scrollToId) || contentEl.querySelector('#' + scrollToId)) : null;
-                const lastVersion = h2s[h2s.length - 1];
-                const toScroll = scrollTarget || lastVersion;
-                if (toScroll) {
-                    contentEl.scrollTop = 0;
-                    requestAnimationFrame(() => {
-                        toScroll.scrollIntoView({ block: 'start', behavior: 'smooth' });
-                        if (scrollTarget) {
-                            scrollToAndHighlight(contentEl, scrollTarget);
-                            if (scrollTarget.id && scrollTarget.getAttribute('data-update-heading') === 'true') {
-                                setUpdateJumpActive(contentEl, scrollTarget.id);
-                            }
-                        }
-                    });
-                }
-            }
-        }
-
-    } catch (e) {
-        console.error(e);
-        const msg = (e && e.message) ? e.message : `无法获取文件 "${fileName}"`;
-        contentEl.innerHTML = `
-            <div class="docs-error">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                <p class="error-title">文档加载失败</p>
-                <p>${msg}</p>
-                <button class="action-btn secondary" onclick="closeDocsModal()" style="margin-top: 1.5rem;">关闭</button>
-            </div>
-        `;
+    }
+    const el=target.selector?await waitFor(()=>document.querySelector(target.selector)):document.getElementById(node.section);
+    if(el&&(target.selector||node.id===node.section)){
+        el.style.scrollMarginTop=((document.querySelector('.navbar')?.getBoundingClientRect().height||80)+20)+'px';
+        el.scrollIntoView({block:'start',behavior:behavior()});
+        const focus=el.matches('input,button,textarea,select')?el:el.querySelector('input,textarea,button');focus?.focus({preventScroll:true});highlight(el);
     }
 }
-
-export function closeDocsModal() {
-    toggleModal('docs-modal', false);
+function buildChangelog(content,scrollToId){
+    content.classList.add('docs-changelog');
+    const headings=[...content.querySelectorAll('h2')];
+    const sections=headings.map((h,index)=>{
+        const version=h.textContent.match(/v\s*(\d+\.\d+\.\d+)/i)?.[1];
+        h.id=version?'update-v-'+version:'update-initial-'+index;h.dataset.updateHeading='true';
+        const card=document.createElement('article');card.className='docs-release';
+        h.before(card);card.append(h);
+        while(card.nextSibling&&!(card.nextSibling.nodeType===1&&card.nextSibling.tagName==='H2'))card.append(card.nextSibling);
+        return {h,card,version};
+    });
+    const versions=sections.filter(x=>x.version),latest=versions.at(-1);
+    latest?.card.classList.add('docs-release-latest');
+    const bar=document.createElement('nav');bar.className='docs-update-jump';bar.setAttribute('aria-label','更新日志版本导航');
+    const label=document.createElement('label');label.textContent='跳转到版本';label.htmlFor='docs-version-select';
+    const select=document.createElement('select');select.id='docs-version-select';
+    [...sections].reverse().forEach(({h,version})=>{const option=document.createElement('option');option.value=h.id;option.textContent=h.textContent+(version===latest?.version?' · 最新':'');select.append(option);});
+    const newest=document.createElement('button');newest.type='button';newest.className='docs-update-jump-btn';newest.textContent='最新版本';
+    bar.append(label,select,newest);content.before(bar);
+    const find=id=>sections.find(x=>x.h.id===id)?.h;
+    const jump=(h,animated=true)=>{if(!h?.isConnected)return;select.value=h.id;newest.classList.toggle('active',h===latest?.h);newest.setAttribute('aria-pressed',String(h===latest?.h));scrollWithin(content,h,animated);};
+    select.onchange=()=>jump(find(select.value));newest.onclick=()=>jump(latest?.h);
+    let frame=0;
+    const onScroll=()=>{if(frame)return;frame=requestAnimationFrame(()=>{frame=0;const line=bar.getBoundingClientRect().bottom+35;let current=sections[0];for(const section of sections){if(section.h.getBoundingClientRect().top<=line)current=section;else break;}if(current){select.value=current.h.id;newest.classList.toggle('active',current===latest);newest.setAttribute('aria-pressed',String(current===latest));}});};
+    content.addEventListener('scroll',onScroll,{passive:true});
+    content.querySelectorAll('a[href^="#"]').forEach(link=>{
+        link.classList.add('docs-internal-link');
+        link.onclick=async e=>{e.preventDefault();const id=link.getAttribute('href').slice(1);try{if(id.startsWith('section-'))await navigateDocLink(id);else jump(find(id));}catch(error){window.showToast?.(error.message,'error');}};
+    });
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{if(content.isConnected&&content.classList.contains('docs-changelog'))jump(find(scrollToId)||latest?.h,false);}));
+    return ()=>{content.removeEventListener('scroll',onScroll);cancelAnimationFrame(frame);};
 }
+export async function openDoc(fileName,title,scrollToId){
+    if(!/^[a-zA-Z0-9_-]+\.md$/.test(fileName))return;
+    const modal=ensureModal(),content=document.getElementById('docs-content');
+    const run=++requestVersion;controller?.abort();controller=new AbortController();disposeView();
+    document.getElementById('docs-title').textContent=title;
+    modal.querySelector('.docs-update-jump')?.remove();
+    content.classList.remove('docs-changelog');content.style.whiteSpace='';content.scrollTop=0;
+    content.innerHTML='<div class="docs-loading" role="status">正在加载文档…</div>';toggleModal('docs-modal',true);
+    modal.querySelector('.close-modal')?.focus();
+    const timer=setTimeout(()=>controller?.abort(),8000);
+    try{
+        const response=await fetch('/static/docs/'+fileName,{signal:controller.signal,cache:'no-cache'});
+        if(!response.ok)throw new Error('文档读取失败，请稍后重试');
+        const markdown=await response.text();clearTimeout(timer);
+        try{await ensureMarked();}catch{if(run===requestVersion){content.style.whiteSpace='pre-wrap';content.textContent=markdown;}return;}
+        if(run!==requestVersion)return;
+        content.innerHTML=sanitizeMarkdownHtml(window.marked.parse(markdown,{gfm:true,breaks:true}));
+        content.querySelectorAll('pre code').forEach(block=>window.hljs?.highlightElement(block));
+        content.querySelectorAll('a:not([href^="#"])').forEach(a=>{a.target='_blank';a.rel='noopener noreferrer';});
+        renderMathIn(content);
+        if(fileName==='update.md')disposeView=buildChangelog(content,scrollToId);
+    }catch(error){if(run!==requestVersion)return;content.replaceChildren();const p=document.createElement('p');p.className='docs-error';p.textContent=error.name==='AbortError'?'文档加载超时，请重新打开':error.message;content.append(p);}
+    finally{clearTimeout(timer);}
+}
+export function closeDocsModal(){requestVersion++;controller?.abort();disposeView();toggleModal('docs-modal',false);}
+window.openDoc=openDoc;window.closeDocsModal=closeDocsModal;

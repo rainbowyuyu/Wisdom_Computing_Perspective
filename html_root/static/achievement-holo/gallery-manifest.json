@@ -1,0 +1,119 @@
+[
+  {
+    "id": "tutorial",
+    "title": "新手教程",
+    "subtitle": "启程",
+    "tier": "pearl",
+    "edition": "001 / 013",
+    "base": "./deck/tutorial/",
+    "config": "./deck/tutorial/card-config.json"
+  },
+  {
+    "id": "formulas_1",
+    "title": "第一条公式",
+    "subtitle": "公式入门",
+    "tier": "pearl",
+    "edition": "002 / 013",
+    "base": "./deck/formulas_1/",
+    "config": "./deck/formulas_1/card-config.json"
+  },
+  {
+    "id": "formulas_10",
+    "title": "算式积累",
+    "subtitle": "公式进阶",
+    "tier": "silver",
+    "edition": "003 / 013",
+    "base": "./deck/formulas_10/",
+    "config": "./deck/formulas_10/card-config.json"
+  },
+  {
+    "id": "formulas_30",
+    "title": "公式笔记本",
+    "subtitle": "公式大师",
+    "tier": "gold",
+    "edition": "004 / 013",
+    "base": "./deck/formulas_30/",
+    "config": "./deck/formulas_30/card-config.json"
+  },
+  {
+    "id": "scripts_1",
+    "title": "第一段动画脚本",
+    "subtitle": "动画启航",
+    "tier": "pearl",
+    "edition": "005 / 013",
+    "base": "./deck/scripts_1/",
+    "config": "./deck/scripts_1/card-config.json"
+  },
+  {
+    "id": "scripts_5",
+    "title": "脚本达人",
+    "subtitle": "动画进阶",
+    "tier": "silver",
+    "edition": "006 / 013",
+    "base": "./deck/scripts_5/",
+    "config": "./deck/scripts_5/card-config.json"
+  },
+  {
+    "id": "scripts_12",
+    "title": "可视化导演",
+    "subtitle": "动画大师",
+    "tier": "gold",
+    "edition": "007 / 013",
+    "base": "./deck/scripts_12/",
+    "config": "./deck/scripts_12/card-config.json"
+  },
+  {
+    "id": "templates_1",
+    "title": "模板启航",
+    "subtitle": "智能体入门",
+    "tier": "pearl",
+    "edition": "008 / 013",
+    "base": "./deck/templates_1/",
+    "config": "./deck/templates_1/card-config.json"
+  },
+  {
+    "id": "templates_3",
+    "title": "模板就绪",
+    "subtitle": "智能体进阶",
+    "tier": "silver",
+    "edition": "009 / 013",
+    "base": "./deck/templates_3/",
+    "config": "./deck/templates_3/card-config.json"
+  },
+  {
+    "id": "templates_6",
+    "title": "多角色编队",
+    "subtitle": "智能体编队",
+    "tier": "gold",
+    "edition": "010 / 013",
+    "base": "./deck/templates_6/",
+    "config": "./deck/templates_6/card-config.json"
+  },
+  {
+    "id": "wrongbook_1",
+    "title": "第一道错题",
+    "subtitle": "复盘启程",
+    "tier": "pearl",
+    "edition": "011 / 013",
+    "base": "./deck/wrongbook_1/",
+    "config": "./deck/wrongbook_1/card-config.json"
+  },
+  {
+    "id": "wrongbook_5",
+    "title": "错题收录",
+    "subtitle": "复盘进阶",
+    "tier": "silver",
+    "edition": "012 / 013",
+    "base": "./deck/wrongbook_5/",
+    "config": "./deck/wrongbook_5/card-config.json"
+  },
+  {
+    "id": "wrongbook_12",
+    "title": "复习星轨",
+    "subtitle": "复盘大师",
+    "tier": "gold",
+    "edition": "013 / 013",
+    "base": "./deck/wrongbook_12/",
+    "config": "./deck/wrongbook_12/card-config.json"
+  }
+]

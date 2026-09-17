@@ -1,10 +1,11 @@
 # 动画脚本库：保存、列表、获取、删除、更新
 import asyncio
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Cookie, HTTPException
 from fastapi.responses import JSONResponse
 
 from ..config import get_db_connection
+from .solution_library import username_for_session
 from ..models import AnimationScriptModel, AnimationScriptUpdateModel
 
 logger = logging.getLogger(__name__)
@@ -12,7 +13,9 @@ router = APIRouter(prefix="/animation_scripts", tags=["animation_scripts"])
 
 
 @router.post("/save")
-async def save_animation_script(data: AnimationScriptModel):
+async def save_animation_script(data: AnimationScriptModel, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != data.username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     conn = None
     cursor = None
     try:
@@ -56,7 +59,9 @@ def _list_animation_scripts_sync(username: str):
 
 
 @router.get("/list")
-async def list_animation_scripts(username: str):
+async def list_animation_scripts(username: str, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     try:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _list_animation_scripts_sync, username)
@@ -65,7 +70,9 @@ async def list_animation_scripts(username: str):
 
 
 @router.get("/get")
-async def get_animation_script(id: int, username: str):
+async def get_animation_script(id: int, username: str, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     conn = None
     cursor = None
     try:
@@ -90,7 +97,9 @@ async def get_animation_script(id: int, username: str):
 
 
 @router.delete("/delete")
-async def delete_animation_script(id: int, username: str):
+async def delete_animation_script(id: int, username: str, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     conn = None
     cursor = None
     try:
@@ -109,7 +118,9 @@ async def delete_animation_script(id: int, username: str):
 
 
 @router.put("/update")
-async def update_animation_script(data: AnimationScriptUpdateModel):
+async def update_animation_script(data: AnimationScriptUpdateModel, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != data.username:
+        raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     conn = None
     cursor = None
     try:
@@ -121,7 +132,9 @@ async def update_animation_script(data: AnimationScriptUpdateModel):
         )
         conn.commit()
         if cursor.rowcount == 0:
-            return JSONResponse(status_code=404, content={"status": "error", "message": "未找到脚本或无权修改"})
+            cursor.execute('SELECT id FROM animation_scripts WHERE id=%s AND user_id=%s', (data.id, data.username))
+            if not cursor.fetchone():
+                return JSONResponse(status_code=404, content={"status": "error", "message": "未找到脚本或无权修改"})
         return {"status": "success", "message": "更新成功"}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})

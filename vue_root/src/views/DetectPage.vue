@@ -28,7 +28,8 @@
             <label>绘图工具</label>
             <div class="tools-grid">
               <button
-                class="tool-btn active"
+                class="tool-btn"
+                :class="{ active: tool === 'pen' }"
                 @click="setTool('pen')"
                 data-shortcut="toolPen"
                 title="画笔 (B)"
@@ -37,6 +38,7 @@
               </button>
               <button
                 class="tool-btn"
+                :class="{ active: tool === 'eraser' }"
                 @click="setTool('eraser')"
                 data-shortcut="toolEraser"
                 title="橡皮擦 (E)"
@@ -101,7 +103,7 @@
                 id="brush-size"
                 min="1"
                 max="20"
-                value="3"
+                v-model.number="brushSize"
                 style="flex: 1"
               />
             </div>
@@ -113,9 +115,15 @@
             <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
             <span class="upload-text">点击或拖拽图片到此处</span>
             <span class="upload-text">或直接粘贴剪贴板图片</span>
-            <input id="image-upload" type="file" accept="image/*" />
+            <input
+              id="image-upload"
+              ref="fileInputRef"
+              type="file"
+              accept="image/*"
+              @change="onFileChange"
+            />
           </label>
-          <div id="file-name-display" class="file-name"></div>
+          <div id="file-name-display" class="file-name">{{ fileName }}</div>
         </div>
 
         <div
@@ -161,17 +169,27 @@
       <div class="workspace-main">
         <div class="canvas-wrapper">
           <div id="canvas-container">
-            <canvas id="drawing-board"></canvas>
+            <canvas
+              id="drawing-board"
+              ref="canvasRef"
+              @pointerdown="onPointerDown"
+              @pointermove="onPointerMove"
+              @pointerup="onPointerUp"
+              @pointercancel="onPointerUp"
+              @pointerleave="onPointerUp"
+            ></canvas>
 
             <div
               id="uploaded-preview-container"
-              style="display: none; position: relative; width: 100%; height: 100%"
+              v-show="inputMode === 'upload' && !!uploadedPreviewUrl"
+              style="position: relative; width: 100%; height: 100%"
             >
               <img
                 id="uploaded-preview"
-                src=""
+                ref="uploadedPreviewRef"
+                :src="uploadedPreviewUrl || ''"
                 alt="预览"
-                style="display: none; width: 100%; height: 100%; object-fit: contain"
+                style="width: 100%; height: 100%; object-fit: contain"
                 @click="openImageEditor"
               />
               <div class="canvas-image-edit-hint">点击编辑</div>
@@ -229,15 +247,23 @@
               <div class="code-detail-popup">
                 <textarea
                   id="latex-code-detect"
+                  ref="codeAreaRef"
                   placeholder="LaTeX 代码..."
                   style="width: 100%; height: 100px; font-family: monospace; box-sizing: border-box"
+                  :value="currentLatex"
+                  @input="onCodeAreaInput"
                 ></textarea>
               </div>
             </details>
           </div>
 
           <div class="math-field-container">
-            <math-field id="latex-output" virtual-keyboard-mode="manual">
+            <math-field
+              id="latex-output"
+              ref="mathFieldRef"
+              virtual-keyboard-mode="manual"
+              @input="onMathFieldInput"
+            >
               \text{等待识别...}
             </math-field>
           </div>
@@ -295,43 +321,60 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { useDetectService } from "../services/detectService";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { useAgentRunnerStore } from "../stores/agentRunner";
 
 type InputMode = "draw" | "upload";
+type Tool = "pen" | "eraser";
+type Point = { x: number; y: number };
+type Stroke = { tool: Tool; size: number; points: Point[] };
+
+const router = useRouter();
+const runner = useAgentRunnerStore();
 
 const inputMode = ref<InputMode>("draw");
 
-const {
-  isRecognizing,
-  canOperate,
-  processRecognition,
-  copyToCalc,
-  openInDevLatexFromDetect,
-} = useDetectService();
+const isRecognizing = ref(false);
+const currentLatex = ref<string>(String.raw`\text{等待识别...}`);
+
+const canOperate = computed(() => {
+  const t = (currentLatex.value || "").trim();
+  return (
+    t.length > 0 &&
+    !t.includes("等待识别") &&
+    !t.includes("正在识别") &&
+    !t.includes("等待输入") &&
+    !t.startsWith("\\text{Error") &&
+    !isRecognizing.value
+  );
+});
+
+const mathFieldRef = ref<any | null>(null);
+const codeAreaRef = ref<HTMLTextAreaElement | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const uploadedPreviewRef = ref<HTMLImageElement | null>(null);
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+
+const uploadedFile = ref<File | null>(null);
+const uploadedPreviewUrl = ref<string | null>(null);
+const fileName = computed(() => uploadedFile.value?.name || "");
+
+const tool = ref<Tool>("pen");
+const brushSize = ref<number>(3);
+
+const strokes = ref<Stroke[]>([]);
+const redoStack = ref<Stroke[]>([]);
+
+let ctx: CanvasRenderingContext2D | null = null;
+let drawing = false;
 
 function switchInputMode(mode: InputMode) {
   inputMode.value = mode;
 }
 
-function setTool(tool: "pen" | "eraser") {
-  (window as any).setTool?.(tool);
-}
-
-function undo() {
-  (window as any).undo?.();
-}
-
-function redo() {
-  (window as any).redo?.();
-}
-
-function clearCanvas() {
-  (window as any).clearCanvas?.();
-}
-
-function processRecognitionHandler() {
-  processRecognition();
+function setTool(t: Tool) {
+  tool.value = t;
 }
 
 function openSettings(section?: string) {
@@ -342,16 +385,233 @@ function openImageEditor() {
   (window as any).ImageEditor?.openEditor?.("uploaded-preview", "canvas");
 }
 
-function saveAndShowFormula() {
+function resizeCanvas() {
+  const canvas = canvasRef.value;
+  if (!canvas) return;
+  const parent = canvas.parentElement as HTMLElement | null;
+  if (!parent) return;
+  const rect = parent.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+  canvas.style.width = `${rect.width}px`;
+  canvas.style.height = `${rect.height}px`;
+  ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    redrawAll();
+  }
+}
+
+function getCanvasPoint(e: PointerEvent): Point {
+  const canvas = canvasRef.value!;
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function drawStroke(s: Stroke) {
+  if (!ctx) return;
+  if (!s.points.length) return;
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = s.size;
+  if (s.tool === "eraser") {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = "rgba(255,255,255,1)";
+  }
+  ctx.beginPath();
+  ctx.moveTo(s.points[0].x, s.points[0].y);
+  for (let i = 1; i < s.points.length; i++) ctx.lineTo(s.points[i].x, s.points[i].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function redrawAll() {
+  const canvas = canvasRef.value;
+  if (!canvas || !ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const s of strokes.value) drawStroke(s);
+}
+
+function undo() {
+  const last = strokes.value.pop();
+  if (last) redoStack.value.push(last);
+  redrawAll();
+}
+
+function redo() {
+  const last = redoStack.value.pop();
+  if (last) strokes.value.push(last);
+  redrawAll();
+}
+
+function clearCanvas() {
+  strokes.value = [];
+  redoStack.value = [];
+  redrawAll();
+}
+
+function onPointerDown(e: PointerEvent) {
+  if (inputMode.value !== "draw") return;
+  if (!canvasRef.value) return;
+  (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  drawing = true;
+  redoStack.value = [];
+  const p = getCanvasPoint(e);
+  const s: Stroke = { tool: tool.value, size: brushSize.value, points: [p] };
+  strokes.value.push(s);
+  drawStroke(s);
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!drawing) return;
+  if (inputMode.value !== "draw") return;
+  const s = strokes.value[strokes.value.length - 1];
+  if (!s) return;
+  s.points.push(getCanvasPoint(e));
+  drawStroke(s);
+}
+
+function onPointerUp() {
+  drawing = false;
+}
+
+function setLatex(val: string) {
+  currentLatex.value = val;
+  const mf = mathFieldRef.value;
+  if (mf && typeof mf.setValue === "function") mf.setValue(val);
+  if (codeAreaRef.value) codeAreaRef.value.value = val;
+}
+
+function onMathFieldInput(e: any) {
+  const v = String(e?.target?.value ?? "");
+  currentLatex.value = v;
+  if (codeAreaRef.value) codeAreaRef.value.value = v;
+}
+
+function onCodeAreaInput(e: Event) {
+  const v = (e.target as HTMLTextAreaElement).value;
+  currentLatex.value = v;
+  const mf = mathFieldRef.value;
+  if (mf && typeof mf.setValue === "function") mf.setValue(v);
+}
+
+function onFileChange() {
+  const f = fileInputRef.value?.files?.[0] || null;
+  uploadedFile.value = f;
+  if (uploadedPreviewUrl.value) {
+    URL.revokeObjectURL(uploadedPreviewUrl.value);
+    uploadedPreviewUrl.value = null;
+  }
+  if (f) uploadedPreviewUrl.value = URL.createObjectURL(f);
+}
+
+async function canvasToBlob(): Promise<Blob | null> {
+  const canvas = canvasRef.value;
+  if (!canvas) return null;
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+}
+
+async function processRecognitionHandler() {
+  isRecognizing.value = true;
+  setLatex(String.raw`\text{正在识别...}`);
+
+  let blob: Blob | null = null;
+  if (inputMode.value === "draw") blob = await canvasToBlob();
+  else blob = uploadedFile.value;
+
+  if (!blob) {
+    const msg = inputMode.value === "draw" ? "请先绘制内容" : "请先上传图片";
+    if (typeof (window as any).showAlert === "function") {
+      await (window as any).showAlert(msg, "提示");
+    }
+    setLatex(String.raw`\text{等待输入...}`);
+    isRecognizing.value = false;
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", blob);
+
+  try {
+    const response = await fetch("/api/detect", { method: "POST", body: formData });
+    const data = await response.json();
+    if (data.status === "success") {
+      const mathPath="/static/js/math-text.js";
+      const {normalizeLatex}=await import(/* @vite-ignore */ mathPath);
+      const latex = normalizeLatex(data.latex ?? "");
+      try {
+        sessionStorage.setItem("last_detect_latex", latex);
+        sessionStorage.setItem("last_detect_problem", String(data.problem_text || latex));
+      } catch {}
+      setLatex(latex);
+      try {
+        if (data.vision_prompt && typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem("last_detect_vision_prompt", String(data.vision_prompt));
+        } else if (typeof sessionStorage !== "undefined") {
+          sessionStorage.removeItem("last_detect_vision_prompt");
+        }
+      } catch (_) {}
+    } else {
+      setLatex(String.raw`\text{Error: }` + String(data.message ?? "识别失败"));
+    }
+  } catch (_) {
+    setLatex(String.raw`\text{网络错误}`);
+  } finally {
+    isRecognizing.value = false;
+  }
+}
+
+async function saveAndShowFormula() {
   (window as any).saveAndShowFormula?.();
 }
 
-function copyToCalcHandler() {
-  copyToCalc();
+async function copyToCalcHandler() {
+  if (!canOperate.value) {
+    if (typeof (window as any).showAlert === "function") {
+      await (window as any).showAlert("请先进行识别或输入有效公式", "提示");
+    }
+    return;
+  }
+  try {
+    const isRecognized = sessionStorage.getItem("last_detect_latex") === currentLatex.value;
+    sessionStorage.setItem("pending_calc_latex", isRecognized ? (sessionStorage.getItem("last_detect_problem") || currentLatex.value) : currentLatex.value);
+    sessionStorage.setItem("pending_calc_context", isRecognized ? (sessionStorage.getItem("last_detect_vision_prompt") || "") : "");
+  } catch (_) {}
+  router.push("/calculate");
 }
 
-function openInDevLatexFromDetectHandler() {
-  openInDevLatexFromDetect();
+async function openInDevLatexFromDetectHandler() {
+  if (!canOperate.value) {
+    if (typeof (window as any).showAlert === "function") {
+      await (window as any).showAlert("请先识别出有效公式后再编辑", "提示");
+    }
+    return;
+  }
+  try {
+    sessionStorage.setItem("pending_devtools_latex", currentLatex.value);
+  } catch (_) {}
+  router.push("/devtools");
 }
+
+onMounted(() => {
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+
+  runner.consumeIfCurrent("detect", async (step) => {
+    if (step.formula) setLatex(step.formula);
+    if (step.trigger === "recognize") await processRecognitionHandler();
+    if (step.save_to_formulas) await saveAndShowFormula();
+  });
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", resizeCanvas);
+  if (uploadedPreviewUrl.value) URL.revokeObjectURL(uploadedPreviewUrl.value);
+});
 </script>
 

@@ -1,0 +1,35 @@
+{
+  "title": "第一条公式",
+  "subtitle": "公式入门",
+  "technique": "云端首存",
+  "tagline": "第一行 LaTeX 落库",
+  "edition": "002 / 013",
+  "collection": "智算星云 · 成就典藏",
+  "description": "保存你的第一条云端公式",
+  "tier": "pearl",
+  "achievementId": "formulas_1",
+  "assets": {
+    "model": "./assets/card.glb",
+    "subject": "./assets/subject.png",
+    "background": "./assets/background.png",
+    "text": "./assets/text.png",
+    "lineart": "./assets/lineart.png"
+  },
+  "parameters": {
+    "subjectScale": 1.25,
+    "subjectDepth": 0.28,
+    "backgroundDepth": -0.2,
+    "foil": 0.48
+  },
+  "safeArea": {
+    "scale": 1.12,
+    "offset": [
+      -0.06,
+      -0.085
+    ]
+  },
+  "appearance": {
+    "background": "#0b1220"
+  },
+  "defaultFinish": "pearl"
+}

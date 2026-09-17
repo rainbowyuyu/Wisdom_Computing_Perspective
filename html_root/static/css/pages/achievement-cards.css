@@ -1,0 +1,289 @@
+/* ========== 成就闪卡（实装） ========== */
+.achievement-panel-content--holo {
+    width: min(720px, 94vw);
+    max-height: 82vh;
+    overflow: hidden;
+}
+
+.achievement-panel-content--holo .achievement-panel-list {
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0.35rem 0.55rem 1.1rem;
+}
+
+.achievement-holo-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.35);
+}
+
+.achievement-holo-summary-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.achievement-holo-summary-text strong {
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.achievement-holo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 1.15rem 0.9rem;
+    padding: 0.55rem 0.15rem 0.85rem;
+}
+
+.ach-holo-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.ach-holo-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    perspective: 1000px;
+    border-radius: 12px;
+    outline: none;
+    touch-action: pan-y;
+    overflow: visible;
+}
+
+.ach-holo-flipper {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    will-change: transform;
+}
+
+.ach-holo-card3d {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+}
+
+.ach-holo-face {
+    position: absolute;
+    inset: 0;
+    /* Composite artwork together, then tilt the complete card. A layer can
+       never fall behind the opaque card plane on a different GPU compositor. */
+    transform-style: flat;
+    isolation: isolate;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+        0 30px 60px -22px rgba(15, 23, 42, 0.55),
+        0 6px 14px rgba(15, 23, 42, 0.22),
+        0 0 0 1px rgba(148, 163, 184, 0.28);
+    background: #0b1220;
+}
+
+.ach-holo-layer {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translate(var(--layer-x, 0px), var(--layer-y, 0px));
+}
+
+.ach-holo-layer img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    user-select: none;
+    display: block;
+    border-radius: 12px;
+}
+
+.ach-holo-line {
+    z-index: 2;
+    /* 白底黑线线稿：multiply 只压暗轮廓，不盖住主体颜色 */
+    mix-blend-mode: multiply;
+    opacity: 0.12;
+    pointer-events: none;
+}
+
+.ach-holo-foil {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    pointer-events: none;
+    opacity: 0.22;
+    z-index: 4;
+    transform: none;
+    mix-blend-mode: color-dodge;
+    background:
+        radial-gradient(55% 40% at var(--mx, 50%) var(--my, 45%),
+            rgba(255, 238, 190, 0.65),
+            transparent 70%),
+        linear-gradient(115deg,
+            transparent 20%,
+            rgba(94, 234, 212, 0.22) 40%,
+            rgba(251, 191, 36, 0.28) 52%,
+            rgba(167, 139, 250, 0.22) 64%,
+            transparent 80%);
+}
+
+.ach-holo-tier-silver .ach-holo-foil {
+    background:
+        radial-gradient(circle at var(--mx, 50%) var(--my, 35%),
+            rgba(255, 255, 255, 0.6), transparent 40%),
+        linear-gradient(115deg,
+            transparent 18%,
+            rgba(226, 232, 240, 0.35) 45%,
+            rgba(148, 163, 184, 0.4) 55%,
+            transparent 78%);
+}
+
+.ach-holo-tier-gold .ach-holo-foil {
+    background:
+        radial-gradient(circle at var(--mx, 50%) var(--my, 35%),
+            rgba(255, 248, 220, 0.7), transparent 42%),
+        linear-gradient(115deg,
+            transparent 18%,
+            rgba(251, 191, 36, 0.35) 42%,
+            rgba(245, 158, 11, 0.45) 55%,
+            rgba(252, 211, 77, 0.3) 68%,
+            transparent 82%);
+}
+
+.ach-holo-edge {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    pointer-events: none;
+    z-index: 5;
+    transform: none;
+}
+
+.ach-holo-fallback {
+    display: none;
+}
+.ach-holo-stage.use-fallback .ach-holo-flipper { display:none; }
+.ach-holo-stage.use-fallback .ach-holo-fallback { display:block;width:100%;height:100%;object-fit:cover;border-radius:12px; }
+.ach-holo-bg { z-index: 0; }
+.ach-holo-subject { z-index: 1; }
+.ach-holo-text { z-index: 3; }
+
+.ach-holo-lock {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(1.5px);
+    color: rgba(248, 250, 252, 0.92);
+    font-size: 1.25rem;
+    z-index: 6;
+    transform: none;
+}
+
+.ach-holo-card.is-locked .ach-holo-layer img { filter:saturate(.65); }
+.ach-holo-stage:focus-visible { outline:2px solid var(--primary-color);outline-offset:6px; }
+
+.ach-holo-card.is-unlocked .ach-holo-stage:hover .ach-holo-face,
+.ach-holo-stage.is-tilting .ach-holo-face {
+    box-shadow:
+        0 22px 40px rgba(15, 23, 42, 0.58),
+        0 0 0 1px rgba(94, 234, 212, 0.35);
+}
+
+.ach-holo-caption-title {
+    font-size: 0.82rem;
+    font-weight: 650;
+    color: var(--text-main);
+    line-height: 1.25;
+}
+
+.ach-holo-caption-desc {
+    margin: 0.15rem 0 0;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.ach-holo-progress {
+    margin-top: 0.3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.ach-holo-progress-meta {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+}
+
+.ach-holo-progress-bar {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.25);
+    overflow: hidden;
+}
+
+.ach-holo-progress-bar > i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+}
+
+.ach-holo-lg .ach-holo-stage {
+    width: min(300px, 72vw);
+    margin: 0 auto;
+}
+
+.achievement-unlock-fallback {
+    margin: 0;
+    color: var(--text-main);
+    text-align: center;
+}
+
+.achievement-unlock-holo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.85rem;
+    padding: 1.1rem 0.75rem 0.5rem;
+    overflow: visible;
+}
+
+.achievement-unlock-content {
+    width: min(460px, 94vw);
+}
+
+@media (max-width: 560px) {
+    .achievement-holo-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ach-holo-card3d,
+    .ach-holo-layer {
+        transition: none !important;
+    }
+}

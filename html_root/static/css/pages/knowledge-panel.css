@@ -1029,7 +1029,7 @@
     background: radial-gradient(circle at 0% 0%, rgba(59,130,246,0.22), transparent 55%), rgba(15,23,42,0.96);
     border-radius: 18px;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
 }
 
 [data-theme="dark"] .achievement-unlock-content {

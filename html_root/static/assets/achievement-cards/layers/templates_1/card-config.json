@@ -1,0 +1,35 @@
+{
+  "title": "模板启航",
+  "subtitle": "智能体入门",
+  "technique": "模板初成",
+  "tagline": "第一个自动化模板",
+  "edition": "008 / 013",
+  "collection": "智算星云 · 成就典藏",
+  "description": "保存第一个属于你的智能体模板",
+  "tier": "pearl",
+  "achievementId": "templates_1",
+  "assets": {
+    "model": "./assets/card.glb",
+    "subject": "./assets/subject.png",
+    "background": "./assets/background.png",
+    "text": "./assets/text.png",
+    "lineart": "./assets/lineart.png"
+  },
+  "parameters": {
+    "subjectScale": 1.25,
+    "subjectDepth": 0.28,
+    "backgroundDepth": -0.2,
+    "foil": 0.48
+  },
+  "safeArea": {
+    "scale": 1.12,
+    "offset": [
+      -0.06,
+      -0.085
+    ]
+  },
+  "appearance": {
+    "background": "#0b1220"
+  },
+  "defaultFinish": "pearl"
+}

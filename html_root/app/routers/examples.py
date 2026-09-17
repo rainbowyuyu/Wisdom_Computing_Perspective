@@ -9,7 +9,8 @@ import base64
 from typing import Optional, Dict, Set, List, Any
 from fastapi import APIRouter, Cookie, Query, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse, FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from pathlib import Path
 
 from ..config import (
     ROOT_DIR,
@@ -555,6 +556,7 @@ async def get_danmaku_list(
                 int(r.get("color", 16777215)),
                 (r.get("user_id") or "").strip(),
                 (r.get("text") or "").strip(),
+                r['id'],
             ])
         return {"code": 0, "data": out}
     except Exception as e:
@@ -570,9 +572,9 @@ async def get_danmaku_list(
 class DanmakuCreateV1(BaseModel):
     video_id: str
     text: str
-    time: float
-    color: Optional[int] = 16777215
-    mode: Optional[int] = 1  # 1=滚动 4=底部 5=顶部
+    time: float = Field(ge=0, le=86400, allow_inf_nan=False)
+    color: int = Field(default=16777215, ge=0, le=16777215)
+    mode: int = 1  # 1=滚动 4=底部 5=顶部
 
 
 @router.post("/v1/danmaku/send")
@@ -587,6 +589,8 @@ async def post_danmaku_v1(body: DanmakuCreateV1, auth_session: Optional[str] = C
     video_id = (body.video_id or "").strip()[:128]
     if not video_id:
         return JSONResponse(status_code=400, content={"code": -1, "message": "缺少 video_id"})
+    if Path(video_id).name!=video_id or not (Path(STORAGE_DIR)/(video_id+'.mp4')).is_file():
+        return JSONResponse(status_code=404,content={"code":-1,"message":"视频不存在"})
     t = max(0, float(body.time))
     color = int(body.color) if body.color is not None else 16777215
     mode = int(body.mode) if body.mode is not None else 1
@@ -603,7 +607,7 @@ async def post_danmaku_v1(body: DanmakuCreateV1, auth_session: Optional[str] = C
             (video_id, username, text, t, color, mode),
         )
         conn.commit()
-        payload = {"code": 0, "data": {"video_id": video_id, "username": username, "text": text, "time": t}}
+        payload = {"code": 0, "data": {"id":cursor.lastrowid,"video_id": video_id, "username": username, "text": text, "time": t,"color":color,"mode":mode}}
         await _broadcast_video(video_id, {"type": "new_danmaku", "data": payload["data"]})
         return payload
     except Exception as e:
@@ -618,7 +622,23 @@ async def post_danmaku_v1(body: DanmakuCreateV1, auth_session: Optional[str] = C
 
 class HeartbeatBody(BaseModel):
     video_id: str
-    progress: float
+    progress: float = Field(ge=0, le=86400, allow_inf_nan=False)
+
+
+@router.delete('/v1/danmaku/{ident}')
+async def delete_danmaku(ident: int, auth_session: Optional[str] = Cookie(None)):
+    username=_username_from_session(auth_session)
+    if not username: return JSONResponse(status_code=401,content={'code':-1,'message':'请先登录'})
+    conn=get_db_connection();cursor=conn.cursor(dictionary=True)
+    try:
+        _ensure_tables(cursor)
+        cursor.execute('SELECT video_id FROM example_video_danmaku WHERE id=%s AND user_id=%s',(ident,username));row=cursor.fetchone()
+        if not row: return JSONResponse(status_code=404,content={'code':-1,'message':'弹幕不存在或无权删除'})
+        cursor.execute('DELETE FROM example_video_danmaku WHERE id=%s AND user_id=%s',(ident,username));conn.commit()
+        await _broadcast_video(row['video_id'],{'type':'delete_danmaku','id':ident})
+        return {'code':0}
+    finally:
+        cursor.close();conn.close()
 
 
 @router.post("/v1/player/heartbeat")

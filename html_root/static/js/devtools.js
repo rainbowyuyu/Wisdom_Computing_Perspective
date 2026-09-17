@@ -1,3 +1,6 @@
+import { renderFormula, normalizeLatex } from './math-text.js';
+import { mountCodeAssistant } from './code-assistant.js?v=20260917-creator-2';
+import { consumeEvents } from './event-stream.js';
 // static/js/devtools.js
 
 import { RAINBOW_LIB_INFO } from './rainbow_data.js';
@@ -22,8 +25,9 @@ class GenScene(Scene):
 
 // 1. 工具切换逻辑
 export function switchDevTool(tool) {
+    initDevTools();
     document.querySelectorAll('#devtools .tab-btn').forEach(btn => btn.classList.remove('active'));
-    const btn = document.querySelector(`#devtools .tab-btn[onclick*="${tool}"]`);
+    const btn = document.querySelector(`#devtools .tab-btn[data-tool="${tool}"], #devtools .tab-btn[onclick*="${tool}"]`);
     if(btn) btn.classList.add('active');
 
     const latexPanel = document.getElementById('dev-latex');
@@ -31,6 +35,7 @@ export function switchDevTool(tool) {
     const rainbowPanel = document.getElementById('dev-rainbow'); // [新增]
 
     // 隐藏所有
+    if(!latexPanel||!manimPanel)return;
     latexPanel.style.display = 'none';
     manimPanel.style.display = 'none';
     if(rainbowPanel) rainbowPanel.style.display = 'none';
@@ -38,11 +43,11 @@ export function switchDevTool(tool) {
     if (tool === 'latex') {
         latexPanel.style.display = 'flex';
     } else if (tool === 'manim') {
-        manimPanel.style.display = 'block';
+        manimPanel.style.display = 'grid';
         if (monacoEditor) {
-            setTimeout(() => monacoEditor.layout(), 50);
+            setTimeout(() => monacoEditor?.layout(), 50);
         } else {
-            loadMonaco();
+            loadMonaco().catch(showEditorLoadError);
         }
         // AI 编辑面板默认打开
         const aiPanel = document.getElementById('manim-ai-edit-float');
@@ -60,11 +65,14 @@ export function switchDevTool(tool) {
 
 // 2. 初始化入口
 export function initDevTools() {
+    const host=document.getElementById('devtools');if(!host)return;
+    // The shell may exist before the assistant markup, or survive a failed mount.
+    // Check the actual mounted controls even when the rest of the tools are ready.
+    if(!initManimAiEdit())return;
+    if(host.dataset.devInitialized)return;
     initLatexTool();
     initManimResize();
-    initManimVideoFloat();
-    initManimAiEdit();
-    initRenderCooldownListeners();
+    host.dataset.devInitialized='true';
 }
 
 /** 竖排布局：上（代码+日志）/ 下（视频）拖拽调整高度 */
@@ -184,6 +192,7 @@ let keyframeBreakpoints = new Set();
 
 /** 切换 AI 编辑面板显示/隐藏 */
 export function toggleAiEditPanel() {
+    initDevTools();
     const panel = document.getElementById('manim-ai-edit-float');
     if (!panel) return;
     const visible = panel.style.display !== 'none';
@@ -238,12 +247,19 @@ function getImportantChangeLine(originalCode, modifiedCode, instruction) {
 }
 
 /** 渲染关键帧：支持断点（# @keyframe 注释），结果显示在视频预览区，输出日志 */
-export async function previewKeyframes() {
+let devPreviewController=null;
+export async function previewKeyframes({signal} = {}) {
+    if(devPreviewController){if(!signal)devPreviewController.abort();return false;}
+    if(devRenderController||signal?.aborted)return false;
     const code = monacoEditor ? monacoEditor.getValue() : '';
     if (!code || !code.trim()) {
         if (typeof showToast === 'function') showToast('请输入或加载代码', 'info');
         return;
     }
+    const controller=new AbortController();devPreviewController=controller;
+    const cancel=()=>controller.abort();signal?.addEventListener('abort',cancel,{once:true});
+    const button=document.getElementById('btn-manim-keyframe'),label=button?.innerHTML;
+    if(button)button.textContent='停止预览';
     const breakpointLine = getBreakpointLine(code);
     appendKeyframeLog(breakpointLine ? `正在渲染断点行 ${breakpointLine} 的关键帧...` : '正在渲染关键帧...');
     const loading = document.getElementById('dev-manim-loading');
@@ -264,6 +280,7 @@ export async function previewKeyframes() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
             credentials: 'include',
+            signal:controller.signal,
         });
         const data = await res.json();
         if (loading) loading.style.display = 'none';
@@ -279,18 +296,23 @@ export async function previewKeyframes() {
                 img.src = url;
                 preview.style.display = 'flex';
             }
+            return true;
         } else {
             const err = (data.message || '渲染失败').slice(0, 150);
             appendKeyframeLog('渲染失败: ' + err);
             if (placeholder) placeholder.style.display = '';
             if (typeof showToast === 'function') showToast(err, 'error');
         }
-    } catch (_) {
+    } catch (error) {
         if (loading) loading.style.display = 'none';
-        appendKeyframeLog('网络错误');
+        appendKeyframeLog(error.name==='AbortError'?'已停止预览。':'网络错误');
         if (placeholder) placeholder.style.display = '';
-        if (typeof showToast === 'function') showToast('网络错误', 'error');
+        if (error.name!=='AbortError' && typeof showToast === 'function') showToast('网络错误', 'error');
+    } finally {
+        signal?.removeEventListener('abort',cancel);devPreviewController=null;
+        if(button)button.innerHTML=label;
     }
+    return false;
 }
 
 function hideKeyframeInVideoArea() {
@@ -323,176 +345,30 @@ export async function renderKeyframeForCode(code, breakpointLine = null) {
 
 /** 初始化 AI 编辑（独立浮动面板） */
 function initManimAiEdit() {
-    const panel = document.getElementById('manim-ai-edit-float');
-    const header = document.getElementById('manim-ai-edit-float-header');
-    const input = document.getElementById('manim-ai-edit-input');
-    const btn = document.getElementById('manim-ai-edit-btn');
-    const conversation = document.getElementById('manim-ai-edit-conversation');
-    const previewBlock = document.getElementById('manim-ai-preview-block');
-    const keyframeImg = document.getElementById('manim-ai-edit-keyframe-img');
-    const diffContainer = document.getElementById('manim-ai-edit-diff-container');
-    const acceptBtn = document.getElementById('manim-ai-edit-accept');
-    const rejectBtn = document.getElementById('manim-ai-edit-reject');
-    if (!input || !btn || !conversation || !previewBlock || !diffContainer) return;
+    const panel=document.getElementById('manim-ai-edit-float');
+    const dev=document.getElementById('dev-manim');if(!dev||!panel)return false;
+    dev.classList.add('manim-studio');dev.append(panel);
+    const preview=document.getElementById('manim-video-float-wrap')||document.getElementById('ide-preview-pane');
+    if(preview){preview.classList.add('studio-preview');dev.append(preview);}
+    mountCodeAssistant(panel,()=>monacoEditor,runDevManim,ensureManimEditor);
+    return !!panel.codeAssistant;
+}
 
-    initAiEditFloatDrag(panel, header);
-
-    function appendMsg(role, text) {
-        const div = document.createElement('div');
-        div.className = 'manim-ai-edit-msg ' + role;
-        div.textContent = text;
-        if (previewBlock && previewBlock.parentNode === conversation) {
-            conversation.insertBefore(div, previewBlock);
-        } else {
-            conversation.appendChild(div);
-        }
-        conversation.scrollTop = conversation.scrollHeight;
-    }
-
-    function showDiff(originalCode, modifiedCode) {
-        aiEditPendingCode = modifiedCode;
-        if (!window.monaco) {
-            appendMsg('ai', 'Monaco 未加载，无法展示差异。请先切换到 Manim 工作台。');
-            return;
-        }
-        if (aiEditDiffEditor) {
-            const m = aiEditDiffEditor.getModel();
-            if (m && m.original) m.original.dispose();
-            if (m && m.modified) m.modified.dispose();
-            aiEditDiffEditor.dispose();
-            aiEditDiffEditor = null;
-        }
-        diffContainer.innerHTML = '';
-        const origModel = window.monaco.editor.createModel(originalCode, 'python');
-        const modModel = window.monaco.editor.createModel(modifiedCode, 'python');
-        aiEditDiffEditor = window.monaco.editor.createDiffEditor(diffContainer, {
-            theme: 'vs-dark',
-            readOnly: true,
-            automaticLayout: true,
-            fontSize: 12,
-            renderSideBySide: true,
-        });
-        aiEditDiffEditor.setModel({ original: origModel, modified: modModel });
-        if (previewBlock) {
-            previewBlock.style.display = 'flex';
-            conversation.scrollTop = conversation.scrollHeight;
-        }
-        setTimeout(() => { if (aiEditDiffEditor) aiEditDiffEditor.layout(); }, 50);
-    }
-
-    function hidePreviewBlock() {
-        if (previewBlock) previewBlock.style.display = 'none';
-        if (keyframeImg) keyframeImg.src = '';
-    }
-
-    function hideDiff() {
-        hidePreviewBlock();
-        aiEditPendingCode = null;
-        if (aiEditDiffEditor) {
-            const m = aiEditDiffEditor.getModel();
-            if (m && m.original) m.original.dispose();
-            if (m && m.modified) m.modified.dispose();
-            aiEditDiffEditor.dispose();
-            aiEditDiffEditor = null;
-        }
-        if (diffContainer) diffContainer.innerHTML = '';
-    }
-
-    function onAccept() {
-        if (aiEditPendingCode && monacoEditor) {
-            monacoEditor.setValue(aiEditPendingCode);
-            if (typeof showToast === 'function') showToast('已应用编辑', 'success');
-        }
-        hideDiff();
-    }
-
-    function onReject() {
-        hideDiff();
-        if (typeof showToast === 'function') showToast('已取消变更', 'info');
-    }
-
-    if (acceptBtn) acceptBtn.addEventListener('click', onAccept);
-    if (rejectBtn) rejectBtn.addEventListener('click', onReject);
-
-    /** 检测是否为纠错/修复意图（需要传入渲染日志） */
-    function isErrorCorrectionIntent(text) {
-        const t = (text || '').toLowerCase();
-        return /\b(纠错|修复|改正|修正|fix|报错|错误|error|exception|traceback)\b/i.test(t);
-    }
-
-    async function doEdit() {
-        const user = getCurrentUsername();
-        if (!user) {
-            if (typeof window.toggleAuthModal === 'function') window.toggleAuthModal(true);
-            if (typeof showToast === 'function') showToast('请先登录后使用 AI 编辑', 'info');
-            return;
-        }
-        const instruction = (input.value || '').trim();
-        if (!instruction) {
-            if (typeof showToast === 'function') showToast('请输入编辑指令', 'info');
-            return;
-        }
-        const editor = monacoEditor;
-        if (!editor) {
-            if (typeof showToast === 'function') showToast('请先切换到 Manim 工作台', 'error');
-            return;
-        }
-        const code = editor.getValue();
-
-        // 纠错意图时读取渲染日志供模型参考
-        let renderLog = '';
-        if (isErrorCorrectionIntent(instruction)) {
-            const logEl = document.getElementById('dev-manim-log');
-            renderLog = (logEl?.textContent || '').trim();
-            if (renderLog) appendMsg('ai', '已读取渲染日志，将结合报错信息进行修改…');
-        }
-
-        appendMsg('user', instruction);
-        input.value = '';
-        btn.disabled = true;
-        btn.title = '处理中...';
-        hidePreviewBlock();
-        try {
-            const body = { code, instruction };
-            if (renderLog) body.render_log = renderLog;
-
-            const res = await fetch('/api/devtools/edit_code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-                credentials: 'include',
-            });
-            const data = await res.json();
-            if (data.status === 'success' && data.code) {
-                appendMsg('ai', '已根据您的指令修改代码。正在生成效果预览…');
-                // 优先使用后端返回的关键帧断点（add/play 显示行），其次前端计算的改动行
-                const keyframeLine = Array.isArray(data.keyframe_lines) && data.keyframe_lines.length > 0
-                    ? data.keyframe_lines[0]
-                    : getImportantChangeLine(code, data.code, instruction);
-                const previewUrl = await renderKeyframeForCode(data.code, keyframeLine);
-                if (previewUrl && keyframeImg) {
-                    keyframeImg.src = previewUrl;
-                }
-                appendMsg('ai', '请查看效果预览及代码对比，选择接受或拒绝。');
-                showDiff(code, data.code);
-            } else {
-                appendMsg('ai', data.message || '编辑失败，请重试。');
-            }
-        } catch (_) {
-            appendMsg('ai', '网络错误，请检查连接后重试。');
-        } finally {
-            btn.disabled = false;
-            btn.title = '发送指令';
-        }
-    }
-
-    btn.addEventListener('click', doEdit);
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            doEdit();
-        }
-    });
+export function disposeDevTools() {
+    delete document.getElementById('devtools')?.dataset.devInitialized;
+    document.getElementById('manim-ai-edit-float')?.codeAssistant?.dispose();
+    devRenderController?.abort();
+    devPreviewController?.abort();
+    editorThemeObserver?.disconnect();editorThemeObserver=null;
+    if(monacoEditor){editorDraft=monacoEditor.getValue();monacoEditor.getModel()?.dispose();monacoEditor.dispose();monacoEditor=null;window.monacoEditor=null;}
+}
+let editorDraft=null;
+let completionProvider=null,editorThemeObserver=null;
+export async function ensureManimEditor() {
+    switchDevTool('manim');
+    await loadMonaco();
+    if(!monacoEditor)throw new Error('工作台已关闭，请重新打开后生成。');
+    return monacoEditor;
 }
 
 function initAiEditFloatDrag(wrap, header) {
@@ -552,19 +428,7 @@ function updateDevLatexView(latex) {
         source.value = value;
     }
     if (preview) {
-        // 与全站一致：用 KaTeX 渲染，渲染失败时至少显示原始 LaTeX
-        if (value) {
-            preview.innerHTML = `\\[ ${value} \\]`;
-        } else {
-            preview.innerHTML = '';
-        }
-        if (typeof renderMath === 'function') {
-            try {
-                renderMath(preview);
-            } catch (_) {
-                // 忽略单次渲染异常，避免阻塞编辑
-            }
-        }
+        renderFormula(preview,value);
     }
 }
 
@@ -650,7 +514,7 @@ export function copyDevLatex() {
 
 // 供外部模块调用：填充 LaTeX 编辑器
 export function fillLatexInDevtools(latex) {
-    updateDevLatexView(latex || '');
+    updateDevLatexView(normalizeLatex(latex || ''));
 }
 
 // Temml 按需加载：用于生成 MathML / 可粘贴到 Word 的内容
@@ -685,7 +549,7 @@ function ensureTemmlLoaded() {
  */
 export async function copyDevLatexAsMathML() {
     const source = document.getElementById('dev-latex-source');
-    const latex = (source && source.value) || '';
+    const latex = normalizeLatex((source && source.value) || '');
     if (!latex.trim()) {
         if (typeof showToast === 'function') showToast('请先输入或识别公式', 'info');
         return;
@@ -839,42 +703,52 @@ export function goToFormulasForImport() {
 
 // --- Manim 模块 (Monaco Kernel) ---
 // Monaco 懒加载：仅在用户进入开发者工具时加载，减轻首屏体积
-function loadMonaco() {
-    // 如果已经加载过，直接初始化
-    if (window.monaco) {
-        initMonacoEditor();
-        return;
+let monacoLoading=null;
+function showEditorLoadError(error) {
+    const container=document.getElementById('monaco-container');
+    if(!container||monacoEditor)return;
+    container.replaceChildren();
+    const message=document.createElement('p'),retry=document.createElement('button');
+    message.textContent=error.message;retry.textContent='重新加载编辑器';retry.className='action-btn secondary';
+    retry.onclick=()=>{retry.disabled=true;loadMonaco().catch(showEditorLoadError);};
+    container.append(message,retry);
+}
+async function loadMonaco() {
+    if(!window.monaco){
+        if(!monacoLoading){
+            monacoLoading=new Promise((resolve,reject)=>{
+                const base='/static/vendor/monaco-editor/0.45.0/min/vs';
+                let script,settled=false;
+                const finish=error=>{
+                    if(settled)return;settled=true;clearTimeout(timer);
+                    if(error){script?.remove();if(!window.monaco)window.require?.reset?.();reject(new Error('代码编辑器加载失败，请检查本站连接后重试。'));}
+                    else resolve();
+                };
+                const timer=setTimeout(()=>finish(true),20000);
+                const core=()=>{
+                    try{
+                        window.require.config({paths:{vs:base}});
+                        window.require(['vs/editor/editor.main'],()=>finish(),()=>finish(true));
+                    }catch{finish(true);}
+                };
+                if(window.require?.config){core();return;}
+                document.getElementById('monaco-loader-script')?.remove();
+                script=document.createElement('script');script.id='monaco-loader-script';script.src=base+'/loader.js';
+                script.onload=core;script.onerror=()=>finish(true);document.body.appendChild(script);
+            }).finally(()=>{monacoLoading=null;});
+        }
+        await monacoLoading;
     }
-
-    // 防止重复注入
-    if (document.getElementById('monaco-loader-script')) return;
-
-    const loaderUrl = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js';
-
-    const script = document.createElement('script');
-    script.id = 'monaco-loader-script';
-    script.src = loaderUrl;
-
-    script.onload = () => {
-        // loader.js 加载完毕，此时 window.require 可用
-        // 配置 Monaco 路径
-        window.require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
-
-        // 加载编辑器核心
-        window.require(['vs/editor/editor.main'], function() {
-            initMonacoEditor();
-        });
-    };
-
-    document.body.appendChild(script);
+    initMonacoEditor();
 }
 
 function initMonacoEditor() {
     const container = document.getElementById('monaco-container');
-    if (!container) return;
+    if (!container || monacoEditor) return;
+    container.replaceChildren();
 
     // 1. 注册 Manim 智能补全 (模拟 Pylance)
-    monaco.languages.registerCompletionItemProvider('python', {
+    completionProvider ||= monaco.languages.registerCompletionItemProvider('python', {
         provideCompletionItems: function(model, position) {
             const suggestions = [
                 // 核心类
@@ -936,9 +810,9 @@ class GenScene(Scene):
 
     // 2. 创建编辑器实例
     monacoEditor = monaco.editor.create(container, {
-        value: defaultCode,
+        value: editorDraft ?? defaultCode,
         language: 'python',
-        theme: 'vs-dark', // 深色主题
+        theme: document.documentElement.dataset.theme==='dark'?'vs-dark':'vs',
         automaticLayout: true, // 自动响应 resize (性能开销稍大，但方便)
         fontSize: 14,
         fontFamily: "'JetBrains Mono', 'Consolas', 'Courier New', monospace",
@@ -967,6 +841,9 @@ class GenScene(Scene):
         }
     });
     window.monacoEditor = monacoEditor;
+    editorThemeObserver?.disconnect();
+    editorThemeObserver=new MutationObserver(()=>monaco.editor.setTheme(document.documentElement.dataset.theme==='dark'?'vs-dark':'vs'));
+    editorThemeObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
     // 绑定代码变化时的布局自动调整（Monaco 懒加载后补绑）
     if (typeof scheduleManimLayoutAdjust === 'function') {
@@ -996,85 +873,33 @@ function updateRunButtonFromCooldown(left) {
     }
 }
 
-export async function runDevManim() {
-    if (getIsRenderCooldown()) {
-        if (typeof showAlert === 'function') await showAlert("全站渲染冷却中，请稍后再试（开发者工具与动态计算共享冷却）", "提示");
-        return;
-    }
-    if (!monacoEditor) return;
-    const code = monacoEditor.getValue();
-
-    const btn = document.getElementById('btn-run-manim');
-    const video = document.getElementById('dev-manim-video');
-    const placeholder = document.getElementById('dev-manim-placeholder');
-    const loading = document.getElementById('dev-manim-loading');
-    const logEl = document.getElementById('dev-manim-log');
-
-    startRenderCooldown(30);
-    updateRunButtonFromCooldown(30);
-    setRenderInProgress(true, { source: 'devtools' });
-    placeholder.style.display = 'none';
-    video.style.display = 'none';
-    loading.style.display = 'block';
-    if (logEl) {
-        logEl.textContent = '';
-        logEl.style.display = 'block';
-    }
-
-    try {
-        const res = await fetch('/api/devtools/run_manim_stream', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code })
-        });
-        if (!res.ok || !res.body) {
-            if (logEl) logEl.textContent = '请求失败';
-            placeholder.style.display = 'block';
-            loading.style.display = 'none';
-            return;
-        }
-        const reader = res.body.getReader();
-        const dec = new TextDecoder();
-        let buf = '';
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            buf += dec.decode(value, { stream: true });
-            const lines = buf.split('\n');
-            buf = lines.pop() || '';
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const data = JSON.parse(line.slice(6));
-                        if (data.type === 'log' && data.message && logEl) {
-                            logEl.textContent += '> ' + data.message + '\n';
-                            logEl.scrollTop = logEl.scrollHeight;
-                        } else if (data.type === 'start' && logEl) {
-                            logEl.textContent += '> ' + (data.message || '') + '\n';
-                            logEl.scrollTop = logEl.scrollHeight;
-                        } else if (data.type === 'complete' && data.video_url) {
-                            hideKeyframeInVideoArea();
-                            if (placeholder) placeholder.style.display = 'none';
-                            video.src = `${data.video_url}?t=${new Date().getTime()}`;
-                            video.style.display = 'block';
-                            if (logEl) { logEl.textContent += '> 渲染完成。\n'; logEl.scrollTop = logEl.scrollHeight; }
-                        } else if (data.type === 'error') {
-                            if (logEl) { logEl.textContent += '> 错误: ' + (data.message || '') + '\n'; logEl.scrollTop = logEl.scrollHeight; }
-                            placeholder.style.display = 'block';
-                        }
-                    } catch (_) {}
-                }
+let devRenderController=null;
+export function stopDevRender(){devRenderController?.abort();devPreviewController?.abort();}
+export async function runDevManim({signal} = {}) {
+    if(devRenderController||devPreviewController)return false;
+    if(!monacoEditor)return false;
+    if(signal?.aborted)return false;
+    const code=monacoEditor.getValue(),controller=new AbortController();devRenderController=controller;
+    const cancel=()=>controller.abort();signal?.addEventListener('abort',cancel,{once:true});
+    const btn=document.getElementById('btn-run-manim'),video=document.getElementById('dev-manim-video');
+    const placeholder=document.getElementById('dev-manim-placeholder'),loading=document.getElementById('dev-manim-loading'),log=document.getElementById('dev-manim-log');
+    let stop=document.getElementById('btn-stop-dev-render');
+    if(!stop){stop=document.createElement('button');stop.id='btn-stop-dev-render';stop.className='ide-btn';stop.textContent='停止渲染';stop.onclick=stopDevRender;btn.after(stop);}
+    btn.disabled=true;stop.hidden=false;loading.style.display='block';placeholder.style.display='none';video.style.display='none';log.textContent='';
+    let success=false;
+    try{
+        const response=await fetch('/api/devtools/run_manim_stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code}),signal:controller.signal});
+        await consumeEvents(response,event=>{
+            if(event.type==='error')throw new Error(event.message||'渲染失败');
+            if(event.message){log.textContent=(log.textContent+'\n'+event.message).slice(-24000);log.scrollTop=log.scrollHeight;}
+            if(event.type==='complete'){
+                if(!/^\/videos\/[a-f0-9-]+\.mp4$/.test(event.video_url))throw new Error('视频地址无效');
+                hideKeyframeInVideoArea();video.src=event.video_url;video.style.display='block';success=true;
             }
-        }
-        if (video.style.display !== 'block') placeholder.style.display = 'block';
-    } catch (e) {
-        console.error(e);
-        if (logEl) logEl.textContent += '网络错误: ' + e.message + '\n';
-        placeholder.style.display = 'block';
-    } finally {
-        loading.style.display = 'none';
-        setRenderInProgress(false);
-    }
+        },controller.signal);
+    }catch(error){log.textContent+='\n'+(error.name==='AbortError'?'已停止渲染。':error.message);}
+    finally{signal?.removeEventListener('abort',cancel);loading.style.display='none';placeholder.style.display=success?'none':'block';btn.disabled=false;stop.hidden=true;devRenderController=null;}
+    return success;
 }
 
 // 当前工作台脚本的最新视频文案摘要（仅前端存储，用于列表预览）
@@ -1082,50 +907,12 @@ let currentVideoCopy = '';
 
 /** 创作者：总结当前 Manim 脚本，生成视频文案（标题 + 简介 + 章节建议），结果以弹窗形式展示 */
 export async function generateVideoCopy() {
-    const code = monacoEditor ? monacoEditor.getValue() : '';
-    if (!code || !code.trim()) {
-        if (typeof showToast === 'function') showToast('请先编写或导入脚本', 'info');
-        return;
-    }
-    const modalId = 'video-copy-modal';
-    const modal = document.getElementById(modalId);
-    const contentEl = modal && modal.querySelector('.video-copy-content');
-    const btnSave = modal && modal.querySelector('.video-copy-save-btn');
-    if (!modal || !contentEl || !btnSave) {
-        if (typeof showToast === 'function') showToast('页面缺少视频文案弹窗容器', 'error');
-        return;
-    }
-    contentEl.innerHTML = '<div class="formulas-loading" style="text-align:center;padding:2rem;color:var(--text-secondary);"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成视频文案，请稍候…</div>';
-    btnSave.disabled = true;
-
-    toggleModal(modalId, true);
-
-    try {
-        const res = await fetch('/api/devtools/generate_video_copy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code })
-        });
-        const data = await res.json();
-        if (data.status !== 'success' || !data.copy) {
-            contentEl.innerHTML = `<p style="color:#ef4444;">生成失败：${(data && data.message) || '未知错误'}</p>`;
-            return;
-        }
-        currentVideoCopy = data.copy;
-        if (window.marked && typeof window.marked.parse === 'function') {
-            // 生成 Markdown 再做一次基础 XSS 清洗，避免脚本注入
-            const rawHtml = window.marked.parse(currentVideoCopy);
-            const safe = sanitizeMarkdownHtml(rawHtml);
-            contentEl.innerHTML = `<div class="markdown-body agent-reply-content">${safe}</div>`;
-            if (typeof window.typesetAgentMath === 'function') window.typesetAgentMath(contentEl);
-        } else {
-            contentEl.innerHTML = `<pre style="white-space:pre-wrap; font-family:inherit;">${currentVideoCopy}</pre>`;
-        }
-        btnSave.disabled = false;
-    } catch (e) {
-        console.error(e);
-        contentEl.innerHTML = `<p style="color:#ef4444;">生成视频文案时出错：${e.message || e}</p>`;
-    }
+    const code=monacoEditor?.getValue();if(!code?.trim())throw new Error('请先输入脚本');
+    const dialog=document.createElement('dialog');dialog.className='studio-save-dialog';
+    dialog.innerHTML='<h3>脚本说明</h3><p class="studio-summary-text" role="status">正在阅读脚本…</p><button>关闭</button>';
+    document.body.append(dialog);dialog.showModal();dialog.querySelector('button').onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();
+    try{const res=await fetch('/api/devtools/generate_video_copy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});const data=await res.json();if(!res.ok||data.status!=='success')throw new Error(data.message||'生成失败');currentVideoCopy=data.copy;dialog.querySelector('p').textContent=data.copy;return true;}
+    catch(error){dialog.querySelector('p').textContent=error.message;return false;}
 }
 
 /** 将当前视频文案与脚本 ID 关联存入 localStorage，供「我的脚本」和动画脚本库预览使用 */
@@ -1171,45 +958,13 @@ export function closeVideoCopyModal() {
 }
 
 /** 从外部（如我的算式-动画脚本库）跳转到本工作台并填入代码，可选自动运行；支持 scriptId/note 以支持工作台保存 */
-export function openManimWorkbenchWithCode(code, options = {}) {
-    workbenchScriptId = options.scriptId ?? null;
-    workbenchScriptNote = options.note ?? '';
-
-    switchDevTool('manim');
-    const setCode = () => {
-        if (monacoEditor) {
-            monacoEditor.setValue(code || '');
-            if (options.autoRun) setTimeout(() => runDevManim(), 400);
-        }
-    };
-    setTimeout(setCode, 150);
-    const t = setInterval(() => {
-        if (monacoEditor) {
-            setCode();
-            clearInterval(t);
-        }
-    }, 100);
-    setTimeout(() => clearInterval(t), 6000);
+export async function openManimWorkbenchWithCode(code, options = {}) {
+    workbenchScriptId=options.scriptId??null;workbenchScriptNote=options.note??'';
+    const editor=await ensureManimEditor();editor.setValue(code||'');
+    if(options.autoRun)return await runDevManim();
+    return true;
 }
-
-/** 新建空白脚本：跳转到云端渲染工作台并填入框架代码（由算式库「新建空白脚本」调用） */
-export function openNewBlankScriptInWorkbench() {
-    workbenchScriptId = null;
-    workbenchScriptNote = '';
-
-    switchDevTool('manim');
-    const setCode = () => {
-        if (monacoEditor) monacoEditor.setValue(MANIM_FRAMEWORK_SCRIPT);
-    };
-    setTimeout(setCode, 150);
-    const t = setInterval(() => {
-        if (monacoEditor) {
-            setCode();
-            clearInterval(t);
-        }
-    }, 100);
-    setTimeout(() => clearInterval(t), 6000);
-}
+export function openNewBlankScriptInWorkbench(){return openManimWorkbenchWithCode(MANIM_FRAMEWORK_SCRIPT);}
 
 function initRenderCooldownListeners() {
     window.addEventListener('render-cooldown-tick', (e) => updateRunButtonFromCooldown(e.detail.left));
@@ -1267,11 +1022,12 @@ function renderRainbowLib() {
 
     const communityHtml = `
         <div class="rainbow-community-section">
-            <h3 class="rainbow-community-title"><i class="fa-solid fa-users"></i> 社区模块</h3>
-            <p class="rainbow-community-desc">提交你写好的 Manim 脚本（附简短说明），审核通过后将展示在此，其他人可一键载入、fork 改编。敬请期待。</p>
-            <button type="button" class="action-btn tertiary" disabled style="opacity:0.8;">即将开放</button>
+            <h3 class="rainbow-community-title"><i class="fa-solid fa-code"></i> 我的可复用脚本</h3>
+            <p class="rainbow-community-desc">在工作台保存动画脚本，回到脚本库阅读说明、载入代码并继续改编。</p>
+            <button type="button" class="action-btn tertiary" data-rainbow-scripts>打开我的脚本库</button>
         </div>`;
     container.innerHTML = headerHtml + cardsHtml + '</div>' + communityHtml;
+    container.querySelector('[data-rainbow-scripts]').onclick=async()=>{const G=await import('./site-graph.js');G.executeNodeAction(G.getNodeById('formulas-scripts'));};
 
     if(window.hljs) container.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
 }
@@ -1421,29 +1177,23 @@ function loadScriptIntoEditor(scriptId) {
 }
 
 /** 打开脚本备注弹窗（与公式编辑窗口同款样式），用户填写后点保存再执行实际保存 */
+export async function saveScriptDirect(note=workbenchScriptNote||'未命名动画') {
+    const response=await fetch('/api/user/me',{credentials:'include'}),me=await response.json();
+    if(!response.ok||!me.username){window.toggleAuthModal?.(true);throw new Error('请登录后保存脚本');}
+    const code=monacoEditor?.getValue();if(!code?.trim())throw new Error('代码不能为空');
+    const endpoint=workbenchScriptId?'/update':'/save';
+    const res=await fetch('/api/animation_scripts'+endpoint,{method:workbenchScriptId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:workbenchScriptId,username:me.username,note,code})});
+    const result=await res.json();if(!res.ok||result.status!=='success')throw new Error(result.message||'保存失败');
+    workbenchScriptId=result.id||workbenchScriptId;workbenchScriptNote=note;
+    window.dispatchEvent(new CustomEvent('formula-library-updated'));
+    return workbenchScriptId;
+}
 export function saveScriptFromWorkbench() {
-    const user = getCurrentUsername();
-    if (!user) {
-        if (typeof window.toggleAuthModal === 'function') window.toggleAuthModal(true);
-        return;
-    }
-    const code = monacoEditor ? monacoEditor.getValue() : '';
-    if (!code || !code.trim()) {
-        showToast('代码不能为空', 'error');
-        return;
-    }
-    window._scriptNoteModalSource = 'devtools';
-    const titleEl = document.getElementById('script-note-modal-title');
-    const inputEl = document.getElementById('script-note-input');
-    const prefixEl = document.getElementById('script-note-prefix');
-    if (prefixEl) prefixEl.style.display = 'none';
-    if (titleEl) titleEl.textContent = workbenchScriptId != null ? '编辑脚本备注' : '脚本备注';
-    if (inputEl) {
-        inputEl.value = workbenchScriptNote || '未命名';
-        inputEl.placeholder = '例如：矩阵动画、公式推演';
-        inputEl.focus();
-    }
-    toggleModal('script-note-modal', true);
+    const dialog=document.createElement('dialog');dialog.className='studio-save-dialog';
+    dialog.innerHTML='<form><h3>保存到我的脚本</h3><label>脚本名称<input name="note" maxlength="200" required></label><p role="status"></p><div><button type="button">取消</button><button type="submit">保存脚本</button></div></form>';
+    dialog.querySelector('input').value=workbenchScriptNote||'未命名动画';document.body.append(dialog);dialog.showModal();
+    dialog.querySelector('[type=button]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+    dialog.querySelector('form').onsubmit=async event=>{event.preventDefault();const btn=dialog.querySelector('[type=submit]');btn.disabled=true;try{await saveScriptDirect(dialog.querySelector('input').value.trim());dialog.close();window.showToast?.('脚本已保存','success');}catch(error){dialog.querySelector('[role=status]').textContent=error.message;}finally{btn.disabled=false;}};
 }
 
 /** 关闭脚本备注弹窗 */

@@ -1,5 +1,5 @@
 <template>
-  <AgentPageInner :active-section="'agent'" :logged-in="true" />
+  <AgentPageInner />
 </template>
 
 <script setup lang="ts">

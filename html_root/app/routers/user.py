@@ -161,27 +161,22 @@ async def change_username(data: ChangeUsernameModel, auth_session: Optional[str]
         cursor.execute("SELECT id FROM users WHERE username = %s", (new_username,))
         if cursor.fetchone():
             return JSONResponse(status_code=400, content={"status": "error", "message": "该用户名已被占用"})
-        cursor = conn.cursor()
         cursor.execute("UPDATE users SET username = %s WHERE username = %s", (new_username, username))
-        cursor.execute("UPDATE formulas SET user_id = %s WHERE user_id = %s", (new_username, username))
-        cursor.execute("UPDATE animation_scripts SET user_id = %s WHERE user_id = %s", (new_username, username))
-        cursor.execute("UPDATE user_settings SET user_id = %s WHERE user_id = %s", (new_username, username))
-        cursor.execute("UPDATE agent_templates SET user_id = %s WHERE user_id = %s", (new_username, username))
-        cursor.execute("SELECT avatar_url, nickname FROM user_profiles WHERE user_id = %s", (username,))
-        prof = cursor.fetchone()
-        if prof:
-            cursor.execute(
-                """INSERT INTO user_profiles (user_id, avatar_url, nickname, updated_at)
-                   VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                   ON DUPLICATE KEY UPDATE avatar_url = VALUES(avatar_url), nickname = VALUES(nickname), updated_at = CURRENT_TIMESTAMP""",
-                (new_username, prof[0], prof[1]),
-            )
-            cursor.execute("DELETE FROM user_profiles WHERE user_id = %s", (username,))
+        # FK-backed tables cascade. Legacy username-owned tables must move in the
+        # same transaction; the new notebook's numeric owner_id stays stable.
+        for table in ('formulas','animation_scripts','agent_templates','user_profiles','user_settings',
+                      'formula_topics','user_achievements','user_wrongbook','course_packs',
+                      'example_play_history','example_video_comments','example_video_danmaku',
+                      'example_video_likes','example_video_notes','user_favorites','watch_later'):
+            cursor.execute('SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s',(table,))
+            if cursor.fetchone()['n']:
+                cursor.execute(f'UPDATE `{table}` SET user_id=%s WHERE user_id=%s',(new_username,username))
         conn.commit()
-        if auth_session and auth_session in SESSION_STORE:
-            SESSION_STORE[auth_session] = new_username
+        for token,name in list(SESSION_STORE.items()):
+            if name==username:SESSION_STORE[token]=new_username
         return {"status": "success", "username": new_username, "message": "用户名已修改"}
     except Exception as e:
+        if conn:conn.rollback()
         logger.error(f"change_username: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:

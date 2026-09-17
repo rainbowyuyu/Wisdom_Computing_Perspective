@@ -8,7 +8,9 @@ from openai import OpenAI
 # 项目根目录（html_root，与 main.py 同级）
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-load_dotenv()
+# Local credentials override the repository defaults; deployment env vars win.
+load_dotenv(os.path.join(ROOT_DIR, ".env.local"))
+load_dotenv(os.path.join(ROOT_DIR, ".env"))
 logger = logging.getLogger(__name__)
 
 # MySQL

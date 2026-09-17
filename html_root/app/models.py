@@ -1,6 +1,6 @@
 # API 请求/响应数据模型
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AuthModel(BaseModel):
@@ -73,9 +73,9 @@ class ManimKeyframeModel(BaseModel):
 
 
 class ManimCodeEditModel(BaseModel):
-    code: str
-    instruction: str
-    render_log: Optional[str] = None  # 渲染日志，纠错意图时传入供模型参考
+    code: str = Field(default="", max_length=40000)
+    instruction: str = Field(min_length=1, max_length=3000)
+    render_log: Optional[str] = Field(default=None, max_length=12000)  # 渲染日志，纠错意图时传入供模型参考
 
 
 class AgentRequest(BaseModel):

@@ -368,28 +368,28 @@ function runDriverTour(driverFn) {
                 onHighlightStarted: (el) => goToAndScroll('calculate', el)
             },
             {
-                element: '#calculate .header-actions .btn-import:first-child',
+                element: '#calculate [data-action=library]',
                 popover: {
-                    title: '8. 一键导入',
-                    description: '不需要重新输入。点击【导入】图标，直接选择刚才保存的公式。',
+                    title: '8. 从算式库继续',
+                    description: '在【我的算式】选择已保存的公式或题解，可继续计算或阅读之前的完整解答。',
                     side: "left"
                 },
                 onHighlightStarted: (el) => goToAndScroll('calculate', el)
             },
             {
-                element: '#calculate #calc-method',
+                element: '#calculate .tutor-composer',
                 popover: {
-                    title: '9. 选择可视化模式',
-                    description: '选择【公式推演】或【可视化演示】等模式，系统会生成对应动画。通用计算可视化会<b>分步执行</b>：先计算、再可视化，生成<b>两个视频</b>并带标签，便于保存时区分。',
+                    title: '9. 输入题目',
+                    description: '输入完整题目或 LaTeX，系统会自动组织分步推导与交互图形。无需手动选择计算模式。',
                     side: "left"
                 },
                 onHighlightStarted: (el) => goToAndScroll('calculate', el)
             },
             {
-                element: '#calculate .calc-sidebar .action-btn.full-width',
+                element: '#calculate .tutor-compose-actions',
                 popover: {
                     title: '10. 生成视频',
-                    description: '点击生成后，右侧会播放 Manim 渲染的数学动画。生成完成后可【保存代码】到【我的算式】中的脚本库，便于在【开发者工具】中继续编辑与渲染。',
+                    description: '勾选【同步生成动画】后开始解题。完成后可切换步骤与视频章节，并将题解、图形和动画保存到【我的算式】。',
                     side: "right"
                 },
                 onHighlightStarted: (el) => goToAndScroll('calculate', el)
@@ -518,7 +518,7 @@ function runRoleTour(driverFn, role) {
                 element: '#calculate .section-title',
                 popover: {
                     title: '3. 用动态计算复盘',
-                    description: '看完例题后，切到「动态计算」，把公式导入进来，选择【公式推演】或【可视化演示】，生成属于你自己的动画讲解。',
+                    description: '看完例题后，切到「动态计算」，输入题目或已有公式，逐步探索图形并生成自己的动画讲解。',
                     side: 'bottom'
                 },
                 onHighlightStarted: (el) => goToAndScroll('calculate', el)

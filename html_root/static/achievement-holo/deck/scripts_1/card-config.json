@@ -1,0 +1,35 @@
+{
+  "title": "第一段动画脚本",
+  "subtitle": "动画启航",
+  "technique": "首镜开拍",
+  "tagline": "第一段 Manim 诞生",
+  "edition": "005 / 013",
+  "collection": "智算星云 · 成就典藏",
+  "description": "在工作台中创建第一段 Manim 脚本",
+  "tier": "pearl",
+  "achievementId": "scripts_1",
+  "assets": {
+    "model": "./assets/card.glb",
+    "subject": "./assets/subject.png",
+    "background": "./assets/background.png",
+    "text": "./assets/text.png",
+    "lineart": "./assets/lineart.png"
+  },
+  "parameters": {
+    "subjectScale": 1.25,
+    "subjectDepth": 0.28,
+    "backgroundDepth": -0.2,
+    "foil": 0.48
+  },
+  "safeArea": {
+    "scale": 1.12,
+    "offset": [
+      -0.06,
+      -0.085
+    ]
+  },
+  "appearance": {
+    "background": "#0b1220"
+  },
+  "defaultFinish": "pearl"
+}

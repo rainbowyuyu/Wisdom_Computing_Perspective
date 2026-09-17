@@ -3,7 +3,9 @@ import asyncio
 import logging
 from typing import List, Tuple
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Cookie
+from ..store import SESSION_STORE
+from .solution_library import ensure_solution_table, username_for_session
 from fastapi.responses import JSONResponse
 
 from ..config import get_db_connection, client, api_key
@@ -135,7 +137,9 @@ def _infer_formula_topics(latex: str, note: str = "") -> List[Tuple[str, float]]
 
 
 @router.post("/save")
-async def save_formula(data: FormulaModel):
+async def save_formula(data: FormulaModel, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != data.username:
+        return JSONResponse(status_code=403, content={"status":"error","message":"无权修改其他账户的算式"})
     conn = None
     cursor = None
     try:
@@ -172,14 +176,15 @@ async def save_formula(data: FormulaModel):
             conn.close()
 
 
-def _list_formulas_sync(username: str):
+def _list_formulas_sync(username: str, include_solutions: bool = False):
     """同步执行，供 run_in_executor 调用，避免阻塞事件循环（渲染时可并发加载算式库）"""
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM formulas WHERE user_id = %s ORDER BY created_at DESC", (username,))
+        ensure_solution_table(cursor)
+        cursor.execute("SELECT f.*, s.title AS solution_title, s.step_count, s.video_url FROM formulas f LEFT JOIN formula_solutions s ON s.formula_id=f.id WHERE f.user_id = %s " + ("" if include_solutions else "AND s.formula_id IS NULL ") + "ORDER BY f.created_at DESC, f.id DESC", (username,))
         formulas = cursor.fetchall()
         for f in formulas:
             f["created_at"] = f["created_at"].isoformat()
@@ -194,17 +199,24 @@ def _list_formulas_sync(username: str):
 
 
 @router.get("/list")
-async def list_formulas(username: str):
+async def list_formulas(username: str, auth_session: str | None = Cookie(None)):
     try:
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, _list_formulas_sync, username)
+        result = await loop.run_in_executor(None, _list_formulas_sync, username, SESSION_STORE.get(auth_session or '') == username)
         return result
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
+@router.get('/list/me')
+def list_my_formulas(auth_session: str | None = Cookie(None)):
+    return _list_formulas_sync(username_for_session(auth_session), True)
+
+
 @router.delete("/delete")
-async def delete_formula(id: int, username: str):
+async def delete_formula(id: int, username: str, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != username:
+        return JSONResponse(status_code=403, content={"status":"error","message":"无权删除其他账户的算式"})
     conn = None
     cursor = None
     try:
@@ -233,12 +245,18 @@ async def delete_formula(id: int, username: str):
 
 
 @router.put("/update")
-async def update_formula(data: FormulaUpdateModel):
+async def update_formula(data: FormulaUpdateModel, auth_session: str | None = Cookie(None)):
+    if username_for_session(auth_session) != data.username:
+        return JSONResponse(status_code=403, content={"status":"error","message":"无权修改其他账户的算式"})
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        ensure_solution_table(cursor)
+        cursor.execute('SELECT formula_id FROM formula_solutions WHERE formula_id=%s', (data.id,))
+        if cursor.fetchone():
+            return JSONResponse(status_code=409, content={"status":"error","message":"请在可视化页面修改题目并重新解题，避免已保存的步骤与题目不一致。"})
         cursor.execute(
             "UPDATE formulas SET latex = %s, note = %s WHERE id = %s AND user_id = %s",
             (data.latex, data.note, data.id, data.username),

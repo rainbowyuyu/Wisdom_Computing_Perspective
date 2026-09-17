@@ -2,11 +2,11 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue({ template: { transformAssetUrls: { includeAbsolute: false }, compilerOptions: { isCustomElement: tag => tag === "math-field" } } })],
   root: ".",
-  // 让 Vite 直接使用后端项目里的 html_root/static 作为静态资源根目录
-  // 这样 /static/css/main.css 等路径在开发环境下也能正常访问，样式不会丢失
-  publicDir: "../html_root",
+  // Static assets are served by FastAPI in both development and production.
+  // Never copy the backend directory (including .env and source) into dist.
+  publicDir: false,
   build: {
     outDir: "dist",
     rollupOptions: {
@@ -14,7 +14,8 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173
+    port: 5173,
+    proxy: Object.fromEntries(["/api", "/static", "/videos", "/assets", "/css", "/js", "/docs"].map(path => [path, { target: "http://127.0.0.1:8000", changeOrigin: true, ws: path==='/api' }]))
   }
 });
 

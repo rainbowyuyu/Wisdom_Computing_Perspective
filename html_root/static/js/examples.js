@@ -1,6 +1,11 @@
+import { renderWrongbook, editWrongbook, openWrongbook } from './wrongbook.js';
+import { textWithMath } from './math-text.js';
+import { createTeachingDanmaku } from './teaching-danmaku.js';
 // static/js/examples.js — 教学案例：B 站风预览、点赞、评论与弹幕（登录后可发）
-import { toggleModal, toggleAuthModal, showToast } from './ui.js';
+import { toggleModal, toggleAuthModal as staticAuthModal, showToast } from './ui.js';
 import * as Settings from './settings.js';
+import { editCoursePack, openCoursePack, renderCoursePacks, chooseCoursePack, importCoursePack, disposeCourseDialogs } from './course-packs.js';
+function toggleAuthModal(show){if(window.toggleAuthModal&&window.toggleAuthModal!==toggleAuthModal)window.toggleAuthModal(show);else staticAuthModal(show);}
 
 let examplesFilterMode = 'all';
 let examplesTag = '';
@@ -10,6 +15,26 @@ let examplesPage = 1;
 const EXAMPLES_PAGE_SIZE_DESKTOP = 9;
 const EXAMPLES_PAGE_SIZE_MOBILE = 4;
 let examplesLastVideos = [];
+let teachingCatalog = [];
+let loadGeneration=0;
+export async function ensurePlayer(){
+    if(document.getElementById('video-modal'))return;
+    const response=await fetch('/static/templates/teaching-player.html');if(!response.ok)throw new Error('播放器加载失败');
+    const html=await response.text();if(document.getElementById('video-modal'))return;
+    const container=document.createElement('div');container.id='teaching-player-host';container.innerHTML=html;document.body.append(container);
+}
+export async function mountExamples(host){
+    await ensurePlayer();if(!host.isConnected)return()=>{};
+    host.innerHTML='<h2 class="section-title">教学案例与课包</h2><p class="section-subtitle">观看、记录、备课，让每一次理解成为下一堂课的起点。</p><div id="examples-filter" class="examples-toolbar"><div class="examples-filter-tabs"><button class="examples-filter-tab active" data-filter="all">全部案例</button><button class="examples-filter-tab" data-filter="favorites">收藏</button><button class="examples-filter-tab" data-filter="watch_later">稍后看</button><button class="examples-filter-tab" data-filter="courseware">我的课件</button></div><button id="examples-create-course-btn" class="action-btn secondary">创建课包与教案</button><div class="examples-tag-filter"><label for="examples-tag-select">标签</label><select id="examples-tag-select" class="examples-tag-select"><option value="">全部</option></select></div></div><div id="examples-grid" class="video-grid"></div>';
+    window.Examples={loadExamples,switchExamplesFilter,playExample,playExampleByVideoId,playCoursePack,closeVideoModal,openCoursePackModal,ensurePlayer,focusPlayerFeature};
+    window.playExample=playExample;window.closeVideoModal=closeVideoModal;
+    await loadExamples();
+    const params=new URLSearchParams(location.search);if(host.isConnected&&params.get('video'))playExampleByVideoId(params.get('video'),Number(params.get('t')||0));
+    return()=>{loadGeneration++;closeVideoModal();disposeCourseDialogs();};
+}
+window.addEventListener('course-packs-updated',()=>{if(document.querySelector('.examples-filter-tab.active')?.dataset.filter==='courseware')loadExamples();});
+window.addEventListener('auth-state-change',()=>{closeVideoModal();document.querySelectorAll('.course-dialog').forEach(d=>{if(!d.querySelector('.course-editor'))d.close();});if(document.getElementById('examples-grid'))loadExamples();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.querySelector('dialog[open]')&&document.getElementById('video-modal')?.classList.contains('show')){e.preventDefault();e.stopImmediatePropagation();closeVideoModal();}},true);
 
 function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -17,13 +42,21 @@ function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,
 function safePlay(el) { if (el && typeof el.play === 'function') el.play().catch(() => {}); }
 
 export async function loadExamples() {
+    const generation=++loadGeneration;
     const grid = document.getElementById('examples-grid');
     if (!grid) return;
+    initExamplesFilterTabs();
 
     const filterTab = document.querySelector('.examples-filter-tab.active');
     const filterMode = (filterTab && filterTab.dataset.filter) || 'all';
     const tagSelect = document.getElementById('examples-tag-select');
     const tag = (tagSelect && tagSelect.value) || '';
+    grid.classList.toggle('course-pack-grid',filterMode==='courseware');
+    grid.classList.toggle('wrongbook-host',filterMode==='wrongbook');
+    for(const control of document.querySelectorAll('#examples-create-course-btn,.course-import'))control.hidden=filterMode==='wrongbook';
+    if(tagSelect)tagSelect.closest('.examples-tag-filter').hidden=['courseware','wrongbook'].includes(filterMode);
+    if(filterMode==='wrongbook'){const options=window.pendingWrongbookOptions||{};window.pendingWrongbookOptions=null;return renderWrongbook(grid,()=>generation===loadGeneration,options);}
+    if(filterMode==='courseware'){document.querySelector('.examples-pagination')?.remove();return renderCoursePacks(grid,()=>generation===loadGeneration);}
 
     grid.innerHTML = '<div class="video-grid-loading"><i class="fa-solid fa-spinner"></i>加载案例中...</div>';
 
@@ -36,6 +69,7 @@ export async function loadExamples() {
     try {
         const res = await fetch(url, { credentials: 'include' });
         const text = await res.text();
+        if(generation!==loadGeneration||!grid.isConnected)return;
         let data;
         try {
             data = JSON.parse(text);
@@ -44,6 +78,7 @@ export async function loadExamples() {
         }
         if (data.status === 'success') {
             const videos = data.data || [];
+            teachingCatalog = videos;
             if (filterMode === 'all' && !tag && Array.isArray(videos)) {
                 videos.forEach(v => { (v.tags || []).forEach(t => allTagsSet.add(String(t))); });
                 if (tagSelect) {
@@ -73,14 +108,14 @@ export async function loadExamples() {
  * @returns {Promise<boolean>} 是否成功切换（登录校验失败时返回 false）
  */
 export async function switchExamplesFilter(mode) {
-    const valid = ['all', 'favorites', 'watch_later', 'courseware'].includes(mode);
+    const valid = ['all', 'favorites', 'watch_later', 'courseware', 'wrongbook'].includes(mode);
     const filterMode = valid ? mode : 'all';
     if (filterMode === 'favorites' || filterMode === 'watch_later' || filterMode === 'courseware') {
         try {
             const res = await fetch('/api/user/me', { credentials: 'include' });
             const me = await res.json();
             if (!me || me.status !== 'success' || !me.username) {
-                if (typeof toggleAuthModal === 'function') toggleAuthModal(true);
+                window.toggleAuthModal?.(true);
                 if (typeof showToast === 'function') showToast('登录后可查看我的收藏、稍后看和课件包', 'info');
                 return false;
             }
@@ -95,13 +130,15 @@ export async function switchExamplesFilter(mode) {
         tab.classList.add('active');
     }
     initExamplesFilterTabs();
-    loadExamples();
+    await loadExamples();
     return true;
 }
 
 function initExamplesFilterTabs() {
-    if (examplesFilterTabsInited) return;
-    examplesFilterTabsInited = true;
+    const toolbar=document.getElementById('examples-filter');
+    if(!toolbar||toolbar.dataset.bound)return;
+    toolbar.dataset.bound='true';
+    if(!toolbar.querySelector('[data-filter=wrongbook]'))toolbar.querySelector('.examples-filter-tabs').insertAdjacentHTML('beforeend','<button class="examples-filter-tab" data-filter="wrongbook">错题本</button>');
     document.querySelectorAll('.examples-filter-tab').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.preventDefault();
@@ -114,54 +151,18 @@ function initExamplesFilterTabs() {
 
     const createCourseBtn = document.getElementById('examples-create-course-btn');
     if (createCourseBtn) {
+        createCourseBtn.disabled=false;createCourseBtn.title='创建教案、选择视频并保存课包';
         createCourseBtn.addEventListener('click', () => openCoursePackModal());
     }
+    const importButton=document.createElement('label');importButton.className='action-btn tertiary course-import';importButton.innerHTML='导入课包<input type="file" accept="application/json,.json" hidden>';
+    toolbar.append(importButton);importButton.querySelector('input').onchange=async e=>{try{await importCoursePack(e.target.files[0]);}catch(error){showToast(error.message,'error');}finally{e.target.value='';}};
 
-    // 创建课包弹窗：智能体 / 手动流程
-    const agentBtn = document.getElementById('course-pack-modal-agent-btn');
-    if (agentBtn) {
-        agentBtn.addEventListener('click', () => {
-            if (typeof closeCoursePackModal === 'function') closeCoursePackModal();
-            if (window.Agent && typeof window.Agent.startRoleFlow === 'function') {
-                window.Agent.startRoleFlow('teacher');
-            } else if (typeof showSection === 'function') {
-                showSection('agent');
-            }
-        });
-    }
-    const manualBtn = document.getElementById('course-pack-modal-manual-btn');
-    if (manualBtn) {
-        manualBtn.addEventListener('click', () => {
-            if (typeof closeCoursePackModal === 'function') closeCoursePackModal();
-            if (typeof showSection === 'function') showSection('examples');
-            if (typeof showToast === 'function') showToast('请按步骤：智能识别/我的算式 → Manim 工作台 → 教学案例中加入课件包', 'info');
-        });
-    }
-    document.querySelectorAll('.course-pack-step-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const step = link.getAttribute('data-course-pack-step');
-            if (!step || typeof showSection !== 'function') return;
-            if (typeof closeCoursePackModal === 'function') closeCoursePackModal();
-            showSection(step === 'my-formulas' ? 'my-formulas' : step);
-            if (step === 'devtools' && typeof window.switchDevTool === 'function') window.switchDevTool('manim');
-        });
-    });
 }
 
-/** 教师：打开创建课包说明弹窗（入口统一在教学案例页） */
-function openCoursePackModal() {
-    const modal = document.getElementById('course-pack-modal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    requestAnimationFrame(() => modal.classList.add('show'));
-}
-window.closeCoursePackModal = function () {
-    const modal = document.getElementById('course-pack-modal');
-    if (!modal) return;
-    modal.classList.remove('show');
-    setTimeout(() => { modal.style.display = 'none'; }, 300);
-};
+/** 教师：打开教案与课包编辑器（入口统一在教学案例页） */
+export function openCoursePackModal() { return editCoursePack(); }
+window.openCoursePackModal=openCoursePackModal;
+
 
 function formatDuration(sec) {
     if (sec == null || !Number.isFinite(sec) || sec < 0) return '';
@@ -393,6 +394,14 @@ let currentVideoTitle = '';
 let currentVideoResumeTime = 0;
 let danmakuList = [];
 const danmakuShownCountRef = { value: 0 };
+let playbackGeneration=0;
+let playlist=null;
+function mergeDanmaku(entries){
+    const map=new Map();for(const d of [...danmakuList,...entries]){
+        const key=d.id?String(d.id):JSON.stringify([d.time,d.username,d.text,d.color,d.mode]);map.set(key,d);
+    }
+    danmakuList=[...map.values()].sort((a,b)=>a.time-b.time);danmakuCanvasManager?.emit();renderDanmakuArchive();
+}
 let heartbeatTimerId = null;
 
 /** 核心播放逻辑：HLS(MSE) 与 MP4 回退 */
@@ -467,207 +476,7 @@ const DANMAKU_POOL_MAX = 256;
 
 /** Canvas 弹幕：requestAnimationFrame 60fps + 轨道碰撞 + 对象池 + 可选防挡蒙版 */
 function createDanmakuCanvasManager() {
-    let canvas = null;
-    let container = null;
-    let getTime = () => 0;
-    let getVisible = () => true;
-    let getList = () => [];
-    let shownCountRef = { value: 0 };
-    let rafId = null;
-    const active = [];
-    const pool = [];
-    const trackRight = [];
-    let lastTime = 0;
-    let maskImage = null;
-
-    function getOpacity() {
-        return Settings.getDanmakuOpacity ? Settings.getDanmakuOpacity() / 100 : 0.9;
-    }
-    function getFontSize() {
-        const s = Settings.getDanmakuFontSize ? Settings.getDanmakuFontSize() : 'medium';
-        return s === 'small' ? 14 : s === 'large' ? 18 : 16;
-    }
-
-    function allocItem() {
-        if (pool.length) return pool.pop();
-        return { x: 0, y: 0, text: '', width: 0, track: 0, isMine: false };
-    }
-
-    function recycleItem(item) {
-        item.text = '';
-        if (pool.length < DANMAKU_POOL_MAX) pool.push(item);
-    }
-
-    /** 轨道管理：上一条弹幕右缘 + 间距 < 屏幕宽度则该轨可用，优先填满顶部轨道 */
-    function findTrack(w) {
-        const cw = canvas ? canvas.width : 0;
-        for (let t = 0; t < DANMAKU_TRACKS; t++) {
-            const right = trackRight[t] ?? -9999;
-            if (right + DANMAKU_GAP < cw) return t;
-        }
-        return 0;
-    }
-
-    function emit(text, isMine) {
-        if (!canvas || !getVisible()) return;
-        const ctx = canvas.getContext('2d');
-        const fontSize = getFontSize();
-        ctx.font = `600 ${fontSize}px sans-serif`;
-        const width = Math.ceil(ctx.measureText(text).width);
-        const track = findTrack(width);
-        const trackH = (canvas.height / DANMAKU_TRACKS);
-        const y = track * trackH + trackH / 2 + fontSize / 2 - 2;
-        const item = allocItem();
-        item.x = canvas.width;
-        item.y = y;
-        item.text = text;
-        item.width = width;
-        item.track = track;
-        item.isMine = !!isMine;
-        active.push(item);
-        const right = item.x + item.width;
-        if (trackRight[track] == null || right > trackRight[track]) trackRight[track] = right;
-    }
-
-    function tick(now) {
-        rafId = requestAnimationFrame(tick);
-        if (!canvas || !container) return;
-        const ctx = canvas.getContext('2d');
-        const cw = canvas.width;
-        const ch = canvas.height;
-        const dt = lastTime ? (now - lastTime) / 1000 : 0.016;
-        lastTime = now;
-
-        const t = getTime();
-        const list = getList();
-        const ref = shownCountRef;
-        while (ref.value < list.length && list[ref.value].time <= t) {
-            const d = list[ref.value];
-            ref.value++;
-            emit(d.text || '', !!(d.username && d.username === currentDanmakuUsername));
-        }
-
-        const speed = DANMAKU_SPEED * dt;
-        for (let i = active.length - 1; i >= 0; i--) {
-            const item = active[i];
-            item.x -= speed;
-            if (item.x + item.width < 0) {
-                active.splice(i, 1);
-                recycleItem(item);
-                continue;
-            }
-            const right = item.x + item.width;
-            if (trackRight[item.track] === right) {
-                let max = item.x;
-                for (let j = 0; j < active.length; j++) {
-                    if (active[j].track === item.track && active[j].x + active[j].width > max)
-                        max = active[j].x + active[j].width;
-                }
-                trackRight[item.track] = max;
-            }
-        }
-
-        ctx.clearRect(0, 0, cw, ch);
-        if (!getVisible()) return;
-        const opacity = getOpacity();
-        const fontSize = getFontSize();
-        ctx.font = `600 ${fontSize}px sans-serif`;
-        ctx.textBaseline = 'middle';
-        const danmakuBlue = 'rgba(0, 174, 236, ';
-        const danmakuBlueStroke = 'rgba(0, 140, 200, 0.95)';
-        for (const item of active) {
-            if (item.isMine) {
-                const pad = 4;
-                ctx.fillStyle = danmakuBlue + (opacity * 0.35) + ')';
-                ctx.strokeStyle = danmakuBlueStroke;
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(item.x - pad, item.y - fontSize / 2 - pad, item.width + pad * 2, fontSize + pad * 2, 6);
-                else ctx.rect(item.x - pad, item.y - fontSize / 2 - pad, item.width + pad * 2, fontSize + pad * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = danmakuBlue + opacity + ')';
-                ctx.strokeStyle = 'rgba(0, 100, 160, 0.85)';
-            } else {
-                ctx.fillStyle = danmakuBlue + opacity + ')';
-                ctx.strokeStyle = 'rgba(0, 100, 160, 0.85)';
-                ctx.lineWidth = 2;
-            }
-            ctx.strokeText(item.text, item.x, item.y);
-            ctx.fillText(item.text, item.x, item.y);
-        }
-
-        /* 智能防挡弹幕：蒙版区域用 destination-out 擦除，弹幕从人背后穿过 */
-        if (maskImage && maskImage.complete && maskImage.naturalWidth) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.drawImage(maskImage, 0, 0, cw, ch);
-            ctx.restore();
-        }
-    }
-
-    function setMask(urlOrImage) {
-        if (!urlOrImage) {
-            maskImage = null;
-            return;
-        }
-        if (typeof urlOrImage === 'object' && urlOrImage instanceof HTMLImageElement) {
-            maskImage = urlOrImage;
-            return;
-        }
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => { maskImage = img; };
-        img.onerror = () => { maskImage = null; };
-        img.src = String(urlOrImage);
-    }
-
-    return {
-        init(opts) {
-            canvas = opts.canvas;
-            container = opts.container;
-            getTime = opts.getTime || getTime;
-            getVisible = opts.getVisible || getVisible;
-            getList = opts.getList || (() => []);
-            shownCountRef = opts.shownCountRef || { value: 0 };
-            lastTime = 0;
-            setMask(opts.maskUrl || null);
-            for (let t = 0; t < DANMAKU_TRACKS; t++) trackRight[t] = -9999;
-            active.length = 0;
-            if (canvas && container) {
-                const rect = container.getBoundingClientRect();
-                const dpr = window.devicePixelRatio || 1;
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
-                canvas.style.width = rect.width + 'px';
-                canvas.style.height = rect.height + 'px';
-                canvas.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
-            }
-        },
-        start() {
-            if (rafId) return;
-            lastTime = 0;
-            rafId = requestAnimationFrame(tick);
-        },
-        stop() {
-            if (rafId) cancelAnimationFrame(rafId);
-            rafId = null;
-        },
-        resize() {
-            if (!canvas || !container) return;
-            const rect = container.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
-            canvas.style.width = rect.width + 'px';
-            canvas.style.height = rect.height + 'px';
-            canvas.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
-        },
-        setGetList(fn) { getList = fn; },
-        setShownCountRef(ref) { shownCountRef = ref; },
-        setMask,
-        emit(text, isMine) { emit(text, isMine); }
-    };
+    return createTeachingDanmaku({getOpacity:()=>Settings.getDanmakuOpacity()/100,getFontSize:()=>({small:16,medium:20,large:26}[Settings.getDanmakuFontSize()]||20)});
 }
 
 let danmakuCanvasManager = null;
@@ -679,6 +488,7 @@ function loadVideoNotes(videoId) {
     fetch('/api/examples/notes?video_id=' + encodeURIComponent(videoId), { credentials: 'include' })
         .then(r => r.json())
         .then(data => {
+            if(videoId!==currentVideoId)return;
             if (data.status !== 'success' || !Array.isArray(data.data)) {
                 listEl.innerHTML = '<div class="video-comment-item" style="color:rgba(255,255,255,0.5);">暂无笔记</div>';
                 return;
@@ -692,16 +502,19 @@ function loadVideoNotes(videoId) {
                 const t = Number(n.time_sec);
                 const timeStr = formatDuration(t);
                 const fullContent = (n.content || '').trim();
-                const content = fullContent.slice(0, 80) + (fullContent.length > 80 ? '…' : '');
+                const content = fullContent;
                 const contentAttr = escapeAttr(fullContent.slice(0, 500));
                 const titleAttr = escapeAttr(currentVideoTitle || '');
                 return '<div class="video-note-item" data-time="' + t + '" data-content="' + contentAttr + '" data-time-sec="' + t + '" data-video-title="' + titleAttr + '" role="button" tabindex="0">' +
                     '<span class="video-note-time">' + escapeHtml(timeStr) + '</span><span class="video-note-content">' + escapeHtml(content) + '</span>' +
-                    '<button type="button" class="video-note-to-exercise-btn" title="根据此笔记让智能体出一道同类练习题"><i class="fa-solid fa-pen-to-square"></i></button></div>';
+                    '<button type="button" class="video-note-delete" data-note-id="' + n.id + '" aria-label="删除笔记">删除</button><button type="button" class="video-note-to-exercise-btn" title="根据此笔记让智能体出一道同类练习题"><i class="fa-solid fa-pen-to-square"></i></button></div>';
             }).join('');
+            listEl.querySelectorAll('.video-note-content').forEach(el=>textWithMath(el,el.textContent));
+            listEl.querySelectorAll('.video-note-delete').forEach(button=>{button.onclick=async e=>{e.stopPropagation();button.disabled=true;try{const r=await fetch('/api/examples/notes/'+button.dataset.noteId,{method:'DELETE'});const result=await r.json();if(!r.ok||result.status!=='success')throw new Error(result.message||'删除失败');if(currentVideoId===videoId)loadVideoNotes(videoId);}catch(error){showToast(error.message,'error');button.disabled=false;}};});
             listEl.querySelectorAll('.video-note-item').forEach(el => {
+                el.addEventListener('keydown',e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();el.click();}});
                 el.addEventListener('click', (e) => {
-                    if (e.target.closest('.video-note-to-exercise-btn')) return;
+                    if (e.target.closest('button')) return;
                     const player = document.getElementById('example-video-player');
                     const time = parseFloat(el.dataset.time, 10);
                     if (player && Number.isFinite(time)) { player.currentTime = time; safePlay(player); }
@@ -718,8 +531,7 @@ function loadVideoNotes(videoId) {
                     const videoTitle = (item.dataset.videoTitle || '').trim();
                     const timeStr = item.querySelector('.video-note-time') ? item.querySelector('.video-note-time').textContent : timeSec;
                     const prompt = '请根据以下学习笔记出一道同类数学练习题（含步骤与答案），以 Markdown 格式回复。\n\n笔记内容：' + (content || '(无)') + '\n视频时间点：' + timeStr + (videoTitle ? '\n视频：' + videoTitle : '');
-                    if (window.Agent && typeof window.Agent.prefillAndShow === 'function') window.Agent.prefillAndShow(prompt);
-                    else if (typeof showToast === 'function') showToast('请刷新页面后重试', 'info');
+                    closeVideoModal();import('./agent-workspace.js').then(A=>A.prefillAgent(prompt));
                 });
             });
         })
@@ -738,6 +550,7 @@ function bindVideoNotesOnce() {
         if (!content || !currentVideoId) return;
         const player = document.getElementById('example-video-player');
         const timeSec = player && Number.isFinite(player.currentTime) ? player.currentTime : 0;
+        const sentVideo=currentVideoId;
         noteSend.disabled = true;
         fetch('/api/examples/notes', {
             method: 'POST',
@@ -748,6 +561,7 @@ function bindVideoNotesOnce() {
             .then(r => r.json())
             .then(data => {
                 if (data.status === 'success') {
+                    if(currentVideoId!==sentVideo)return;
                     noteInput.value = '';
                     loadVideoNotes(currentVideoId);
                     if (typeof showToast === 'function') showToast('笔记已添加', 'success');
@@ -766,6 +580,7 @@ function loadComments(videoId) {
     fetch('/api/examples/comments?video_id=' + encodeURIComponent(videoId), { credentials: 'include' })
         .then(r => r.json())
         .then(data => {
+            if(videoId!==currentVideoId)return;
             if (data.status !== 'success' || !Array.isArray(data.data)) {
                 listEl.innerHTML = '<div class="video-comment-item" style="color:rgba(255,255,255,0.5);">暂无评论</div>';
                 return;
@@ -795,49 +610,6 @@ function escapeHtml(str) {
 /** 弹幕分段时长（秒），与后端 segment 一致 */
 const DANMAKU_SEGMENT_SECONDS = 360;
 
-/** 本地错题本存储键（未登录时存于当前浏览器，登录后走数据库） */
-const WRONGBOOK_STORAGE_KEY = 'wcp_examples_wrongbook_v1';
-
-function getWrongbookUsername() {
-    const userSpan = document.getElementById('username-span');
-    const userDisplay = document.getElementById('user-display');
-    if (userDisplay && userDisplay.style.display !== 'none' && userSpan) return userSpan.innerText || null;
-    return null;
-}
-
-function getWrongbookListFromStorage() {
-    try {
-        const raw = localStorage.getItem(WRONGBOOK_STORAGE_KEY);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (_) { return []; }
-}
-
-function setWrongbookListToStorage(list) {
-    try {
-        localStorage.setItem(WRONGBOOK_STORAGE_KEY, JSON.stringify(Array.isArray(list) ? list : []));
-    } catch (_) {}
-}
-
-/** 获取错题列表（登录走 API，未登录走 localStorage） */
-async function getWrongbookList(videoId) {
-    const user = getWrongbookUsername();
-    if (user) {
-        try {
-            const params = new URLSearchParams({ username: user });
-            if (videoId) params.set('video_id', videoId);
-            const res = await fetch('/api/wrongbook/list?' + params, { credentials: 'include' });
-            const d = await res.json();
-            if (d.status === 'success' && Array.isArray(d.data)) return d.data;
-        } catch (_) {}
-        return [];
-    }
-    const list = getWrongbookListFromStorage();
-    if (videoId) return list.filter(item => item.video_id === videoId);
-    return list;
-}
-
 function loadDanmaku(videoId, onLoaded) {
     danmakuList = [];
     danmakuShownCountRef.value = 0;
@@ -850,12 +622,13 @@ function loadDanmaku(videoId, onLoaded) {
             .then(r => r.json());
     loadSegment(null)
         .then(data => {
+            if(videoId!==currentVideoId)return;
             const list = (data.code === 0 && Array.isArray(data.data)) ? data.data : [];
             const merged = list.map(d => {
-                const [time, , , author, content] = Array.isArray(d) ? d : [d.time, 1, 16777215, d.username, d.text];
-                return { time: Number(time), text: content || '', username: author || '' };
+                const [time, mode, color, author, content,id] = Array.isArray(d) ? d : [d.time,d.mode,d.color,d.username,d.text,d.id];
+                return { id,time: Number(time),mode,color,text: content || '', username: author || '' };
             });
-            danmakuList = merged.filter(d => Number.isFinite(d.time)).sort((a, b) => a.time - b.time);
+            mergeDanmaku(merged.filter(d => Number.isFinite(d.time)));
             if (onLoaded) onLoaded();
             if (danmakuCanvasManager) danmakuCanvasManager.resize();
         })
@@ -894,19 +667,22 @@ function connectVideoWs(videoId) {
         const ws = new WebSocket(url);
         currentVideoWs = ws;
         ws.onmessage = (e) => {
+            if(currentVideoWs!==ws||videoId!==currentVideoId)return;
             try {
                 const msg = JSON.parse(e.data);
                 if (msg.type === 'viewer_count') {
                     const el = document.getElementById('video-viewer-count');
                     if (el) el.textContent = msg.count > 0 ? msg.count + ' 人正在看' : '';
                 } else if (msg.type === 'new_danmaku' && msg.data) {
-                    danmakuList.push({ text: msg.data.text, time: msg.data.time, username: msg.data.username });
-                    danmakuList.sort((a, b) => a.time - b.time);
+                    mergeDanmaku([msg.data]);
+                } else if(msg.type==='delete_danmaku'){
+                    danmakuList=danmakuList.filter(d=>d.id!==msg.id);danmakuCanvasManager?.emit();renderDanmakuArchive();
                 }
             } catch (_) {}
         };
-        ws.onclose = () => { currentVideoWs = null; };
+        ws.onclose = () => { if(currentVideoWs===ws)currentVideoWs = null; };
         ws.onopen = () => {
+            if(currentVideoWs!==ws){ws.close();return;}
             currentVideoWsHeartbeat = setInterval(() => {
                 if (currentVideoWs && currentVideoWs.readyState === WebSocket.OPEN)
                     currentVideoWs.send(JSON.stringify({ type: 'ping' }));
@@ -969,6 +745,8 @@ function initCustomPlayer() {
 
     function syncPlayPauseUI() {
         const paused = !player || player.paused;
+        wrapper?.classList.toggle('is-paused',paused);
+        playBtn?.setAttribute('aria-label',paused?'播放':'暂停');
         if (centerPlay) {
             centerPlay.classList.toggle('hidden', !paused);
             const icon = centerPlay.querySelector('i');
@@ -985,6 +763,7 @@ function initCustomPlayer() {
         const dur = player && player.duration && Number.isFinite(player.duration) ? player.duration : 0;
         if (timeEl) timeEl.textContent = formatDuration(cur) + ' / ' + formatDuration(dur);
         if (progressPlayed && dur > 0) progressPlayed.style.width = (cur / dur * 100) + '%';
+        if(progressWrap){progressWrap.setAttribute('aria-valuemax',String(dur));progressWrap.setAttribute('aria-valuenow',String(Math.round(cur)));progressWrap.setAttribute('aria-valuetext',formatDuration(cur)+' / '+formatDuration(dur));}
     }
 
     function syncBufferUI() {
@@ -1020,6 +799,17 @@ function initCustomPlayer() {
     if (playBtn) playBtn.addEventListener('click', (e) => { e.stopPropagation(); if (player) (player.paused ? safePlay(player) : player.pause()); });
 
     if (progressWrap && progressTrack) {
+        progressWrap.tabIndex=0;progressWrap.setAttribute('role','slider');progressWrap.setAttribute('aria-label','播放进度');progressWrap.setAttribute('aria-valuemin','0');
+        progressWrap.addEventListener('keydown',e=>{
+            if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+            e.preventDefault();e.stopPropagation();const dur=Number.isFinite(player.duration)?player.duration:0;
+            player.currentTime=e.key==='Home'?0:e.key==='End'?dur:Math.max(0,Math.min(dur,player.currentTime+(e.key==='ArrowRight'?5:-5)));
+        });
+        let dragging=false;
+        progressWrap.addEventListener('pointerdown',e=>{if(e.button!==0)return;dragging=true;progressWrap.setPointerCapture(e.pointerId);seekFromProgress(e);});
+        progressWrap.addEventListener('pointermove',e=>{if(dragging)seekFromProgress(e);});
+        progressWrap.addEventListener('pointerup',()=>{dragging=false;});
+        progressWrap.addEventListener('pointercancel',()=>{dragging=false;});
         const previewTimeEl = document.getElementById('custom-player-preview-time');
         const previewBoxEl = document.getElementById('custom-player-preview-box');
         progressWrap.addEventListener('click', (e) => { e.stopPropagation(); seekFromProgress(e); });
@@ -1206,6 +996,7 @@ function bindPlayerContextMenu() {
     const wrapper = document.getElementById('video-player-wrapper');
     const menu = document.getElementById('player-context-menu');
     if (!wrapper || !menu) return;
+    menu.querySelectorAll('[data-action=color],[data-action=sound],[data-action=changelog]').forEach(b=>b.remove());
     wrapper.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         menu.classList.add('show');
@@ -1227,20 +1018,14 @@ function bindPlayerContextMenu() {
                 player.loop = !player.loop;
                 if (typeof showToast === 'function') showToast(player.loop ? '已开启循环' : '已关闭循环', 'success');
             } else if (action === 'copy' && player) {
-                const url = player.src || (currentVideoId ? location.origin + '/api/v1/player/stream/' + currentVideoId : '');
+                const url = currentVideoId ? location.origin + '/?section=examples&video=' + encodeURIComponent(currentVideoId) : '';
                 if (url) navigator.clipboard.writeText(url).then(() => {
                     if (typeof showToast === 'function') showToast('已复制视频地址', 'success');
                 }).catch(() => {});
             } else if (action === 'stats') {
                 showPlayerStatsPanel();
-            } else if (action === 'color' && typeof showToast === 'function') {
-                showToast('视频色彩调整功能敬请期待', 'info');
-            } else if (action === 'sound' && typeof showToast === 'function') {
-                showToast('可在控制栏调节音量', 'info');
             } else if (action === 'shortcuts' && typeof showToast === 'function') {
                 showToast('空格 播放/暂停 · 左右键 进退 5 秒 · 上下键 音量', 'info');
-            } else if (action === 'changelog' && typeof showToast === 'function') {
-                showToast('更新历史请见站点文档', 'info');
             }
             menu.classList.remove('show');
         });
@@ -1294,11 +1079,8 @@ let watchedSegments = [];
 function getHighEnergyData(duration) {
     if (currentHighEnergyData.length > 0) return currentHighEnergyData;
     const len = Math.max(10, Math.min(HIGH_ENERGY_SAMPLES, Math.floor((duration || 60) / 2)));
-    const arr = [];
-    for (let i = 0; i < len; i++) {
-        arr.push(Math.floor(Math.random() * 40) + (i % 5 === 0 ? 50 : 0));
-    }
-    currentHighEnergyData = arr;
+    const arr = Array(len).fill(0);
+    for(const bullet of danmakuList){const i=Math.floor(bullet.time/Math.max(1,duration||60)*len);if(i>=0&&i<len)arr[i]++;}
     return arr;
 }
 
@@ -1307,7 +1089,7 @@ function mergeWatchedSegment(start, end) {
     const out = [];
     for (const s of watchedSegments) {
         if (s[1] < seg[0] || s[0] > seg[1]) out.push(s);
-        else seg[0] = Math.min(seg[0], s[0]); seg[1] = Math.max(seg[1], s[1]);
+        else {seg[0] = Math.min(seg[0], s[0]); seg[1] = Math.max(seg[1], s[1]);}
     }
     out.push(seg);
     out.sort((a, b) => a[0] - b[0]);
@@ -1355,46 +1137,14 @@ function updateVideoProgressSummary() {
         watched += Math.max(0, e - s);
     }
     const pct = Math.max(0, Math.min(100, (watched / dur) * 100));
-    el.textContent = `已观看约 ${pct.toFixed(0)}%`;
+    el.textContent = `本次已观看约 ${pct.toFixed(0)}%`;
 }
 
-/** 将当前时间点加入错题本（登录走数据库，未登录走 localStorage） */
-async function addCurrentTimeToWrongbook() {
-    if (!currentVideoId) return;
-    const player = document.getElementById('example-video-player');
-    const titleEl = document.getElementById('video-modal-title');
-    const noteInput = document.getElementById('video-note-input');
-    const time = player && Number.isFinite(player.currentTime) ? Math.max(0, Math.floor(player.currentTime)) : 0;
-    const title = (titleEl && titleEl.innerText) ? titleEl.innerText.trim() : '';
-    const content = (noteInput && noteInput.value) ? noteInput.value.trim() : '';
-    const user = getWrongbookUsername();
-    if (user) {
-        try {
-            const res = await fetch('/api/wrongbook/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: user, video_id: currentVideoId, title, time_sec: time, note: content }),
-                credentials: 'include',
-            });
-            const d = await res.json();
-            if (d.status === 'success') {
-                if (d.duplicate && typeof showToast === 'function') showToast('该时间点已在错题本中', 'info');
-                else if (typeof showToast === 'function') showToast('已加入错题本', 'success');
-            } else if (typeof showToast === 'function') showToast(d.message || '添加失败', 'error');
-        } catch (_) {
-            if (typeof showToast === 'function') showToast('网络错误', 'error');
-        }
-        return;
-    }
-    const list = getWrongbookListFromStorage();
-    const key = `${currentVideoId}-${time}-${content || ''}`;
-    if (list.some(item => item.key === key)) {
-        if (typeof showToast === 'function') showToast('该时间点已在错题本中', 'info');
-        return;
-    }
-    list.push({ key, video_id: currentVideoId, title, time_sec: time, note: content, created_at: Date.now() });
-    setWrongbookListToStorage(list);
-    if (typeof showToast === 'function') showToast('已加入本地错题本', 'success');
+/** Save a video time point together with the learner's correction. */
+async function addCurrentTimeToWrongbook(){
+    if(!currentVideoId)return;
+    const player=document.getElementById('example-video-player');player?.pause();
+    return editWrongbook({source_type:'video',video_id:currentVideoId,title:currentVideoTitle,problem:currentVideoTitle,time_sec:Math.floor(player?.currentTime||0),note:document.getElementById('video-note-input')?.value||''});
 }
 
 /** 创作者：导出发布包（标题+弹幕+字幕模板 JSON，供 B 站等平台使用） */
@@ -1439,7 +1189,7 @@ function exportHtmlCourseware() {
     const descEl = document.getElementById('video-modal-desc');
     const title = (titleEl && titleEl.innerText) ? titleEl.innerText.trim() : '数学可视化课件';
     const description = (descEl && descEl.innerText) ? descEl.innerText.trim() : '';
-    const src = videoEl && videoEl.currentSrc ? videoEl.currentSrc : (videoEl && videoEl.src ? videoEl.src : '');
+    const src = location.origin+'/assets/storage/'+encodeURIComponent(currentVideoId)+'.mp4';
     if (!src) {
         if (typeof showToast === 'function') showToast('当前视频地址不可用，无法导出课件', 'error');
         return;
@@ -1471,7 +1221,7 @@ function exportHtmlCourseware() {
     <div class="player-frame">
       <video src="${src}" controls playsinline></video>
     </div>
-    <p class="hint">提示：可将此 HTML 文件直接拖入浏览器播放，或在 PowerPoint / Keynote 中通过“插入对象/网页”嵌入展示。</p>
+    <p class="hint">本课件引用本站视频，需要网络及本站服务可访问。可直接在浏览器打开。</p>
   </div>
 </body>
 </html>`;
@@ -1487,63 +1237,11 @@ function exportHtmlCourseware() {
 
 /** 教师：将当前视频加入课件包（自动为用户创建默认课件包） */
 async function addCurrentVideoToCoursePack() {
-    if (!currentVideoId) return;
-
-    // 登录校验
-    try {
-        const meRes = await fetch('/api/user/me', { credentials: 'include' });
-        const me = await meRes.json();
-        if (!me || me.status !== 'success' || !me.username) {
-            if (typeof toggleAuthModal === 'function') toggleAuthModal(true);
-            else if (typeof showToast === 'function') showToast('请先登录', 'error');
-            return;
-        }
-    } catch (_) {
-        if (typeof showToast === 'function') showToast('请先登录', 'error');
-        return;
-    }
-
-    try {
-        const res = await fetch('/api/examples/course-pack/add', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ video_id: currentVideoId })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-            if (typeof showToast === 'function') {
-                showToast('已加入「我的课件」分组，可在筛选栏选择「我的课件」查看', 'success');
-            }
-        } else if (data.message && typeof showToast === 'function') {
-            showToast(data.message, 'error');
-        }
-    } catch (_) {
-        if (typeof showToast === 'function') showToast('网络错误', 'error');
-    }
+    if(currentVideoId) return chooseCoursePack(currentVideoId);
 }
 
-/** 查看当前视频的错题记录 */
-async function showWrongbookForCurrentVideo() {
-    if (!currentVideoId) return;
-    const list = await getWrongbookList(currentVideoId);
-    if (!list.length) {
-        if (typeof showToast === 'function') showToast('当前视频还没有错题记录', 'info');
-        return;
-    }
-    const sorted = list.slice().sort((a, b) => (a.time_sec || 0) - (b.time_sec || 0));
-    const lines = sorted.map(item => {
-        const tStr = formatDuration(item.time_sec || 0);
-        const note = (item.note || '').slice(0, 60);
-        return `[${tStr}] ${note || '(未填写笔记，可在上方补充)'}`;
-    });
-    const text = lines.join('\n');
-    if (typeof showAlert === 'function') {
-        showAlert(text, '本视频的错题记录');
-    } else {
-        alert(text);
-    }
-}
+/** Open the real notebook filtered to the current video. */
+function showWrongbookForCurrentVideo(){const video_id=currentVideoId;closeVideoModal();openWrongbook({video_id});}
 
 function bindHighEnergyBar() {
     const player = document.getElementById('example-video-player');
@@ -1617,9 +1315,14 @@ function bindHighEnergyBar() {
     if (player) {
         player.addEventListener('loadedmetadata', draw);
         player.addEventListener('resize', draw);
+        let lastTime=null,lastWall=0;
+        const reset=()=>{lastTime=null;lastWall=performance.now();};
+        for(const event of ['seeking','loadedmetadata','pause','play'])player.addEventListener(event,reset);
         player.addEventListener('timeupdate', () => {
             const t = player.currentTime;
-            if (Number.isFinite(t) && t >= 0) mergeWatchedSegment(Math.max(0, t - 2), t);
+            const now=performance.now(),delta=t-lastTime,elapsed=(now-lastWall)/1000;
+            if(!player.paused&&!player.seeking&&lastTime!==null&&delta>0&&delta<=elapsed*player.playbackRate+.3)mergeWatchedSegment(lastTime,t);
+            lastTime=t;lastWall=now;
             draw();
             updateVideoProgressSummary();
         });
@@ -1630,8 +1333,7 @@ function bindHighEnergyBar() {
 }
 
 function setWatchedSegmentsFromLastProgress(lastPlayTime) {
-    if (lastPlayTime > 0) watchedSegments = [[0, lastPlayTime]];
-    else watchedSegments = [];
+    watchedSegments = [];
 }
 
 function stopHeartbeat() {
@@ -1659,6 +1361,9 @@ function startHeartbeat() {
 }
 
 export function playExample(videoSrc, title, desc, videoId, options = {}) {
+    if(currentVideoId)closeVideoModal();
+    playlist=options.playlist||null;
+    const generation=++playbackGeneration;
     const player = document.getElementById('example-video-player');
     const titleEl = document.getElementById('video-modal-title');
     const descEl = document.getElementById('video-modal-desc');
@@ -1680,12 +1385,15 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
 
     const initialTime = options.initialTime != null && Number.isFinite(options.initialTime) ? options.initialTime : null;
     const applyConfig = (videoSrcFromConfig, lastPlayTime, fallbackSrc) => {
+        if(generation!==playbackGeneration)return;
         const startTime = initialTime != null ? initialTime : (lastPlayTime > 0 && Number.isFinite(lastPlayTime) ? lastPlayTime : 0);
         setWatchedSegmentsFromLastProgress(startTime);
         if (player) {
             setVideoSource(player, videoSrcFromConfig, { hlsUrl: options.hlsUrl });
             const onReady = () => {
+                if(generation!==playbackGeneration)return;
                 if (startTime > 0) player.currentTime = startTime;
+                startHeartbeat();
                 safePlay(player);
             };
             if (player.readyState >= 2) onReady();
@@ -1693,6 +1401,7 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
             if (fallbackSrc) {
                 const onError = () => {
                     player.removeEventListener('error', onError);
+                    if(generation!==playbackGeneration)return;
                     setVideoSource(player, fallbackSrc, { hlsUrl: options.hlsUrl });
                     player.load();
                     safePlay(player);
@@ -1791,6 +1500,7 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
     let userHasLiked = false;
     let likeCount = 0;
     function updateLikeUI() {
+        if(generation!==playbackGeneration)return;
         if (likeCountEl) likeCountEl.textContent = likeCount;
         if (likeBtn) {
             likeBtn.classList.toggle('liked', userHasLiked);
@@ -1812,6 +1522,7 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
             fetch('/api/user/me', { credentials: 'include' })
                 .then(r => r.json())
                 .then(me => {
+                    if(generation!==playbackGeneration)return;
                     if (me.status !== 'success' || !me.username) {
                         if (typeof toggleAuthModal === 'function') toggleAuthModal(true);
                         return;
@@ -1841,6 +1552,7 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
     fetch('/api/user/me', { credentials: 'include' })
         .then(r => r.json())
         .then(me => {
+                    if(generation!==playbackGeneration)return;
             if (me.status === 'success' && me.username) {
                 return Promise.all([
                     fetch('/api/examples/favorites', { credentials: 'include' }).then(r => r.json()),
@@ -1859,6 +1571,7 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
         .catch(() => updateModalFavoriteWatchLaterUI(false, false));
 
     function updateModalFavoriteWatchLaterUI(fav, wl) {
+        if(generation!==playbackGeneration)return;
         const favBtn = document.getElementById('video-favorite-btn');
         const wlBtn = document.getElementById('video-watch-later-btn');
         if (favBtn) {
@@ -1867,6 +1580,7 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
             if (icon) icon.className = fav ? 'fa-solid fa-star' : 'fa-regular fa-star';
             favBtn.onclick = () => {
                 fetch('/api/user/me', { credentials: 'include' }).then(r => r.json()).then(me => {
+                    if(generation!==playbackGeneration)return;
                     if (me.status !== 'success' || !me.username) { if (typeof toggleAuthModal === 'function') toggleAuthModal(true); return Promise.reject(new Error('未登录')); }
                     const method = fav ? 'DELETE' : 'POST';
                     const url = fav ? '/api/examples/favorites?video_id=' + encodeURIComponent(currentVideoId) : '/api/examples/favorites';
@@ -1888,6 +1602,7 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
             if (icon) icon.className = wl ? 'fa-solid fa-clock' : 'fa-regular fa-clock';
             wlBtn.onclick = () => {
                 fetch('/api/user/me', { credentials: 'include' }).then(r => r.json()).then(me => {
+                    if(generation!==playbackGeneration)return;
                     if (me.status !== 'success' || !me.username) { if (typeof toggleAuthModal === 'function') toggleAuthModal(true); return Promise.reject(new Error('未登录')); }
                     const method = wl ? 'DELETE' : 'POST';
                     const url = wl ? '/api/examples/watch-later?video_id=' + encodeURIComponent(currentVideoId) : '/api/examples/watch-later';
@@ -1947,8 +1662,9 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
     fetch('/api/user/me', { credentials: 'include' })
         .then(r => r.status === 200 ? r.json() : null)
         .then(data => {
+            if(generation!==playbackGeneration)return;
             currentDanmakuUsername = (data && data.status === 'success' && data.username) ? data.username : '';
-            updateModalAuthUI(!!currentDanmakuUsername);
+            updateModalAuthUI(!!currentDanmakuUsername);renderDanmakuArchive();
         })
         .catch(() => {
             currentDanmakuUsername = '';
@@ -1956,10 +1672,10 @@ export function playExample(videoSrc, title, desc, videoId, options = {}) {
         });
 
     toggleModal('video-modal', true);
+    enhanceTeachingPlayer();
     const wrapper = document.getElementById('video-player-wrapper');
     if (wrapper) setTimeout(() => wrapper.focus(), 100);
 
-    startHeartbeat();
     bindCommentAndDanmakuOnce();
 }
 
@@ -2003,21 +1719,22 @@ function bindCommentAndDanmakuOnce() {
         const player = document.getElementById('example-video-player');
         const time = player ? player.currentTime : 0;
         if (!text || !currentVideoId) return;
+        const videoId=currentVideoId;
         danmakuSend.disabled = true;
         fetch('/api/v1/danmaku/send', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ video_id: currentVideoId, text, time })
+            body: JSON.stringify({ video_id:videoId,text,time,color:parseInt(document.getElementById('video-danmaku-color')?.value.slice(1)||'ffffff',16),mode:Number(document.getElementById('video-danmaku-mode')?.value||1) })
         })
             .then(r => r.json())
             .then(data => {
                 const ok = data.status === 'success' || (data && data.code === 0);
                 const payload = data.data || {};
                 if (ok && payload) {
+                    if(videoId!==currentVideoId)return;
                     if (danmakuInput) danmakuInput.value = '';
-                    danmakuList.push({ text: payload.text || '', time: payload.time ?? 0, username: payload.username || currentDanmakuUsername });
-                    danmakuList.sort((a, b) => a.time - b.time);
+                    mergeDanmaku([payload]);
                     if (typeof showToast === 'function') showToast('弹幕已发送', 'success');
                 } else {
                     if (typeof showToast === 'function') showToast(data.message || '发送失败', 'error');
@@ -2034,15 +1751,22 @@ function bindCommentAndDanmakuOnce() {
 }
 
 /** 根据 video_id 打开视频（用于直达链接）。可选 initialTime 秒。 */
-export function playExampleByVideoId(videoId, initialTime) {
+export function playCoursePack(pack,index=0){
+    return playExampleByVideoId(pack.video_ids[index],0,{id:pack.id,name:pack.name,video_ids:[...pack.video_ids],index});
+}
+export function playExampleByVideoId(videoId, initialTime,course=null) {
     if (!videoId) return;
-    fetch('/api/examples', { credentials: 'include' })
+    const request=++playbackGeneration;
+    return fetch('/api/examples', { credentials: 'include' })
         .then(r => r.json())
         .then(data => {
-            if (data.status !== 'success' || !Array.isArray(data.data)) return;
+            if(request!==playbackGeneration)return;
+            if (data.status !== 'success' || !Array.isArray(data.data)) throw new Error('视频目录读取失败，请重试');
+            teachingCatalog = data.data;
             const v = data.data.find(x => (x.video_id || x.filename?.replace(/\.mp4$/i, '')) === videoId);
-            if (!v) return;
+            if (!v) throw new Error('该视频已不可用，请编辑课包重新选择');
             const opts = {
+                playlist:course,
                 spriteUrl: v.sprite_url,
                 durationSec: v.duration_sec,
                 spriteCols: v.sprite_cols || 10,
@@ -2054,23 +1778,104 @@ export function playExampleByVideoId(videoId, initialTime) {
             };
             playExample(v.url || '', v.title || '', v.description || '', v.video_id || videoId, opts);
         })
-        .catch(() => {});
+        .catch(error=>{if(request===playbackGeneration)showToast(error.message,'error');});
 }
 
 export function closeVideoModal() {
     const player = document.getElementById('example-video-player');
+    playbackGeneration++;
+    if(currentVideoId&&currentDanmakuUsername&&player?.readyState>=1)fetch('/api/v1/player/heartbeat',{method:'POST',credentials:'include',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({video_id:currentVideoId,progress:player.currentTime||0})}).catch(()=>{});
     stopHeartbeat();
     closeVideoWs();
     destroyHls();
     if (danmakuCanvasManager) danmakuCanvasManager.stop();
     currentVideoId = '';
+    playlist=null;
     currentSpriteUrl = '';
     if (player) {
         player.pause();
-        player.currentTime = 0;
-        player.src = '';
+        player.removeAttribute('src');
+        player.load();
     }
     hidePlayerContextMenu();
     hidePlayerStatsPanel();
     toggleModal('video-modal', false);
 }
+
+export function focusPlayerFeature(feature){
+    window.pendingTeachingFeature=feature;
+    const modal=document.getElementById('video-modal');
+    if(currentVideoId&&modal?.classList.contains('show')){enhanceTeachingPlayer();return;}
+    showToast('选择一个教学案例，即可打开'+({notes:'时间戳笔记',danmaku:'弹幕设置',lesson:'教案与课包',comments:'评论'}[feature]||'播放器'),'info');
+}
+function enhanceTeachingPlayer(){
+    const modal=document.getElementById('video-modal');if(!modal)return;
+    let courseNav=modal.querySelector('.course-player-nav');
+    if(!courseNav){courseNav=document.createElement('nav');courseNav.className='course-player-nav';courseNav.setAttribute('aria-label','课包播放顺序');modal.querySelector('.video-modal-header').after(courseNav);}
+    courseNav.hidden=!playlist;
+    if(playlist){
+        const course=playlist;
+        courseNav.innerHTML=`<span>${escapeHtml(course.name)} · ${course.index+1} / ${course.video_ids.length}</span><button data-previous ${course.index===0?'disabled':''}>上一节</button><button data-next ${course.index===course.video_ids.length-1?'disabled':''}>下一节</button><button data-read-lesson>教案与课堂练习</button>`;
+        courseNav.querySelector('[data-previous]').onclick=()=>playCoursePack(course,course.index-1);
+        courseNav.querySelector('[data-next]').onclick=()=>playCoursePack(course,course.index+1);
+        courseNav.querySelector('[data-read-lesson]').onclick=()=>{document.getElementById('example-video-player')?.pause();openCoursePack(course.id);};
+    }
+    const bar=modal.querySelector('#video-danmaku-input-wrap');
+    if(bar&&!bar.querySelector('.video-danmaku-style')){
+        const controls=document.createElement('div');controls.className='video-danmaku-style';controls.innerHTML='<input id="video-danmaku-color" type="color" value="#ffffff" aria-label="弹幕颜色"><select id="video-danmaku-mode" aria-label="弹幕位置"><option value="1">滚动</option><option value="5">顶部</option><option value="4">底部</option></select>';bar.prepend(controls);
+    }
+    const exports=modal.querySelector('.video-creator-export');
+    if(!modal.querySelector('#video-danmaku-archive')){const archive=document.createElement('section');archive.id='video-danmaku-archive';archive.innerHTML='<h3>已保存的弹幕</h3><p>点击时间可回到对应片段；可以删除自己发送的弹幕。</p><div class="danmaku-archive-list"></div>';modal.querySelector('#video-modal-notes')?.before(archive);}
+    if(exports&&!exports.querySelector('[data-lesson-create]')){const b=document.createElement('button');b.className='action-btn secondary';b.dataset.lessonCreate='';b.textContent='为此视频编写教案';b.onclick=()=>editCoursePack(null,currentVideoId);exports.prepend(b);}
+    if(!modal.querySelector('.teaching-player-tabs')){
+        const tabs=document.createElement('nav');tabs.className='teaching-player-tabs';tabs.setAttribute('aria-label','播放器学习工具');
+        const panels={notes:['笔记','#video-modal-notes','#video-modal-study','#video-resume-recommend'],danmaku:['弹幕','#video-danmaku-archive'],lesson:['教案与课包','.video-creator-export'],comments:['评论','.video-modal-comments']};
+        tabs.innerHTML=Object.entries(panels).map(([key,[title]])=>`<button type="button" data-player-tab="${key}">${title}</button>`).join('');modal.querySelector('#video-modal-notes')?.before(tabs);
+        tabs.onclick=e=>{const key=e.target.closest('[data-player-tab]')?.dataset.playerTab;if(!key)return;tabs.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b.dataset.playerTab===key);b.setAttribute('aria-pressed',String(b.dataset.playerTab===key));});for(const [id,[,...selectors]] of Object.entries(panels))for(const selector of selectors){const p=modal.querySelector(selector);if(p){p.classList.add('teaching-player-panel');p.hidden=id!==key;}}};
+        tabs.querySelector('button').click();
+    }
+    const target=window.pendingTeachingFeature;
+    if(target){window.pendingTeachingFeature=null;modal.querySelector(`[data-player-tab="${target}"]`)?.click();if(target==='danmaku')modal.querySelector('#video-danmaku-input')?.focus();}
+    renderDanmakuArchive();
+    layoutTeachingPlayer(modal);
+}
+
+function layoutTeachingPlayer(modal) {
+    const panel=modal.querySelector('.video-modal-panel');
+    if(!panel.querySelector('.teaching-watch-layout')){
+        modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','video-modal-title');
+        const layout=document.createElement('div');layout.className='teaching-watch-layout';
+        const main=document.createElement('div');main.className='teaching-watch-main';
+        const side=document.createElement('aside');side.className='teaching-watch-sidebar';side.setAttribute('aria-label','选集与学习工具');
+        layout.append(main,side);panel.append(layout);
+        for(const selector of ['#video-player-wrapper','.video-danmaku-bar','.video-meta-actions']){const el=panel.querySelector(selector);if(el)main.append(el);}
+        const actions=document.createElement('div');actions.className='teaching-watch-actions';
+        actions.innerHTML='<span>边看边学，把理解留在课堂里</span><button type="button" data-watch-create><i class="fa-solid fa-folder-plus"></i> 创建课包</button>';
+        actions.querySelector('button').onclick=()=>{document.getElementById('example-video-player')?.pause();editCoursePack(null,currentVideoId);};main.append(actions);
+        const episodes=document.createElement('section');episodes.className='teaching-episodes';side.append(episodes);
+        for(const selector of ['.course-player-nav','.teaching-player-tabs','#video-modal-notes','#video-modal-study','#video-resume-recommend','#video-danmaku-archive','.video-creator-export','.video-modal-comments']){const el=panel.querySelector(selector);if(el)side.append(el);}
+        const theater=document.createElement('button');theater.type='button';theater.id='custom-player-theater';theater.className='custom-player-btn';theater.title='宽屏模式';theater.setAttribute('aria-label','宽屏模式');theater.setAttribute('aria-pressed','false');theater.innerHTML='<i class="fa-solid fa-desktop"></i>';
+        theater.onclick=()=>{const enabled=panel.classList.toggle('is-theater');theater.setAttribute('aria-pressed',String(enabled));window.dispatchEvent(new Event('resize'));};
+        panel.querySelector('#custom-player-fullscreen').before(theater);
+        const video=document.getElementById('example-video-player');
+        video.addEventListener('ended',()=>{
+            if(video.loop||!modal.classList.contains('show')||document.querySelector('dialog[open]'))return;
+            if(playlist&&playlist.index+1<playlist.video_ids.length&&modal.querySelector('[data-auto-next]')?.checked)playCoursePack(playlist,playlist.index+1);
+        });
+    }
+    const episodes=panel.querySelector('.teaching-episodes');
+    const course=playlist;
+    const items=course?course.video_ids.map(id=>teachingCatalog.find(v=>v.video_id===id)||{video_id:id,title:id}):teachingCatalog;
+    const autoNext=episodes.querySelector('[data-auto-next]')?.checked??false;
+    episodes.innerHTML=`<header><div><span class="assistant-eyebrow">${course?'COURSE COLLECTION':'EXPLORE & LEARN'}</span><h3>${escapeHtml(course?.name||'教学选集')}</h3></div><span>${items.length} 节</span></header>${course?`<label class="teaching-auto-next"><input type="checkbox" data-auto-next ${autoNext?'checked':''}> 自动连播</label>`:''}<div class="teaching-episode-list">${items.map((v,i)=>`<button type="button" data-episode="${i}" ${v.video_id===currentVideoId?'aria-current="true"':''}><span>${String(i+1).padStart(2,'0')}</span><strong>${escapeHtml(v.title)}</strong><small>${v.video_id===currentVideoId?'正在播放':v.duration_sec?formatDuration(v.duration_sec):'播放'}</small></button>`).join('')}</div>`;
+    episodes.onclick=e=>{const b=e.target.closest('[data-episode]');if(!b)return;const index=Number(b.dataset.episode);if(course)playCoursePack(course,index);else playExampleByVideoId(items[index].video_id);};
+    const active=episodes.querySelector('[aria-current]'), list=episodes.querySelector('.teaching-episode-list');
+    if(active&&list)list.scrollTop=active.offsetTop-list.firstElementChild.offsetTop;
+}
+function renderDanmakuArchive(){
+    const host=document.querySelector('.danmaku-archive-list');if(!host)return;
+    host.innerHTML=danmakuList.map(d=>`<div><button data-bullet-time="${Number(d.time)}">${formatDuration(d.time)}</button><span>${escapeHtml(d.text)}</span>${d.username===currentDanmakuUsername&&d.id?`<button data-delete-bullet="${d.id}" aria-label="删除自己的弹幕">删除</button>`:''}</div>`).join('')||'<p>还没有弹幕，发送后会保存到当前视频。</p>';
+    host.onclick=async e=>{const b=e.target.closest('button');if(!b)return;const player=document.getElementById('example-video-player');if(b.hasAttribute('data-bullet-time')){player.currentTime=Number(b.dataset.bulletTime);return;}if(b.dataset.deleteBullet){b.disabled=true;try{const r=await fetch('/api/v1/danmaku/'+b.dataset.deleteBullet,{method:'DELETE'});if(!r.ok)throw new Error('删除失败，请重试');danmakuList=danmakuList.filter(d=>String(d.id)!==b.dataset.deleteBullet);danmakuCanvasManager?.emit();renderDanmakuArchive();}catch(error){showToast(error.message,'error');b.disabled=false;}}};
+}
+
+window.addEventListener('wrongbook-updated',()=>{if(document.querySelector('.examples-filter-tab.active')?.dataset.filter==='wrongbook')loadExamples();});

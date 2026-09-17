@@ -41,3 +41,9 @@ const sectionToPath: Record<string, string> = {
 
 app.mount("#app");
 
+
+const graphBootstrapUrl = "/static/js/role-graph-bootstrap.js";
+import(/* @vite-ignore */ graphBootstrapUrl).catch(error => console.warn("图谱加载失败", error));
+
+const docsUrl="/static/js/docs.js?v=20260917-release-044";
+import(/* @vite-ignore */ docsUrl).catch(error=>console.warn("文档组件加载失败",error));

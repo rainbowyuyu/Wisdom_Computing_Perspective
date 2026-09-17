@@ -15,7 +15,7 @@
           type="text"
           id="nav-search-input"
           class="nav-search-input"
-          placeholder="搜索算式、脚本、案例…"
+          placeholder="搜索题解、课包、错题、案例…"
           maxlength="200"
           autocomplete="off"
         />
@@ -45,7 +45,7 @@
       </button>
 
       <div class="auth-buttons desktop-auth">
-        <button class="login-btn" @click="openAuthModal">登录 / 注册</button>
+        <button v-if="!isLoggedIn" class="login-btn" @click="openAuthModal">登录 / 注册</button>
         <span
           id="user-display"
           class="header-user-display"
@@ -115,18 +115,18 @@
       </div>
     </div>
 
-    <!-- 顶部更新消息：智能体 -->
+    <!-- 顶部更新消息：v0.4.4 -->
     <div class="agent-update-banner" id="agent-update-banner" v-show="showAgentBanner">
       <span class="agent-update-text">
-        新功能：智能体已上线 — 用自然语言调用识别、计算、开发者工具等
+        新功能：分步解题、教学课包与错题复习已打通，让学习与创作连起来
       </span>
       <a
         href="javascript:void(0)"
         class="agent-update-detail"
-        title="查看更新详情（定位到 v.0.3.5）"
+        title="查看更新详情（定位到 v0.4.4）"
         @click="openUpdateDoc"
       >
-        ?
+        v0.4.4 更新详情
       </a>
       <button
         type="button"
@@ -141,22 +141,28 @@
 
     <!-- 主体：使用路由视图承载各页面 -->
     <main class="container">
-      <Transition name="fade-page" mode="out-in">
-        <RouterView v-slot="{ Component }">
+      <RouterView v-slot="{ Component }">
+        <Transition name="fade-page" mode="out-in">
           <component :is="Component" />
-        </RouterView>
-      </Transition>
+        </Transition>
+      </RouterView>
     </main>
 
     <AppFooter />
+    <FloatingPanel />
+    <AuthDialog ref="authDialog" @signed-in="signedIn" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import { getLegacyApp } from "./utils/legacy-bridge";
 import AppFooter from "./components/layout/AppFooter.vue";
+import FloatingPanel from "./components/layout/FloatingPanel.vue";
+import AuthDialog from "./components/layout/AuthDialog.vue";
+const authDialog=ref<InstanceType<typeof AuthDialog>|null>(null);
+function signedIn(name:string){username.value=name;isLoggedIn.value=true;window.dispatchEvent(new CustomEvent('auth-state-change',{detail:{username:name}}));}
 
 type SectionId =
   | "home"
@@ -199,7 +205,7 @@ const username = ref("");
 const userAvatar = ref("");
 
 const mobileMenuVisible = ref(false);
-const showAgentBanner = ref(true);
+const showAgentBanner = ref(localStorage.getItem("wisdom.release.dismissed")!=="0.4.4");
 
 const navItems = [
   { id: "home", label: "首页" },
@@ -231,19 +237,21 @@ function openSettings(section?: string) {
 }
 
 function openAuthModal() {
-  console.log("open auth modal");
+  authDialog.value?.show();
 }
 
-function logout() {
-  console.log("logout");
+async function logout() {
+  const response=await fetch('/api/logout',{method:'POST',credentials:'include'});
+  if(response.ok){isLoggedIn.value=false;username.value='';window.dispatchEvent(new CustomEvent('auth-state-change',{detail:{username:null}}));window.dispatchEvent(new CustomEvent('formula-library-updated'));}
 }
 
 function closeAgentBanner() {
   showAgentBanner.value = false;
+  localStorage.setItem("wisdom.release.dismissed","0.4.4");
 }
 
 function openUpdateDoc() {
-  console.log("open update doc");
+  (window as any).openDoc?.("update.md","更新日志","update-v-0.4.4");
 }
 
 function scrollToSelector(selector: string) {
@@ -257,7 +265,14 @@ function startTutorial() {
   console.log("start tutorial");
 }
 
+let disposeSiteSearch: (() => void) | undefined;
+let appDisposed=false;
+onUnmounted(()=>{appDisposed=true;disposeSiteSearch?.();});
 onMounted(() => {
+  const searchUrl='/static/js/site-search.js';
+  import(/* @vite-ignore */ searchUrl).then(module=>{if(!appDisposed)disposeSiteSearch=module.initNavSearch();}).catch(()=>{});
+  (window as any).toggleAuthModal=(show:boolean)=>{if(show)openAuthModal();};
+  fetch('/api/user/me',{credentials:'include'}).then(r=>r.ok?r.json():null).then(data=>{if(data?.username)signedIn(data.username);}).catch(()=>{});
   // 将部分操作暴露给全局，以兼容旧代码中的 window.App 调用
   const app = getLegacyApp();
   app.__setCurrentSection = (id: string) => {

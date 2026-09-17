@@ -3,13 +3,15 @@
 const MODAL_IDS = [
     'auth-modal', 'settings-modal', 'change-username-modal', 'change-password-modal',
     'agent-templates-modal', 'agent-examples-modal', 'edit-formula-modal', 'video-copy-modal',
-    'script-note-modal', 'select-formula-modal', 'course-pack-modal', 'custom-dialog-modal',
+    'script-note-modal', 'select-formula-modal', 'custom-dialog-modal',
     'script-run-modal', 'docs-modal', 'video-modal', 'image-editor-modal', 'achievement-panel-modal'
 ];
 
+const modalTimers = new WeakMap();
 export function toggleModal(modalId, show) {
     const modal = document.getElementById(modalId);
     if (!modal) return;
+    clearTimeout(modalTimers.get(modal));
 
     if (show) {
         modal.style.display = 'flex';
@@ -18,9 +20,10 @@ export function toggleModal(modalId, show) {
         });
     } else {
         modal.classList.remove('show');
-        setTimeout(() => {
+        modalTimers.set(modal, setTimeout(() => {
             modal.style.display = 'none';
-        }, 300);
+            if(modalId==='auth-modal')window.dispatchEvent(new Event('auth-dialog-closed'));
+        }, 300));
     }
 }
 
@@ -32,7 +35,7 @@ export function closeAllModals() {
 /** 按 ESC 关闭最顶层弹窗（若有多层则逐个关闭） */
 export function initModalEscHandler() {
     document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape') return;
+        if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
         const visible = MODAL_IDS.map(id => document.getElementById(id)).filter(m => m && m.classList.contains('show'));
         if (visible.length) {
             e.preventDefault();
@@ -43,6 +46,7 @@ export function initModalEscHandler() {
 }
 
 export function showSection(sectionId) {
+    if(sectionId!=='examples'&&document.getElementById('video-modal')?.classList.contains('show'))window.closeVideoModal?.();
     document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active-section'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 

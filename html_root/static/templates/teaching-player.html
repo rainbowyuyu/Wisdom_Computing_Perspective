@@ -1,0 +1,187 @@
+<div id="video-modal" class="modal video-modal-overlay">
+        <button type="button" class="video-modal-close-outside" onclick="closeVideoModal()" aria-label="关闭">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="video-modal-panel">
+            <div class="video-modal-header">
+                <div class="video-info">
+                    <h3 id="video-modal-title">视频标题</h3>
+                    <p id="video-modal-desc">视频简介...</p>
+                    <div class="video-meta-actions">
+                        <span class="video-viewer-count" id="video-viewer-count" title="当前观看人数"></span>
+                        <span class="video-meta-actions-group">
+                            <button type="button" id="video-favorite-btn" class="video-action-btn" title="收藏（登录后可用）" aria-label="收藏"><i class="fa-regular fa-star"></i></button>
+                            <button type="button" id="video-watch-later-btn" class="video-action-btn" title="稍后看（登录后可用）" aria-label="稍后看"><i class="fa-regular fa-clock"></i></button>
+                        </span>
+                        <span class="video-meta-actions-sep" aria-hidden="true"></span>
+                        <span class="video-meta-actions-group">
+                            <button type="button" id="video-share-btn" class="video-action-btn" title="复制直达链接（含时间点）" aria-label="分享"><i class="fa-solid fa-share-nodes"></i></button>
+                            <button type="button" id="video-like-btn" class="video-like-btn" title="点赞（登录后可用）" aria-label="点赞">
+                                <i class="fa-regular fa-thumbs-up"></i>
+                                <span id="video-like-count">0</span>
+                            </button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <!-- B站式多层播放器：背景层→视频层→蒙版层→弹幕Canvas→高能条→控制栏→悬浮层→反馈层 -->
+            <div class="video-player-wrapper bilibili-player-area" id="video-player-wrapper" tabindex="0">
+                <!-- 0 背景层 -->
+                <div class="player-layer player-layer-bg" aria-hidden="true"></div>
+                <!-- 1 视频层 -->
+                <video id="example-video-player" class="player-layer player-layer-video" autoplay playsinline></video>
+                <!-- 2 防挡弹幕蒙版层（占位，后续可接蒙版数据） -->
+                <div class="player-layer player-layer-mask" id="player-layer-mask" aria-hidden="true"></div>
+                <!-- 3 弹幕渲染层 Canvas -->
+                <div class="player-layer video-danmaku-layer" id="video-danmaku-layer">
+                    <canvas id="video-danmaku-canvas"></canvas>
+                </div>
+                <!-- 4 中央大播放键 -->
+                <button type="button" class="custom-player-center-play" id="custom-player-center-play" aria-label="播放">
+                    <i class="fa-solid fa-play"></i>
+                </button>
+                <!-- 5 UI 控制层（高能条在进度条上方，随控制栏显隐） -->
+                <div class="custom-player-controls" id="custom-player-controls">
+                    <div class="player-layer-high-energy-inline" id="player-layer-high-energy" aria-hidden="true">
+                        <svg class="high-energy-svg" id="high-energy-svg" preserveAspectRatio="none">
+                            <defs><linearGradient id="high-energy-fill" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="rgba(255,255,255,0.12)"/><stop offset="1" stop-color="rgba(255,255,255,0.35)"/></linearGradient></defs>
+                            <path id="high-energy-path" fill="url(#high-energy-fill)" stroke="none"/>
+                            <path id="high-energy-watched-path" fill="rgba(0,174,236,0.35)" stroke="none"/>
+                        </svg>
+                        <span class="high-energy-tooltip" id="high-energy-tooltip">高能预警</span>
+                    </div>
+                    <div class="custom-player-progress-wrap" id="custom-player-progress-wrap">
+                        <div class="custom-player-progress-track" id="custom-player-progress-track">
+                            <div class="custom-player-progress-loaded" id="custom-player-progress-loaded"></div>
+                            <div class="custom-player-progress-played" id="custom-player-progress-played"></div>
+                            <div class="custom-player-progress-hover" id="custom-player-progress-hover"></div>
+                        </div>
+                        <div class="custom-player-progress-tooltip" id="custom-player-progress-tooltip">
+                            <span class="custom-player-preview-time" id="custom-player-preview-time">0:00</span>
+                            <div class="custom-player-preview-box" id="custom-player-preview-box"></div>
+                        </div>
+                    </div>
+                    <div class="custom-player-bar">
+                        <div class="custom-player-left">
+                            <button type="button" class="custom-player-btn" id="custom-player-play" title="播放/暂停" aria-label="播放/暂停">
+                                <i class="fa-solid fa-play"></i>
+                            </button>
+                            <span class="custom-player-time" id="custom-player-time">0:00 / 0:00</span>
+                        </div>
+                        <div class="custom-player-right">
+                            <div class="custom-player-volume-wrap" id="custom-player-volume-wrap">
+                                <button type="button" class="custom-player-btn" id="custom-player-volume-btn" title="音量" aria-label="音量">
+                                    <i class="fa-solid fa-volume-high"></i>
+                                </button>
+                                <div class="custom-player-volume-slider-wrap" id="custom-player-volume-slider-wrap">
+                                    <input type="range" class="custom-player-volume-slider" id="custom-player-volume-slider" min="0" max="100" value="100" title="音量">
+                                </div>
+                            </div>
+                            <div class="custom-player-speed-wrap" id="custom-player-speed-wrap">
+                                <button type="button" class="custom-player-btn custom-player-speed-btn" id="custom-player-speed-btn" title="倍速">1x</button>
+                                <div class="custom-player-speed-menu" id="custom-player-speed-menu">
+                                    <button type="button" data-rate="0.5">0.5x</button>
+                                    <button type="button" data-rate="0.75">0.75x</button>
+                                    <button type="button" data-rate="1">1x</button>
+                                    <button type="button" data-rate="1.25">1.25x</button>
+                                    <button type="button" data-rate="1.5">1.5x</button>
+                                    <button type="button" data-rate="1.75">1.75x</button>
+                                    <button type="button" data-rate="2">2x</button>
+                                </div>
+                            </div>
+                            <button type="button" class="custom-player-btn" id="video-danmaku-toggle-btn" title="显示/隐藏弹幕"><i class="fa-solid fa-closed-captioning"></i></button>
+                            <button type="button" class="custom-player-btn" id="video-danmaku-screen-btn" title="弹幕区域：全屏/半屏/1/4屏">
+                                <i class="fa-solid fa-expand" id="video-danmaku-screen-icon"></i>
+                            </button>
+                            <span class="custom-player-screen-label" id="video-danmaku-screen-label">全屏</span>
+                            <button type="button" class="custom-player-btn" id="custom-player-fullscreen" title="网页全屏" aria-label="全屏">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- 7 交互反馈：音量数字 Toast -->
+                <div class="player-volume-toast" id="player-volume-toast" aria-live="polite"></div>
+            </div>
+            <!-- 右键菜单（仿 B 站布局与项） -->
+            <div class="player-context-menu" id="player-context-menu" role="menu">
+                <button type="button" role="menuitem" data-action="copy"><i class="fa-solid fa-link"></i> 复制视频地址 (精准空降)</button>
+                <button type="button" role="menuitem" data-action="color"><i class="fa-solid fa-palette"></i> 视频色彩调整</button>
+                <button type="button" role="menuitem" data-action="sound"><i class="fa-solid fa-volume-high"></i> 视频音效调节</button>
+                <button type="button" role="menuitem" data-action="shortcuts"><i class="fa-solid fa-keyboard"></i> 快捷键说明</button>
+                <button type="button" role="menuitem" data-action="changelog"><i class="fa-solid fa-clock-rotate-left"></i> 更新历史</button>
+                <button type="button" role="menuitem" data-action="stats"><i class="fa-solid fa-chart-simple"></i> 视频统计信息</button>
+                <button type="button" role="menuitem" data-action="loop"><i class="fa-solid fa-repeat"></i> 循环播放</button>
+            </div>
+            <!-- Stats for nerds 面板 -->
+            <div class="player-stats-panel" id="player-stats-panel">
+                <div class="player-stats-header">
+                    <span>Stats for nerds</span>
+                    <button type="button" class="player-stats-close" id="player-stats-close" aria-label="关闭">&times;</button>
+                </div>
+                <pre class="player-stats-body" id="player-stats-body"></pre>
+            </div>
+            <div class="video-danmaku-bar">
+                <div class="video-danmaku-input-wrap" id="video-danmaku-input-wrap">
+                    <input type="text" id="video-danmaku-input" placeholder="发个友善的弹幕见证当下" maxlength="80" autocomplete="off">
+                    <a href="#" class="video-danmaku-etiquette" onclick="typeof showToast==='function'&&showToast('请友善发言，勿刷屏、剧透、引战', 'info'); return false;">弹幕礼仪 &gt;</a>
+                    <button type="button" class="action-btn secondary" id="video-danmaku-send">发送</button>
+                </div>
+                <div class="video-danmaku-login-hint" id="video-danmaku-login-hint" style="display:none;"><a href="#" onclick="typeof toggleAuthModal==='function'&&toggleAuthModal(true); return false;">登录</a>后可发弹幕</div>
+            </div>
+            <div class="video-modal-notes" id="video-modal-notes" style="margin-bottom:1rem;">
+                <div class="video-modal-notes-title"><i class="fa-regular fa-note-sticky"></i> 时间戳笔记（登录后可用）</div>
+                <div id="video-notes-list" class="video-notes-list" style="max-height:120px; overflow:auto; margin-bottom:8px;"></div>
+                <div id="video-note-form" class="video-note-form" style="display:none;">
+                    <input type="text" id="video-note-input" placeholder="在当前时间点添加笔记…" maxlength="500" style="flex:1; padding:6px 10px; border-radius:6px; border:1px solid var(--border-color); margin-right:8px;">
+                    <button type="button" class="action-btn secondary" id="video-note-send">添加</button>
+                </div>
+                <div id="video-note-login-hint" class="video-comment-login-hint"><a href="#" onclick="typeof toggleAuthModal==='function'&&toggleAuthModal(true); return false;">登录</a>后可记笔记</div>
+            </div>
+            <!-- 复习推荐：基于续播进度 -->
+            <div class="video-resume-recommend" id="video-resume-recommend" style="display:none; margin-bottom:0.75rem;">
+                <span class="video-resume-text" id="video-resume-text"></span>
+                <button type="button" class="action-btn secondary" id="video-resume-btn"><i class="fa-solid fa-play"></i> 继续观看</button>
+            </div>
+            <!-- 学习闭环：进度汇总 + 错题本（登录后同步到云端） -->
+            <div class="video-modal-study" id="video-modal-study" style="margin-bottom:1.1rem;">
+                <div class="video-modal-study-title">
+                    <i class="fa-solid fa-book-open-reader"></i>
+                    学习进度与错题本
+                </div>
+                <div class="video-modal-study-body">
+                    <span id="video-progress-summary" class="video-progress-summary">已观看：--</span>
+                    <div class="video-study-actions">
+                        <button type="button" class="action-btn secondary" id="video-mark-wrong-btn">
+                            <i class="fa-regular fa-circle-down"></i> 将当前时间点加入错题本
+                        </button>
+                        <button type="button" class="action-btn tertiary" id="video-open-wrongbook-btn">
+                            查看本视频错题记录
+                        </button>
+                    </div>
+                    <p class="video-study-hint">错题与复习记录保存在当前账户，可在教学案例的「错题本」中统一管理。</p>
+                </div>
+            </div>
+            <!-- 创作者 / 教师：导出发布包 & 加入课件包 -->
+            <div class="video-creator-export" style="margin-bottom:1rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
+                <button type="button" class="action-btn tertiary" id="video-export-publish-btn">
+                    <i class="fa-solid fa-file-export"></i> 导出发布包（标题+弹幕+字幕模板）
+                </button>
+                <button type="button" class="action-btn tertiary" id="video-export-html-btn">
+                    <i class="fa-solid fa-file-powerpoint"></i> 导出 HTML 课件（可嵌入 PPT）
+                </button>
+                <button type="button" class="action-btn secondary" id="video-add-course-pack-btn" title="将当前视频加入我的课件列表">
+                    <i class="fa-solid fa-folder-plus"></i> 加入课件包
+                </button>
+            </div>
+            <div class="video-modal-comments">
+                <div class="video-modal-comments-title"><i class="fa-regular fa-comments"></i> 评论区</div>
+                <div id="video-comments-list" class="video-comments-list"></div>
+                <div id="video-comment-form" class="video-comment-input-wrap" style="display:none;">
+                    <input type="text" id="video-comment-input" placeholder="写下你的评论…" maxlength="2000" autocomplete="off">
+                    <button type="button" class="action-btn secondary" id="video-comment-send">发送</button>
+                </div>
+                <div id="video-comment-login-hint" class="video-comment-login-hint"><a href="#" onclick="typeof toggleAuthModal==='function'&&toggleAuthModal(true); return false;">登录</a>后可发表评论</div>
+            </div>
+        </div>
+    </div>

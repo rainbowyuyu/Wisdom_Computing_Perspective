@@ -21,7 +21,7 @@ export const NODES = [
   { id: 'tutorial', name: '30 秒教程', section: 'home', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-graduation-cap', keywords: ['教程','新手','引导'], val: 9, color: '#94a3b8' },
   { id: 'search', name: '全站搜索', section: 'home', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-search', keywords: ['搜索','查找'], val: 8, color: '#94a3b8' },
   { id: 'agent', name: '智能体', section: 'agent', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-robot', keywords: ['智能体','助手','AI','对话'], val: 14, color: '#6366f1' },
-  { id: 'agent-course', name: '创建课包', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-folder-plus', keywords: ['课包','课件包'], val: 10, color: '#818cf8' },
+  { id: 'agent-course', name: '备课工作台', section: 'examples', teaching_action:'create', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-folder-plus', keywords: ['备课','课件包'], val: 10, color: '#818cf8' },
   { id: 'agent-template', name: '从模板运行', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-wand-magic-sparkles', keywords: ['模板'], val: 9, color: '#a5b4fc' },
   { id: 'agent-examples', name: '功能示例', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-lightbulb', keywords: ['示例'], val: 8, color: '#c4b5fd' },
   { id: 'agent-clear', name: '清空对话', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-trash', keywords: ['清空'], val: 7, color: '#a5b4fc' },
@@ -39,15 +39,15 @@ export const NODES = [
   { id: 'detect-copy-calc', name: '去动态计算', section: 'detect', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-calculator', keywords: ['去计算'], val: 9, color: '#67e8f9' },
   { id: 'detect-open-devtools-latex', name: '去 LaTeX 编辑器', section: 'detect', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-pen-to-square', keywords: ['去 LaTeX 编辑器','编辑公式'], val: 9, color: '#67e8f9' },
   { id: 'calculate', name: '动态计算', section: 'calculate', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-calculator', keywords: ['动态计算','计算','推演','可视化','动画'], val: 14, color: '#34d399' },
-  { id: 'calc-normal', name: '通用推演', section: 'calculate', calc_operation: 'normal', type: NODE_TYPE.SUBTOOL, keywords: ['通用'], val: 8, color: '#6ee7b7' },
-  { id: 'calc-formula', name: '公式推演', section: 'calculate', calc_operation: 'formular', type: NODE_TYPE.SUBTOOL, keywords: ['公式推演'], val: 8, color: '#6ee7b7' },
-  { id: 'calc-visual', name: '可视化', section: 'calculate', calc_operation: 'visualization', type: NODE_TYPE.SUBTOOL, keywords: ['可视化'], val: 8, color: '#6ee7b7' },
-  { id: 'calc-solution', name: '完整解题', section: 'calculate', calc_operation: 'solution', type: NODE_TYPE.SUBTOOL, keywords: ['解题'], val: 8, color: '#6ee7b7' },
-  { id: 'calc-import', name: '从库导入', section: 'calculate', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-book-bookmark', keywords: ['导入'], val: 8, color: '#5eead4' },
-  { id: 'calc-clear', name: '清空输入', section: 'calculate', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-trash', keywords: ['清空'], val: 7, color: '#6ee7b7' },
-  { id: 'calc-generate', name: '生成动画', section: 'calculate', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-clapperboard', keywords: ['生成'], val: 10, color: '#34d399' },
-  { id: 'calc-steps', name: '解题步骤', section: 'calculate', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-list-ol', keywords: ['步骤'], val: 8, color: '#6ee7b7' },
-  { id: 'calc-save-script', name: '保存到脚本库', section: 'calculate', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-bookmark', keywords: ['保存脚本'], val: 8, color: '#5eead4' },
+  { id: 'calc-normal', name: '输入题目', section: 'calculate', tutor_target: '.tutor-composer', type: NODE_TYPE.SUBTOOL, keywords: ['通用'], val: 8, color: '#6ee7b7' },
+  { id: 'calc-formula', name: '分步推导', section: 'calculate', tutor_target: '.tutor-workspace', type: NODE_TYPE.SUBTOOL, keywords: ['公式推演'], val: 8, color: '#6ee7b7' },
+  { id: 'calc-visual', name: '交互图形', section: 'calculate', tutor_target: '.tutor-visual', type: NODE_TYPE.SUBTOOL, keywords: ['可视化'], val: 8, color: '#6ee7b7' },
+  { id: 'calc-solution', name: '完整题解', section: 'calculate', tutor_target: '.tutor-result', type: NODE_TYPE.SUBTOOL, keywords: ['解题'], val: 8, color: '#6ee7b7' },
+  { id: 'calc-import', name: '阅读已存题解', section: 'my-formulas', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-book-bookmark', keywords: ['导入'], val: 8, color: '#5eead4' },
+  { id: 'calc-clear', name: '最近练习', section: 'calculate', tutor_target: '.tutor-history', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-trash', keywords: ['清空'], val: 7, color: '#6ee7b7' },
+  { id: 'calc-generate', name: '动画讲解', section: 'calculate', tutor_target: '.tutor-video', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-clapperboard', keywords: ['生成'], val: 10, color: '#34d399' },
+  { id: 'calc-steps', name: '步骤导航', section: 'calculate', tutor_target: '.tutor-step-list', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-list-ol', keywords: ['步骤'], val: 8, color: '#6ee7b7' },
+  { id: 'calc-save-script', name: '保存题解', section: 'calculate', tutor_target: '.tutor-result', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-bookmark', keywords: ['保存题解','保存笔记'], val: 8, color: '#5eead4' },
   { id: 'examples', name: '教学案例', section: 'examples', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-play', keywords: ['教学案例','案例','视频'], val: 14, color: '#f59e0b' },
   { id: 'examples-filter-all', name: '全部案例', section: 'examples', filter_mode: 'all', type: NODE_TYPE.SUBTOOL, keywords: ['全部','全部案例'], val: 8, color: '#fbbf24' },
   { id: 'examples-favorites', name: '收藏', section: 'examples', filter_mode: 'favorites', type: NODE_TYPE.SUBTOOL, icon: 'fa-regular fa-star', keywords: ['收藏','我的收藏'], val: 8, color: '#fcd34d' },
@@ -55,8 +55,12 @@ export const NODES = [
   { id: 'examples-courseware', name: '我的课件', section: 'examples', filter_mode: 'courseware', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-chalkboard-user', keywords: ['课件','我的课件','课件包'], val: 9, color: '#fbbf24' },
   { id: 'examples-create-course', name: '创建课包', section: 'examples', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-folder-plus', keywords: ['创建课包'], val: 9, color: '#f59e0b' },
   { id: 'examples-tag-filter', name: '标签筛选', section: 'examples', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-tags', keywords: ['标签'], val: 8, color: '#fde047' },
-  { id: 'errorbook', name: '错题本', section: 'examples', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-book', keywords: ['错题本'], val: 9, color: '#fcd34d' },
+  { id: 'wrongbook-review', name: '到期错题复习', section: 'examples', review_action:true, type: NODE_TYPE.SUBTOOL, icon:'fa-solid fa-rotate', keywords:['开始复习','复习错题','到期'],val:9,color:'#fcd34d' },
+  { id: 'errorbook', name: '错题本', section: 'examples', filter_mode:'wrongbook', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-book', keywords: ['错题本','复习','订正','错因','掌握'], val: 9, color: '#fcd34d' },
   { id: 'examples-notes', name: '时间戳笔记', section: 'examples', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-bookmark', keywords: ['笔记','时间戳'], val: 8, color: '#fde047' },
+  { id: 'examples-lesson', name: '教案编辑', section: 'examples', teaching_action:'create', type: NODE_TYPE.SUBTOOL, icon:'fa-solid fa-book-open', keywords:['教案','备课','教学目标','教学过程'],val:10,color:'#fbbf24' },
+  { id: 'examples-danmaku', name: '播放器弹幕', section: 'examples', player_feature:'danmaku', type: NODE_TYPE.SUBTOOL, icon:'fa-regular fa-comment', keywords:['弹幕','播放器','颜色','滚动','顶部'],val:9,color:'#fde047' },
+  { id: 'examples-export', name: '导出与导入课包', section: 'examples', filter_mode:'courseware', type: NODE_TYPE.SUBTOOL, icon:'fa-solid fa-file-export',keywords:['导出','导入课包','教案下载','课包JSON'],val:9,color:'#fbbf24' },
   { id: 'my-formulas', name: '我的算式', section: 'my-formulas', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-book', keywords: ['算式','算式库'], val: 14, color: '#14b8a6' },
   { id: 'formulas-tab', name: '算式库', section: 'my-formulas', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-square-root-variable', keywords: ['算式'], val: 10, color: '#2dd4bf' },
   { id: 'formulas-scripts', name: '动画脚本库', section: 'my-formulas', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-code', keywords: ['脚本'], val: 10, color: '#2dd4bf' },
@@ -92,7 +96,7 @@ export const NODES = [
   { id: 'settings-agent', name: '智能体设置', settings_section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-robot', keywords: ['智能体设置','回车发送'], val: 8, color: '#94a3b8' },
   { id: 'settings-detect', name: '智能识别与画板', settings_section: 'detect', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-pen', keywords: ['识别设置','画板','手写','上传'], val: 8, color: '#94a3b8' },
   { id: 'settings-shortcuts', name: '画板快捷键', settings_section: 'shortcuts', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-keyboard', keywords: ['快捷键'], val: 8, color: '#94a3b8' },
-  { id: 'settings-calc', name: '动态计算', settings_section: 'calc', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-calculator', keywords: ['计算设置','默认模式'], val: 8, color: '#94a3b8' },
+  { id: 'settings-calc', name: '动态计算', settings_section: 'calc', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-calculator', keywords: ['计算设置','公式字号'], val: 8, color: '#94a3b8' },
   { id: 'settings-devtools', name: '开发者工具', settings_section: 'devtools', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-code', keywords: ['开发设置','默认标签'], val: 8, color: '#94a3b8' },
   { id: 'settings-examples', name: '教学案例与弹幕', settings_section: 'examples', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-film', keywords: ['弹幕','案例设置'], val: 8, color: '#94a3b8' },
   { id: 'student', name: '学生', section: null, type: NODE_TYPE.ROLE, role: 'student', val: 10, color: '#14b8a6' },
@@ -164,11 +168,26 @@ export const EDGES = [
   { source: 'examples', target: 'examples-filter-all' },
   { source: 'examples', target: 'examples-favorites' },
   { source: 'examples', target: 'examples-watch-later' },
+  { source: 'errorbook', target: 'wrongbook-review' },
+  { source: 'errorbook', target: 'examples-courseware' },
+  { source: 'my-formulas', target: 'examples-courseware' },
   { source: 'examples', target: 'examples-courseware' },
   { source: 'examples', target: 'examples-create-course' },
   { source: 'examples', target: 'examples-tag-filter' },
   { source: 'examples', target: 'errorbook' },
+  { source: 'calculate', target: 'errorbook' },
+  { source: 'examples-notes', target: 'errorbook' },
+  { source: 'errorbook', target: 'agent' },
   { source: 'examples', target: 'examples-notes' },
+  { source: 'examples', target: 'examples-lesson' },
+  { source: 'examples', target: 'examples-danmaku' },
+  { source: 'examples-lesson', target: 'examples-create-course' },
+  { source: 'examples-create-course', target: 'examples-courseware' },
+  { source: 'examples-courseware', target: 'examples-export' },
+  { source: 'examples-courseware', target: 'examples-notes' },
+  { source: 'examples-danmaku', target: 'examples-notes' },
+  { source: 'examples-notes', target: 'examples-lesson' },
+  { source: 'teacher', target: 'examples-lesson' },
   { source: 'examples', target: 'agent' },
   { source: 'examples', target: 'agent-course' },
   { source: 'my-formulas', target: 'formulas-tab' },
@@ -223,12 +242,12 @@ export const ROLE_FLOWS = {
   student: [
     { section: 'examples', label: '教学案例', icon: 'fa-solid fa-play', desc: '观看精选例题与讲解' },
     { section: 'calculate', label: '动态计算', icon: 'fa-solid fa-wand-magic-sparkles', desc: '公式可视化推演' },
-    { section: 'examples', label: '错题本', icon: 'fa-solid fa-book', desc: '时间戳笔记与复习' },
+    { section: 'examples', filter_mode:'wrongbook', label: '错题本', icon: 'fa-solid fa-book', desc: '时间戳笔记与复习' },
   ],
   teacher: [
-    { section: 'agent', label: '智能体创建课包', icon: 'fa-solid fa-robot', desc: '一键生成课件流水线' },
-    { section: 'examples', label: '教学案例', icon: 'fa-solid fa-play', desc: '管理案例与课件包' },
-    { section: 'detect', label: '智能识别', icon: 'fa-solid fa-eye', desc: '图片转公式补充素材' },
+    { section: 'examples', teaching_action:'create', label: '编写教案', icon: 'fa-solid fa-book-open', desc: '组织目标、活动与课堂练习' },
+    { section: 'examples', player_feature:'notes', label: '挑选案例', icon: 'fa-solid fa-play', desc: '观看演示，记录关键时间点' },
+    { section: 'examples', filter_mode:'courseware', label: '我的课件', icon: 'fa-solid fa-folder-open', desc: '阅读教案、播放与导出课包' },
   ],
   creator: [
     { section: 'detect', label: '智能识别', icon: 'fa-solid fa-eye', desc: '图片转 LaTeX 公式' },
@@ -342,81 +361,79 @@ export function getPrevNextForSection(sectionId, devtool) {
  * @param {object} [opts] - { skipFocus: boolean } 是否跳过相机聚焦（role-graph 内部聚焦时传 true）
  * @returns {boolean} 是否已处理
  */
-export function executeNodeAction(node, opts = {}) {
-  if (!node) return false;
-  const { skipFocus } = opts;
-
-  if (node.role) {
-    if (typeof window.RoleGraph !== 'undefined' && typeof window.RoleGraph.openFlow === 'function') {
-      window.RoleGraph.openFlow(node.role);
+let navigationVersion=0;
+async function waitForElement(check,id){
+  const start=Date.now();while(id===navigationVersion){const value=check();if(value)return value;if(Date.now()-start>15000)throw new Error('页面加载超时，请重试');await new Promise(r=>setTimeout(r,50));}throw new Error('已切换到其他节点');
+}
+function focusControl(element){if(!element)return false;element.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});element.focus?.({preventScroll:true});return true;}
+function focusTutorTarget(element){
+  const navbar=document.querySelector('.navbar');
+  const inset=(navbar?.getBoundingClientRect().height||0)+20;
+  element.style.scrollMarginTop=`${inset}px`;
+  const input=element.matches('.tutor-composer')
+    ? [...element.querySelectorAll('textarea,math-field')].find(el=>el.checkVisibility()) : null;
+  if(input)input.focus({preventScroll:true});
+  else {if(!element.hasAttribute('tabindex'))element.tabIndex=-1;element.focus({preventScroll:true});}
+  element.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches)element.animate([
+    {boxShadow:'0 0 0 3px rgba(99,102,241,.3)'},{boxShadow:'0 0 0 0px rgba(99,102,241,0)'}
+  ],{duration:1100});
+}
+export async function executeNodeAction(node,opts={}) {
+  if(!node)return false;const id=++navigationVersion;
+  try{
+    if(node.role){window.RoleGraph?.openFlow?.(node.role);return true;}
+    if(node.id==='center')return true;
+    if(node.settings_section||node.id==='settings'){window.openSettings?.(node.settings_section);return true;}
+    if(!node.section)return false;
+    // Same-page stations locate existing content without resetting the route,
+    // rebuilding the rail or racing a router scroll-to-top.
+    if(!document.getElementById(node.section)?.checkVisibility())window.showSection?.(node.section);
+    const host=await waitForElement(()=>document.getElementById(node.section)?.checkVisibility()&&document.getElementById(node.section),id);
+    if(node.section==='examples'){
+      const E=await waitForElement(()=>document.getElementById('examples-filter')&&window.Examples?.openCoursePackModal&&window.Examples,id);
+      if(node.review_action){await E.switchExamplesFilter('wrongbook');const W=await import('./wrongbook.js');await W.startWrongbookReview();}
+      else if(node.teaching_action==='create'||node.id==='examples-create-course')await E.openCoursePackModal();
+      else if(node.filter_mode)await E.switchExamplesFilter(node.filter_mode);
+      else if(node.player_feature||node.id==='examples-notes'){await E.switchExamplesFilter('all');E.focusPlayerFeature(node.player_feature||'notes');focusControl(host.querySelector('.video-card'));}
+      else if(node.id==='examples-tag-filter')focusControl(host.querySelector('#examples-tag-select'));
+    }else if(node.section==='devtools'){
+      const D=await waitForElement(()=>host.dataset.devInitialized&&window.DevTools,id);D.switchDevTool(node.devtool||'manim');
+      if(node.devtool==='manim')await D.ensureManimEditor();if(id!==navigationVersion)return false;
+      if(node.devtool_action==='ai_edit'){const panel=host.querySelector('#manim-ai-edit-float');panel.style.display='flex';focusControl(panel.querySelector('textarea'));}
+      else if(node.devtool_action==='import')D.toggleImportPanel();
+      else if(node.devtool_action==='save')D.saveScriptFromWorkbench();
+      else if(node.devtool_action)focusControl(host.querySelector({run:'#btn-run-manim',keyframe:'#btn-manim-keyframe',summary:'.ide-btn-summary'}[node.devtool_action]));
+      else if(node.devtool==='latex'){const target={'devtools-latex-import':'.dev-latex-toolbar-main button','devtools-latex-save':'.dev-latex-toolbar-main button:nth-child(2)','devtools-latex-copy':'.dev-latex-toolbar-main button:nth-child(3)','devtools-latex-word':'.dev-latex-toolbar-main button:nth-child(4)','devtools-latex-temml':'.dev-latex-temml-settings'}[node.id];if(target)focusControl(host.querySelector(target));}
+    }else if(node.section==='calculate'&&node.tutor_target){
+      await waitForElement(()=>host.querySelector('.tutor-composer')?.checkVisibility(),id);
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      if(id!==navigationVersion)return false;
+      const el=host.querySelector(node.tutor_target),target=el?.checkVisibility()?el:host.querySelector('.tutor-composer');
+      focusTutorTarget(target);
+      const selected=target===el?node:getNodeById('calc-normal');
+      window.dispatchEvent(new CustomEvent('graph-station-selected',{detail:{nodeId:selected.id,section:node.section}}));
+      if(target!==el)window.showToast?.('请先输入题目并解题，再查看'+node.name,'info');
     }
+    else if(node.section==='agent'){
+      await waitForElement(()=>host.querySelector('.assistant-shell'),id);
+      if(node.id==='agent-template'){window.showSection?.('my-formulas');}
+      else if(node.id==='agent-settings')window.openSettings?.('agent');
+      else focusControl(host.querySelector(node.id==='agent-clear'?'[data-agent=new]':node.id==='agent-examples'?'.assistant-samples button':'textarea'));
+    }else if(node.section==='home'){
+      if(node.id==='tutorial')window.startTutorial?.();else focusControl(document.querySelector(node.id==='search'?'#nav-search-input':'.hero-cta,.hero-actions button'));
+    }else if(node.section==='detect'){
+      const map={'detect-upload':'#image-upload','detect-handwrite':'#drawing-board','detect-lock':'#canvas-lock-btn','detect-save':'#btn-save-check','detect-copy-calc':'#btn-copy-calc','detect-open-devtools-latex':'#btn-edit-in-latex','detect-recognize':'#btn-recognize'};
+      if(node.id==='detect-upload'||node.id==='detect-handwrite'){const buttons=host.querySelectorAll('.tab-switch .tab-btn');buttons[node.id==='detect-upload'?1:0]?.click();}
+      focusControl(host.querySelector(map[node.id]||'#draw-tools button')||host);
+    }else if(node.section==='my-formulas'){
+      const tab={'formulas-scripts':'scripts','formulas-new-script':'scripts','formulas-run':'scripts','formulas-templates':'templates'}[node.id]||'formulas';
+      await waitForElement(()=>host.querySelector('.formulas-sub-tab'),id);
+      const buttons=[...host.querySelectorAll('.formulas-sub-tab')];const b=buttons.find(b=>b.dataset.tab===tab||b.getAttribute('onclick')?.includes("'"+tab+"'"))||buttons[tab==='scripts'?1:tab==='templates'?2:0];b?.click();
+      if(node.id==='formulas-refresh')window.loadMyFormulas?.();focusControl(b);
+    }else focusControl(host);
     return true;
-  }
-
-  if (node.id === 'center') return true;
-
-  if (node.settings_section) {
-    if (typeof window.openSettings === 'function') {
-      window.openSettings(node.settings_section);
-    }
-    return true;
-  }
-
-  if (node.id === 'settings' && typeof window.openSettings === 'function') {
-    window.openSettings();
-    return true;
-  }
-
-  if (node.section && typeof window.showSection === 'function') {
-    window.showSection(node.section);
-  }
-
-  if (node.section === 'devtools' && node.devtool && typeof window.switchDevTool === 'function') {
-    setTimeout(() => window.switchDevTool(node.devtool), 80);
-  }
-
-  if (node.section === 'examples' && node.filter_mode) {
-    if (typeof window.Examples !== 'undefined' && typeof window.Examples.switchExamplesFilter === 'function') {
-      setTimeout(() => window.Examples.switchExamplesFilter(node.filter_mode), 150);
-    }
-  }
-
-  if (node.section === 'calculate' && node.calc_operation) {
-    const method = document.getElementById('calc-method');
-    if (method) method.value = node.calc_operation;
-  }
-
-  if (node.section === 'devtools' && node.devtool === 'manim' && node.devtool_action) {
-    const D = window.DevTools;
-    const act = () => {
-      switch (node.devtool_action) {
-        case 'ai_edit': if (D?.toggleAiEditPanel) D.toggleAiEditPanel(); break;
-        case 'import': if (D?.toggleImportPanel) D.toggleImportPanel(); break;
-        case 'save': if (D?.saveScriptFromWorkbench) D.saveScriptFromWorkbench(); break;
-        case 'summary': if (D?.generateVideoCopy) D.generateVideoCopy(); break;
-        case 'keyframe': if (D?.previewKeyframes) D.previewKeyframes(); break;
-        case 'run': if (typeof window.runDevManim === 'function') window.runDevManim(); break;
-        default: break;
-      }
-    };
-    setTimeout(act, 400);
-  }
-
-  if (node.section === 'detect' && node.id === 'detect-open-devtools-latex') {
-    if (typeof window.openInDevLatexFromDetect === 'function') {
-      setTimeout(() => window.openInDevLatexFromDetect(), 200);
-    }
-  }
-
-  if (node.section === 'examples' && node.id === 'examples-create-course') {
-    if (typeof window.openCoursePackModal === 'function') setTimeout(() => window.openCoursePackModal(), 200);
-  }
-
-  if (node.section === 'my-formulas' && node.id === 'formulas-refresh') {
-    if (typeof window.loadMyFormulas === 'function') setTimeout(() => window.loadMyFormulas(), 200);
-  }
-
-  return true;
+  }catch(error){if(id===navigationVersion)window.showToast?.(error.message,'error');return false;}
 }
 
 /**
@@ -428,6 +445,9 @@ export function getKnowledgeGraphForAgent() {
     .map((n) => {
       const parts = [n.name, `section=${n.section}`];
       if (n.filter_mode) parts.push(`filter_mode=${n.filter_mode}`);
+      if(n.review_action)parts.push('examples_action=review');
+      if(n.teaching_action)parts.push('examples_action=lesson');
+      if(n.player_feature)parts.push(`examples_action=${n.player_feature}`);
       if (n.calc_operation) parts.push(`operation=${n.calc_operation}`);
       if (n.devtool) parts.push(`devtool=${n.devtool}`);
       if (n.devtool_action) parts.push(`devtool_action=${n.devtool_action}`);
@@ -442,7 +462,10 @@ export function getKnowledgeGraphForAgent() {
 export function nodeToAgentStep(node) {
   if (!node || !node.section) return null;
   const step = { section: node.section };
+  if(node.review_action)step.examples_action='review';
   if (node.filter_mode) step.examples_filter = node.filter_mode;
+  if(node.teaching_action||node.id==='examples-create-course')step.examples_action='lesson';
+  if(node.player_feature||node.id==='examples-notes')step.examples_action=node.player_feature||'notes';
   if (node.calc_operation) step.operation = node.calc_operation;
   if (node.devtool) step.devtool = node.devtool;
   if (node.devtool_action) step.devtool_action = node.devtool_action;

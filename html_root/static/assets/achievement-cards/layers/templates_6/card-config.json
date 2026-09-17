@@ -1,0 +1,35 @@
+{
+  "title": "多角色编队",
+  "subtitle": "智能体编队",
+  "technique": "六席成阵",
+  "tagline": "多场景模板编队",
+  "edition": "010 / 013",
+  "collection": "智算星云 · 成就典藏",
+  "description": "为不同场景准备 6 个以上智能体模板",
+  "tier": "gold",
+  "achievementId": "templates_6",
+  "assets": {
+    "model": "./assets/card.glb",
+    "subject": "./assets/subject.png",
+    "background": "./assets/background.png",
+    "text": "./assets/text.png",
+    "lineart": "./assets/lineart.png"
+  },
+  "parameters": {
+    "subjectScale": 1.25,
+    "subjectDepth": 0.28,
+    "backgroundDepth": -0.2,
+    "foil": 0.78
+  },
+  "safeArea": {
+    "scale": 1.12,
+    "offset": [
+      -0.06,
+      -0.085
+    ]
+  },
+  "appearance": {
+    "background": "#0b1220"
+  },
+  "defaultFinish": "gold"
+}

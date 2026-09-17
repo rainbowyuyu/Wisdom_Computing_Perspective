@@ -4,6 +4,9 @@ export interface FormulaItem {
   id: number;
   latex: string;
   note?: string | null;
+  solution_title?: string | null;
+  step_count?: number;
+  video_url?: string | null;
 }
 
 interface FormulasState {
@@ -27,6 +30,7 @@ export function useFormulasStore() {
         method: "GET",
       });
       const data = await res.json();
+      if(res.status===401){state.items=[];state.error='登录后可阅读已保存的算式、题解与动画。';return;}
       if (data.status === "success" && Array.isArray(data.data)) {
         state.items = data.data;
       } else {

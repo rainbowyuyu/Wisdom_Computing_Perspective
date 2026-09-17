@@ -4,7 +4,14 @@
  */
 // showSection / openDoc / switchDevTool 由 window 全局提供
 
-import { getMetroPathForSection, getNodeById, executeNodeAction } from './site-graph.js';
+import { getMetroPathForSection, getNodeById, executeNodeAction } from './site-graph.js?v=20260917-ecosystem-6';
+import {
+    loadAchievementCardManifest,
+    getCardMeta,
+    renderHoloCardHtml,
+    renderAchievementHoloGrid,
+    bindHoloCardTilt,
+} from './achievement-cards.js?v=20260917-artwork-3';
 
 const WRONGBOOK_STORAGE_KEY = 'wcp_examples_wrongbook_v1';
 
@@ -53,7 +60,7 @@ async function fetchUserStats() {
             const wr = await fetch(`/api/wrongbook/list?username=${encodeURIComponent(user)}`, { credentials: 'include' }).catch(() => null);
             if (wr) {
                 const wd = await wr.json();
-                if (wd.status === 'success' && Array.isArray(wd.data)) stats.wrongbook = wd.data.length;
+                if (wd.status === 'success' && Array.isArray(wd.data)) stats.wrongbook = wd.stats?.total ?? wd.total ?? wd.data.length;
             }
         } catch (_) {}
     } else {
@@ -192,37 +199,37 @@ function navigateToAchievement(achievement) {
         return;
     }
     // 错题本成就：跳转到教学案例页
-    if (id.startsWith('wrongbook_')) {
-        if (typeof window.showSection === 'function') window.showSection('examples');
-        if (window.Examples && typeof window.Examples.switchExamplesFilter === 'function') {
-            setTimeout(() => window.Examples.switchExamplesFilter('all'), 150);
-        }
-    }
+    if (id.startsWith('wrongbook_')) {import('./wrongbook.js').then(W=>W.openWrongbook());}
 }
 
-/** 解锁成就弹窗：展示立体徽章与跳转按钮，仅在首次解锁时出现 */
-function showAchievementUnlockModal(achievement) {
+/** 解锁成就弹窗：展示闪卡与跳转按钮，仅在首次解锁时出现 */
+async function showAchievementUnlockModal(achievement) {
     const modal = document.getElementById('achievement-unlock-modal');
     if (!modal || !achievement) return;
-    const titleEl = document.getElementById('achievement-unlock-title');
-    const descEl = document.getElementById('achievement-unlock-desc');
-    const iconEl = document.getElementById('achievement-unlock-icon');
-    const badgeInner = document.getElementById('achievement-unlock-badge-inner');
-    if (titleEl) titleEl.textContent = achievement.label || '解锁新成就';
-    if (descEl) {
-        const cond = achievement.condition || '';
-        const progressText = (achievement.target && achievement.progress != null)
-            ? `进度：${achievement.progress} / ${achievement.target}`
-            : '';
-        descEl.textContent = cond || progressText || '继续探索，解锁更多徽章。';
+    await loadAchievementCardManifest();
+    // Native editors/readers own the top layer; do not interrupt a save with
+    // an achievement overlay that the user cannot dismiss until the dialog closes.
+    if(document.querySelector('dialog[open]')){
+        window.showToast?.('已解锁：'+(achievement.label||'学习成就')+'，可在成就面板查看','success');
+        return;
     }
-    if (iconEl) {
-        const ico = achievement.icon || 'fa-trophy';
-        iconEl.className = 'fa-solid ' + ico + ' achievement-unlock-icon';
-    }
-    if (badgeInner) {
-        badgeInner.style.transform = '';
-        badgeInner.classList.remove('is-interacting');
+
+    const cardHost = document.getElementById('achievement-unlock-holo');
+    const meta = getCardMeta(achievement.id);
+    if (cardHost) {
+        if (meta) {
+            cardHost.innerHTML = renderHoloCardHtml(
+                {
+                    ...meta,
+                    label: achievement.label || meta.label,
+                    condition: achievement.condition || meta.condition,
+                },
+                { size: 'lg', locked: false, showMeta: false },
+            );
+            bindHoloCardTilt(cardHost);
+        } else {
+            cardHost.innerHTML = `<p class="achievement-unlock-fallback">${escapeHtml(achievement.label || '已解锁成就')}</p>`;
+        }
     }
 
     const closeAll = () => {
@@ -242,38 +249,9 @@ function showAchievementUnlockModal(achievement) {
     if (openPanelBtn) {
         openPanelBtn.onclick = (e) => {
             e.stopPropagation();
-            // 只打开成就统计面板，不再跳转页面
             openAchievementPanel(_lastAllAchievements);
             closeAll();
         };
-    }
-
-    // 立体徽章交互：鼠标或触控移动时轻微旋转
-    const badge = document.getElementById('achievement-unlock-badge');
-    if (badge && badgeInner) {
-        const onMove = (e) => {
-            const rect = badge.getBoundingClientRect();
-            const point = e.touches ? e.touches[0] : e;
-            const x = point.clientX - rect.left;
-            const y = point.clientY - rect.top;
-            const dx = (x / rect.width) - 0.5;
-            const dy = (y / rect.height) - 0.5;
-            const maxAngle = 16;
-            const rotateY = dx * maxAngle;
-            const rotateX = -dy * maxAngle;
-            badgeInner.classList.add('is-interacting');
-            badgeInner.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-        };
-        const reset = () => {
-            badgeInner.style.transform = '';
-            setTimeout(() => {
-                badgeInner.classList.remove('is-interacting');
-            }, 180);
-        };
-        badge.onmousemove = onMove;
-        badge.ontouchmove = (e) => { onMove(e); e.preventDefault(); };
-        badge.onmouseleave = reset;
-        badge.ontouchend = reset;
     }
 
     if (typeof window.toggleModal === 'function') {
@@ -284,7 +262,7 @@ function showAchievementUnlockModal(achievement) {
     }
 }
 
-/** 处理本次刷新中新解锁的成就：写入 DB 并弹出解锁页面（只展示一枚） */
+/** 保存新成就并轻提示，完整闪卡由用户从成就面板主动打开。 */
 function handleNewlyUnlockedAchievements(achievements) {
     if (!Array.isArray(achievements) || !achievements.length) return;
     // 后端返回的 db_unlocked 表示历史是否已解锁；仅在 db_unlocked 为 false 且当前 unlocked 为 true 时视为首次解锁
@@ -295,9 +273,9 @@ function handleNewlyUnlockedAchievements(achievements) {
         const progress = a.target || a.progress || 0;
         syncAchievementToDb(a.id, progress, true);
     });
-    // 仅展示其中一枚成就的解锁页面（优先选择目标值较高的，代表“更大”成就）
+    // Learning navigation and saves must never be interrupted by an automatic modal.
     newly.sort((a, b) => (b.target || 0) - (a.target || 0));
-    showAchievementUnlockModal(newly[0]);
+    window.showToast?.('已解锁：'+newly[0].label+'，可在成就面板查看闪卡','success');
 }
 
 /** 选取 5 个最接近完成的成就（未达成优先，按进度从高到低） */
@@ -393,9 +371,24 @@ function centerMetroCurrent(metroWrap) {
 }
 
 /** 地铁式横向导航：prev — [当前] — next */
+let selectedMetroNode=null;
+window.addEventListener('graph-station-selected',({detail})=>{
+    selectedMetroNode=getNodeById(detail.nodeId);
+    const wrap=document.getElementById('knowledge-panel-metro');if(!wrap||!selectedMetroNode)return;
+    wrap.querySelectorAll('.knowledge-metro-station').forEach(button=>{
+        const active=button.dataset.nodeId===detail.nodeId;
+        button.classList.toggle('current',active);
+        if(active)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
+    });
+    const pill=wrap.querySelector('.knowledge-metro-current-pill');
+    if(pill)pill.innerHTML='<i class="fa-solid fa-location-dot"></i> 当前站：'+escapeHtml(selectedMetroNode.name);
+    centerMetroCurrent(wrap);
+});
 function renderMetroNav(sectionId) {
     const devtool = sectionId === 'devtools' ? getActiveDevtool() : null;
     const path = getMetroPathForSection(sectionId, devtool);
+    if(selectedMetroNode?.section!==sectionId)selectedMetroNode=null;
+    if(selectedMetroNode&&path.some(node=>node.id===selectedMetroNode.id))path.forEach(node=>node.current=node.id===selectedMetroNode.id);
     if (!path || path.length === 0) return { html: '', hasNav: false };
     const currentNode = path.find((n) => n.current) || path[path.length - 1];
     const currentName = currentNode ? escapeHtml(currentNode.name) : '';
@@ -406,7 +399,7 @@ function renderMetroNav(sectionId) {
         const sec = escapeHtml(n.section || '');
         const dev = escapeHtml(n.devtool || '');
         const nodeId = escapeHtml(n.id || '');
-        return `<button type="button" class="knowledge-metro-station ${isCurrent ? 'current' : ''}" data-section="${sec}" data-devtool="${dev}" data-node-id="${nodeId}"><span class="knowledge-metro-dot"></span><span class="knowledge-metro-label">${escapeHtml(n.name)}</span></button>`;
+        return `<button type="button" class="knowledge-metro-station ${isCurrent ? 'current' : ''}" ${isCurrent?'aria-current="step"':''} data-section="${sec}" data-devtool="${dev}" data-node-id="${nodeId}"><span class="knowledge-metro-dot"></span><span class="knowledge-metro-label">${escapeHtml(n.name)}</span></button>`;
     });
     const html = `
         <div class="knowledge-metro-current">
@@ -503,14 +496,14 @@ const SECTION_CONFIG = {
     },
     calculate: {
         title: '动态计算',
-        subtitle: '公式推演与可视化',
+        subtitle: '分步解题与动画',
         renderCharts: s => renderMultiBar([
-            { label: '可选用算式', value: s.formulas },
+            { label: '已存公式与题解', value: s.formulas },
             { label: '已存脚本', value: s.scripts }
         ], MILESTONE),
         body: `
             <div class="knowledge-panel-tips">
-                <p>输入 LaTeX 公式一键生成动画。通用模式自动拆分为计算推演 + 可视化演示。</p>
+                <p>输入题目查看分步推导与交互图形。题解和动画可一并保存到我的算式，随时继续阅读。</p>
                 <button type="button" class="knowledge-shortcut-btn full" onclick="showSection('my-formulas'); event.stopPropagation();"><i class="fa-solid fa-book"></i> 我的算式</button>
             </div>
         `
@@ -521,8 +514,8 @@ const SECTION_CONFIG = {
         renderCharts: s => renderAchievementBar('错题本收录', s.wrongbook, 15, 'fa-bookmark'),
         body: `
             <div class="knowledge-panel-tips">
-                <p>浏览微积分、线性代数、几何等分类的 Manim 动画，可加入课件包或复用到工作台。</p>
-                <button type="button" class="knowledge-shortcut-btn full" onclick="showSection('agent'); event.stopPropagation();"><i class="fa-solid fa-robot"></i> 用智能体创建课包</button>
+                <p>浏览微积分、线性代数、几何等分类的 Manim 动画，可加入课件包或复用到工作台。</p><button type="button" class="knowledge-shortcut-btn full" onclick="window.openWrongbook?.(); event.stopPropagation();">打开错题本与复习</button>
+                <button type="button" class="knowledge-shortcut-btn full" onclick="showSection('agent'); event.stopPropagation();"><i class="fa-solid fa-robot"></i> 打开智能体</button>
             </div>
         `
     },
@@ -573,7 +566,14 @@ function ensureCollapsedOnMobile(panel) {
     }
 }
 
+let refreshVersion = 0;
+let currentPanelSection = 'home';
+let dataRefreshTimer;
+for(const event of ['wrongbook-updated','course-packs-updated','formula-library-updated','formula-library-deleted'])window.addEventListener(event,()=>{clearTimeout(dataRefreshTimer);dataRefreshTimer=setTimeout(()=>refreshKnowledgePanel(currentPanelSection),250);});
 export async function refreshKnowledgePanel(sectionId) {
+    currentPanelSection = sectionId;
+    const version = ++refreshVersion;
+    if (_carouselInterval) clearInterval(_carouselInterval);
     const panel = document.getElementById('knowledge-panel');
     const titleEl = document.getElementById('knowledge-panel-title');
     const subtitleEl = document.getElementById('knowledge-panel-subtitle');
@@ -581,6 +581,9 @@ export async function refreshKnowledgePanel(sectionId) {
     const staticEl = document.getElementById('knowledge-panel-static');
 
     if (!panel || !titleEl || !subtitleEl || !dynamicEl || !staticEl) return;
+
+    // 预热闪卡清单，打开成就面板时无需等待
+    loadAchievementCardManifest();
 
     const config = SECTION_CONFIG[sectionId] || SECTION_CONFIG.home;
 
@@ -624,6 +627,7 @@ export async function refreshKnowledgePanel(sectionId) {
         const statsEl = document.getElementById('knowledge-panel-dynamic-stats');
         if (statsEl) {
             fetchUserStats().then(stats => {
+                if (version !== refreshVersion) return;
                 statsEl.innerHTML = renderMultiBar([
                     { label: '算式', value: stats.formulas },
                     { label: '脚本', value: stats.scripts }
@@ -641,6 +645,7 @@ export async function refreshKnowledgePanel(sectionId) {
 
     const stats = await fetchUserStats();
     const achievements = await fetchAchievements(stats);
+    if (version !== refreshVersion) return;
     if (stats.tutorialDone) syncAchievementToDb('tutorial', 1, true);
     handleNewlyUnlockedAchievements(achievements);
     _lastAllAchievements = achievements;
@@ -658,7 +663,7 @@ export async function refreshKnowledgePanel(sectionId) {
     startAchievementCarousel();
     const bodyEl = document.getElementById('knowledge-panel-body');
     if (bodyEl) bodyEl.scrollTop = 0;
-    ensureCollapsedOnMobile(panel);
+    // Collapsed state is controlled by the floating panel and persisted by the user.
 }
 
 /** 星云内渲染进度：展开态显示进度条，折叠态小球水面填满 + 「渲染中」 */
@@ -751,6 +756,8 @@ function startAchievementCarousel() {
     if (!carousel || parseInt(carousel.dataset.count || '0', 10) <= 1) return;
     let step = 0;
     _carouselInterval = setInterval(() => {
+        if (!carousel.isConnected) { clearInterval(_carouselInterval); return; }
+        if (document.hidden || document.getElementById("knowledge-panel")?.classList.contains("collapsed") || matchMedia("(prefers-reduced-motion: reduce)").matches || carousel.matches(":hover, :focus-within")) return;
         const maxScroll = carousel.scrollWidth - carousel.clientWidth;
         if (maxScroll <= 0) return;
         step = (step + 1) % 4;
@@ -759,76 +766,57 @@ function startAchievementCarousel() {
     }, 3500);
 }
 
-/** 打开成就统计面板（独立窗口） */
-function openAchievementPanel(achievements) {
+/** 打开成就统计面板（独立窗口，闪卡展台） */
+async function openAchievementPanel(achievements) {
     const modal = document.getElementById('achievement-panel-modal');
     if (!modal) return;
     const listEl = modal.querySelector('.achievement-panel-list');
     if (!listEl) return;
+    await loadAchievementCardManifest();
+
     const list = Array.isArray(achievements) ? achievements : [];
-    const unlocked = list.filter(a => a && a.unlocked);
-    const locked = list.filter(a => a && !a.unlocked);
-    const badgeWallHtml = `
-        <div class="achievement-badge-wall">
-            ${unlocked.map(a => {
-                const ico = a.icon || 'fa-trophy';
-                const label = escapeHtml(a.label || a.id || '');
-                return `<div class="achievement-badge-tile" data-achievement-id="${escapeHtml(a.id || '')}" title="${label}">
-                    <div class="achievement-badge-hanger"></div>
-                    <div class="achievement-badge-medal">
-                        <div class="achievement-badge-medal-inner">
-                            <i class="fa-solid ${ico}"></i>
-                        </div>
-                    </div>
-                    <div class="achievement-badge-label">${label}</div>
-                </div>`;
-            }).join('')}
-            ${locked.length ? `<div class="achievement-badge-hint">继续使用站内功能，解锁更多挂在这里的徽章～</div>` : ''}
+    const unlocked = list.filter((a) => a && a.unlocked);
+    const locked = list.filter((a) => a && !a.unlocked);
+
+    const summaryHtml = `
+        <div class="achievement-holo-summary">
+            <div class="achievement-holo-summary-text">
+                <strong>智算星云 · 成就闪卡</strong>
+                <span>已解锁 ${unlocked.length} / ${list.length} · 拖动卡面可感受镭射光泽</span>
+            </div>
+            ${locked.length ? `<div class="achievement-badge-hint">继续使用站内功能，点亮更多闪卡～</div>` : ''}
         </div>
     `;
-    const cardsHtml = list.map(a => {
-        const pct = a.target > 0 ? Math.min(100, Math.round(a.progress / a.target * 100)) : 0;
-        const cls = a.unlocked ? 'knowledge-badge unlocked' : 'knowledge-badge';
-        return `
-            <div class="achievement-panel-item" data-achievement-id="${escapeHtml(a.id || '')}">
-                <div class="${cls} achievement-panel-badge"><i class="fa-solid ${a.icon || 'fa-star'}"></i><span>${escapeHtml(a.label)}</span></div>
-                <p class="achievement-panel-condition">${escapeHtml(a.condition || '')}</p>
-                <div class="achievement-panel-progress">
-                    <span class="achievement-panel-meta">${a.progress} / ${a.target}</span>
-                    <div class="knowledge-achievement-bar"><div class="knowledge-achievement-bar-inner" style="width:${pct}%;"></div></div>
-                </div>
-            </div>
-        `;
-    }).join('');
-    listEl.innerHTML = badgeWallHtml + cardsHtml;
-    // 徽章墙点击：弹出 3D 徽章页面
-    listEl.querySelectorAll('.achievement-badge-tile').forEach((el) => {
+
+    const gridHtml = `
+        <div class="achievement-holo-grid">
+            ${renderAchievementHoloGrid(list, { size: 'sm' })}
+        </div>
+    `;
+
+    listEl.innerHTML = summaryHtml + gridHtml;
+    bindHoloCardTilt(listEl);
+
+    listEl.querySelectorAll('.ach-holo-card').forEach((el) => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             const aid = el.getAttribute('data-achievement-id') || '';
-            const ach = list.find(a => a && String(a.id) === aid);
-            if (ach) {
+            const ach = list.find((a) => a && String(a.id) === aid);
+            if (!ach) return;
+            if (ach.unlocked) {
                 showAchievementUnlockModal(ach);
-            }
-            if (typeof window.toggleModal === 'function') {
-                window.toggleModal('achievement-panel-modal', false);
-            }
-        });
-    });
-    // 成就列表卡片点击：进入具体功能（保持导航能力）
-    listEl.querySelectorAll('.achievement-panel-item').forEach((el) => {
-        el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const aid = el.getAttribute('data-achievement-id') || '';
-            const ach = list.find(a => a && String(a.id) === aid);
-            if (ach) {
+                if (typeof window.toggleModal === 'function') {
+                    window.toggleModal('achievement-panel-modal', false);
+                }
+            } else {
                 navigateToAchievement(ach);
-            }
-            if (typeof window.toggleModal === 'function') {
-                window.toggleModal('achievement-panel-modal', false);
+                if (typeof window.toggleModal === 'function') {
+                    window.toggleModal('achievement-panel-modal', false);
+                }
             }
         });
     });
+
     if (typeof window.toggleModal === 'function') {
         window.toggleModal('achievement-panel-modal', true);
     } else {

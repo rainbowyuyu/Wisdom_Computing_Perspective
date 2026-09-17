@@ -1,0 +1,35 @@
+{
+  "title": "公式笔记本",
+  "subtitle": "公式大师",
+  "technique": "卅卷星册",
+  "tagline": "云端笔记已满盈",
+  "edition": "004 / 013",
+  "collection": "智算星云 · 成就典藏",
+  "description": "让云端笔记里躺满 30 条公式",
+  "tier": "gold",
+  "achievementId": "formulas_30",
+  "assets": {
+    "model": "./assets/card.glb",
+    "subject": "./assets/subject.png",
+    "background": "./assets/background.png",
+    "text": "./assets/text.png",
+    "lineart": "./assets/lineart.png"
+  },
+  "parameters": {
+    "subjectScale": 1.25,
+    "subjectDepth": 0.28,
+    "backgroundDepth": -0.2,
+    "foil": 0.78
+  },
+  "safeArea": {
+    "scale": 1.12,
+    "offset": [
+      -0.06,
+      -0.085
+    ]
+  },
+  "appearance": {
+    "background": "#0b1220"
+  },
+  "defaultFinish": "gold"
+}
