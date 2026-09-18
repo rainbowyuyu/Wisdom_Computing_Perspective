@@ -1,0 +1,55 @@
+/* Shared by both entries; versioned directly so older home.css cannot shrink the link. */
+.agent-update-banner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px 16px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, rgba(37, 99, 235, .12), rgba(124, 58, 237, .12));
+    border-bottom: 1px solid var(--border-color);
+    font-size: .9rem;
+}
+.agent-update-text { min-width: 0; color: var(--text-main); line-height: 1.7; }
+.agent-update-detail {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-height: 32px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: opacity .2s;
+}
+.agent-update-detail:hover { opacity: .88; transform: none; }
+.agent-update-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    background: transparent;
+    cursor: pointer;
+}
+.agent-update-close:hover { color: var(--text-main); background: rgba(127, 127, 127, .12); }
+.agent-update-detail:focus-visible, .agent-update-close:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 3px;
+}
+@media (max-width: 600px) {
+    .agent-update-banner { grid-template-columns: minmax(0, 1fr) 32px; padding: 12px 16px; gap: 8px 12px; }
+    .agent-update-text { grid-area: 1 / 1; font-size: 12px; }
+    .agent-update-detail { grid-area: 2 / 1; justify-self: start; }
+    .agent-update-close { grid-area: 1 / 2; align-self: start; }
+}

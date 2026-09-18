@@ -21,19 +21,20 @@ def test_installer_contains_every_declared_table():
 @pytest.mark.skipif(os.getenv('WISDOM_DATABASE_TESTS')!='1',reason='Requires MySQL create database permission')
 def test_one_file_fresh_repeat_and_migration_compatibility(monkeypatch):
     name='qa_schema_'+uuid.uuid4().hex
-    settings=dict(host=config.MYSQL_HOST,user=config.MYSQL_USER,password=config.MYSQL_PASSWORD)
+    settings=dict(host=config.MYSQL_HOST,user=config.MYSQL_USER,password=config.MYSQL_PASSWORD,port=config.MYSQL_PORT)
     connection=mysql.connector.connect(**settings)
     cursor=connection.cursor()
     script=(ROOT/'visdom_db.sql').read_text(encoding='utf-8')
-    # Only redirect the two database-selection statements to our isolated test DB.
-    script=re.sub(r'\bvisdom_db\b',name,script)
     script=re.sub(r'^\s*--[^\n]*','',script,flags=re.M)
     statements=[s.strip() for s in script.split(';') if s.strip()]
     created=False
     try:
+        cursor.execute(f'CREATE DATABASE `{name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci')
+        created=True
+        cursor.execute(f'USE `{name}`')
         for statement in statements:
             cursor.execute(statement)
-            if statement.startswith('CREATE DATABASE'):created=True
+            if cursor.with_rows: cursor.fetchall()
         cursor.execute('SHOW TABLES');tables=[r[0] for r in cursor.fetchall()]
         assert len(tables)==25
         def structure():
@@ -44,7 +45,9 @@ def test_one_file_fresh_repeat_and_migration_compatibility(monkeypatch):
         initial=structure()
         cursor.execute("INSERT INTO users(username,hashed_password) VALUES('bootstrap_probe','not-a-login')")
         connection.commit()
-        for statement in statements:cursor.execute(statement)
+        for statement in statements:
+            cursor.execute(statement)
+            if cursor.with_rows: cursor.fetchall()
         cursor.execute("SELECT COUNT(*) FROM users WHERE username='bootstrap_probe'");assert cursor.fetchone()[0]==1
         assert structure()==initial or all(re.sub(r' AUTO_INCREMENT=\d+','',v)==re.sub(r' AUTO_INCREMENT=\d+','',initial[k]) for k,v in structure().items())
         before_migrations=structure()

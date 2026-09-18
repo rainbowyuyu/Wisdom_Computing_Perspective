@@ -115,18 +115,18 @@
       </div>
     </div>
 
-    <!-- 顶部更新消息：v0.4.4 -->
+    <!-- 顶部更新消息：v0.4.5 -->
     <div class="agent-update-banner" id="agent-update-banner" v-show="showAgentBanner">
       <span class="agent-update-text">
-        新功能：分步解题、教学课包与错题复习已打通，让学习与创作连起来
+        新更新：首页全屏渐变、解题进度与日志阅读优化，部署和数据库升级更方便
       </span>
       <a
         href="javascript:void(0)"
         class="agent-update-detail"
-        title="查看更新详情（定位到 v0.4.4）"
+        title="查看更新详情（定位到 v0.4.5）"
         @click="openUpdateDoc"
       >
-        v0.4.4 更新详情
+        v0.4.5 更新详情
       </a>
       <button
         type="button"
@@ -205,7 +205,7 @@ const username = ref("");
 const userAvatar = ref("");
 
 const mobileMenuVisible = ref(false);
-const showAgentBanner = ref(localStorage.getItem("wisdom.release.dismissed")!=="0.4.4");
+const showAgentBanner = ref(localStorage.getItem("wisdom.release.dismissed")!=="0.4.5");
 
 const navItems = [
   { id: "home", label: "首页" },
@@ -247,11 +247,11 @@ async function logout() {
 
 function closeAgentBanner() {
   showAgentBanner.value = false;
-  localStorage.setItem("wisdom.release.dismissed","0.4.4");
+  localStorage.setItem("wisdom.release.dismissed","0.4.5");
 }
 
 function openUpdateDoc() {
-  (window as any).openDoc?.("update.md","更新日志","update-v-0.4.4");
+  (window as any).openDoc?.("update.md","更新日志","update-v-0.4.5");
 }
 
 function scrollToSelector(selector: string) {

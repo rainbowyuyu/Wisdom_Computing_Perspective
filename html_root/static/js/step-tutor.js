@@ -3,7 +3,7 @@ import { consumeEvents } from './event-stream.js';
 import { escapeText as esc, visualMarkup } from './solution-visual.js';
 import { libraryRequest, solutionMarkdown, exportSolution, openSavedSolution } from './solution-library.js';
 
-const state = {problem:'',context:'',draftProblem:'',draftContext:'', solution:null, steps:[], index:0, progress:1, status:'', busy:false, rendering:false, video:null, error:false, tools:[], capabilities:null,libraryId:null,libraryOwner:null,saving:false,savedVersion:''};
+const state = {problem:'',context:'',draftProblem:'',draftContext:'', solution:null, steps:[], index:0, progress:1, job:null, status:'', busy:false, rendering:false, video:null, error:false, tools:[], capabilities:null,libraryId:null,libraryOwner:null,saving:false,savedVersion:''};
 let controller=null, renderController=null, generation=0, timer=null, playing=false, playbackFrame=0;
 const mounts = new Set();
 const HISTORY_KEY='wisdom.tutor.history.v1';
@@ -29,6 +29,7 @@ function remember() {
 export function cancelTutor() {
     generation++; controller?.abort(); renderController?.abort();
     controller=null; renderController=null; state.busy=false; state.rendering=false;
+    if(state.job)state.job={...state.job,phase:'cancelled'};
     stopPlayback(); state.status='已停止。已生成的步骤仍可阅读和操作。'; publish();
 }
 
@@ -39,6 +40,7 @@ export async function solveProblem(problem, {autoRender=true, context=''}={}) {
     controller?.abort(); renderController?.abort(); stopPlayback();
     const run=++generation; const aborter=new AbortController(); controller=aborter;
     Object.assign(state,{problem,context,draftProblem:problem,draftContext:context,solution:null,steps:[],index:0,progress:1,busy:true,rendering:false,video:null,error:false,tools:['planner'],libraryId:null,libraryOwner:null,savedVersion:'',status:'正在分析题目…'});
+    state.job={phase:'solve',completed:0,total:0};
     mounts.forEach(view=>view.reset()); publish();
     let succeeded=false;
     try {
@@ -48,19 +50,22 @@ export async function solveProblem(problem, {autoRender=true, context=''}={}) {
             if(event.type==='error') throw new Error(event.message);
             if(event.message) state.status=event.message;
             if(event.tool&&!state.tools.includes(event.tool)) state.tools.push(event.tool);
-            if(event.type==='plan') {state.status=event.title;state.tools.push(event.source,'interactive_svg');}
+            if(event.type==='plan') {state.status=event.title;state.tools.push(event.source,'interactive_svg');state.job.total=Number.isInteger(event.total)&&event.total>0?event.total:0;}
             if(event.type==='step') {
                 state.steps[event.index]=normalizeSolution({steps:[event.step]}).steps[0];
+                state.job.completed=state.steps.filter(Boolean).length;
                 mounts.forEach(view=>view.showStep());
             }
             if(event.type==='complete') {
                 state.solution=normalizeSolution(event.solution);state.steps=state.solution.steps;state.status='分步解答已完成，可切换步骤或播放讲解。';succeeded=true;
+                state.job={phase:'done',completed:state.steps.length,total:state.steps.length};
                 remember(); mounts.forEach(view=>view.showStep());
             }
             publish();
         },aborter.signal);
+        if(run===generation&&!succeeded)throw new Error('解题连接已中断，已接收的步骤保留，请重试。');
     } catch(error) {
-        if(run===generation&&error.name!=='AbortError') {state.error=true;state.status=error.message||'解题失败，请重试。';}
+        if(run===generation&&error.name!=='AbortError') {state.error=true;state.job.phase='error';state.status=error.message||'解题失败，请重试。';}
     } finally {
         if(run===generation) {state.busy=false;controller=null;publish();}
     }
@@ -72,6 +77,8 @@ export async function renderTutor() {
     if(!state.solution||state.busy||state.rendering) return;
     const run=generation; const aborter=new AbortController(); renderController=aborter;
     state.rendering=true;state.error=false;state.status='准备生成分步 Manim 动画…';
+    state.job={phase:'render',completed:0,total:0};
+    let completed=false;
     if(!state.tools.includes('manim'))state.tools.push('manim');publish();
     try {
         const response=await fetch('/api/solve/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({solution:state.solution}),signal:aborter.signal});
@@ -79,15 +86,21 @@ export async function renderTutor() {
             if(run!==generation)return;
             if(event.type==='error')throw new Error(event.message);
             if(event.message)state.status=event.message;
+            if(event.type==='progress'&&Number.isInteger(event.chapter)&&event.chapter>=0&&Number.isInteger(event.total)&&event.total>0){
+                // The backend emits a chapter when it starts, so only preceding chapters are complete.
+                state.job={phase:'render',completed:Math.min(event.chapter,event.total-1),total:event.total};
+            }
             if(event.type==='complete') {
                 if(!/^\/videos\/solution_[a-f0-9]+\.mp4$/.test(event.video_url))throw new Error('视频地址无效。');
                 state.video={url:event.video_url,chapters:event.chapters};state.status='解答与动画均已完成。点击步骤可跳到对应视频章节。';remember();
+                completed=true;state.job={phase:'done',completed:state.steps.length,total:state.steps.length};
                 mounts.forEach(view=>view.showVideo());
             }
             publish();
         },aborter.signal);
+        if(run===generation&&!completed)throw new Error('动画连接已中断，交互解答已保留，请重试动画。');
     } catch(error) {
-        if(run===generation&&error.name!=='AbortError') {state.error=true;state.status=error.message||'动画未完成，交互解答已保留。';}
+        if(run===generation&&error.name!=='AbortError') {state.error=true;state.job.phase='error';state.status=error.message||'动画未完成，交互解答已保留。';}
     } finally {
         if(run===generation) {state.rendering=false;renderController=null;publish();}
     }
@@ -114,6 +127,7 @@ export function restoreSavedSolution(record) {
     if(state.busy||state.rendering||state.saving)return false;
     stopPlayback();generation++;
     record={...record,solution:normalizeSolution(record.solution)};
+    state.job=null;
     Object.assign(state,{problem:record.problem,context:record.context||'',draftProblem:record.problem,draftContext:record.context||'',solution:record.solution,steps:record.solution.steps,index:0,progress:1,video:record.video||null,error:false,libraryId:record.id||null,libraryOwner:record.username||null,status:record.id?'正在阅读已保存题解':'已恢复最近的题解。',tools:[record.solution.source,'interactive_svg']});
     state.savedVersion=record.id?JSON.stringify(recordSnapshot()):'';
     mounts.forEach(view=>{view.reset();view.showStep();view.showVideo();});publish();return true;
@@ -126,6 +140,7 @@ export function mountTutor(host) {
       <div class="tutor-compose-actions"><label class="tutor-check"><input name="autoRender" type="checkbox" checked> 同步生成动画</label><span class="tutor-key-hint">Ctrl / ⌘ + Enter</span><button type="submit" class="tutor-primary">开始解题 <i class="fa-solid fa-arrow-right"></i></button><button type="button" data-action="cancel" hidden>停止</button></div></form>
       <div class="tutor-examples" aria-label="示例题"><span>从示例开始</span>${[['一元方程','解方程 x^2-5*x+6=0'],['函数求导','求导 sin(x)'],['定积分','定积分 x^2 从 0 到 1'],['矩阵变换','矩阵 [[1,2],[0,1]]']].map(([label,t])=>`<button type="button" data-example="${esc(t)}">${label}<i class="fa-solid fa-arrow-up-right-from-square"></i></button>`).join('')}</div>
       <div class="tutor-status-row"><p class="tutor-status" role="status" aria-live="polite"></p><button type="button" data-action="retry" hidden>重试解题</button></div>
+      <div class="tutor-job" hidden><div class="tutor-job-heading"><strong></strong><span></span></div><div class="tutor-job-track" role="progressbar" aria-label="计算进度" aria-valuemin="0" aria-valuemax="100"><div class="tutor-job-fill"></div></div><p class="tutor-job-note"></p></div>
       <div class="tutor-workspace" hidden><nav class="tutor-step-list" aria-label="解题步骤"></nav><div class="tutor-stage"><div class="tutor-step-header"><span class="tutor-step-count"></span><h4></h4></div><p class="tutor-explanation"></p><div class="tutor-formula"></div><div class="tutor-visual"></div><p class="tutor-caption"></p><label class="tutor-slider-label">探索图形 <input type="range" min="0" max="1000" value="1000" aria-label="图形探索进度"><output>100%</output></label><details class="tutor-hint"><summary>这一步的提示</summary><p></p></details><div class="tutor-player"><button type="button" data-action="prev" aria-label="上一步">← 上一步</button><button type="button" data-action="play">▶ 自动讲解</button><label>速度 <select aria-label="讲解速度"><option value="6500">0.75×</option><option value="5000" selected>1×</option><option value="3000">1.5×</option></select></label><button type="button" data-action="next" aria-label="下一步">下一步 →</button></div></div></div>
       <div class="tutor-result" hidden><span class="tutor-result-label">解题结论</span><p class="tutor-answer"></p><p class="tutor-verification"></p><div class="tutor-result-actions"><button type="button" class="tutor-primary" data-action="save"><i class="fa-regular fa-bookmark"></i> 保存到我的算式</button><button type="button" data-action="read" hidden>阅读已保存题解</button><button type="button" data-action="render">生成动画</button><details class="tutor-more"><summary>更多 <i class="fa-solid fa-chevron-down"></i></summary><div><button type="button" data-action="wrongbook">加入错题本</button><button type="button" data-action="pack">加入课包</button><button type="button" data-action="export">导出笔记</button><button type="button" data-action="copy">复制解答</button></div></details></div></div>
       <div class="tutor-video" hidden><div class="tutor-video-header"><h4>Manim 分步动画</h4><a download="解题动画.mp4">下载视频 ↓</a></div><video controls playsinline preload="metadata"></video><div class="tutor-chapters"></div></div>
@@ -188,6 +203,26 @@ export function mountTutor(host) {
         $('.tutor-chapters').innerHTML=state.video.chapters.map((c,i)=>`<button type="button" data-chapter="${i}">${i+1}. ${esc(c.title)}</button>`).join('');
     }
     function update() {
+        const job=state.job, panel=$('.tutor-job'),track=$('.tutor-job-track');
+        panel.hidden=!job;
+        if(job){
+            const active=job.phase==='solve'||job.phase==='render',known=job.total>0;
+            const value=known?Math.min(100,Math.round(job.completed/job.total*100)):0;
+            panel.dataset.phase=job.phase;panel.classList.toggle('is-indeterminate',active&&!known);
+            panel.classList.toggle('is-active',active);panel.setAttribute('aria-busy',String(active));
+            const title={solve:'正在分步推导',render:'正在生成动画',done:'已完成',cancelled:'已停止',error:'任务未完成'}[job.phase];
+            const detail=job.phase==='solve'?(known?`已接收 ${job.completed} / ${job.total} 步`:'正在分析与推导…'):
+                job.phase==='render'?(known?`正在绘制第 ${job.completed+1} / ${job.total} 步`:'正在准备渲染…'):
+                job.phase==='done'?'100%':known?`已完成 ${job.completed} / ${job.total} 步`:'';
+            $('.tutor-job-heading strong').textContent=title;$('.tutor-job-heading span').textContent=detail;
+            track.setAttribute('aria-valuetext',`${title}，${detail}`);
+            if(known)track.setAttribute('aria-valuenow',String(value));else track.removeAttribute('aria-valuenow');
+            $('.tutor-job-fill').style.width=known?`${value}%`:active?'35%':'0%';
+            $('.tutor-job-note').textContent=job.phase==='render'?'动画完成后会自动显示，可先阅读解题步骤。':
+                job.phase==='solve'?'解题步骤会陆续出现，也可以随时停止。':
+                job.phase==='error'?'已生成的内容已保留，可使用上方按钮重试。':
+                job.phase==='cancelled'?'已停止等待，已有步骤仍可查看。':'可以继续探索步骤、保存题解或加入课包。';
+        }
         $('.tutor-step-count').textContent=`步骤 ${state.index+1} / ${state.steps.length}`;
         $('.tutor-status').textContent=state.status;host.classList.toggle('tutor-has-error',state.error);
         $('button[type=submit]').disabled=state.busy||state.rendering;

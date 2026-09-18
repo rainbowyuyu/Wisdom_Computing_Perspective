@@ -20,9 +20,9 @@ html_root/.env
 .idea/misc.xml
 .idea/animate_cal.iml
 /intro-video/node_modules
-/vue_root/node_modules
+/html_root/frontend/node_modules
 
-/vue_root/dist/
+/html_root/frontend/dist/
 /html_root/tests/artifacts/
 /html_root/tests/*-result.json
 /html_root/.env.local

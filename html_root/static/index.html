@@ -65,7 +65,8 @@
     <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
 
     <!-- 核心样式 -->
-    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/main.css?v=20260918-hero-1">
+    <link rel="stylesheet" href="/static/css/components/release-banner.css?v=20260918-1">
 
     <!-- 结构化数据：WebSite + SearchAction -->
     <script type="application/ld+json">
@@ -81,14 +82,16 @@
       }
     }
     </script>
-    <link rel="stylesheet" href="/static/css/pages/step-tutor.css">
-    <link rel="stylesheet" href="/static/css/refinements.css">
+    <link rel="stylesheet" href="/static/css/pages/step-tutor.css?v=20260918-progress-1">
+    <link rel="stylesheet" href="/static/css/refinements.css?v=20260918-hero-1">
+    <link rel="stylesheet" href="/static/css/pages/home-background.css?v=20260918-horizontal-fade-4">
 <link rel="stylesheet" href="/static/css/pages/assistant-workspace.css">
 <link rel="stylesheet" href="/static/css/pages/teaching-workspace.css">
 <link rel="stylesheet" href="/static/css/pages/wrongbook.css">
 <link rel="stylesheet" href="/static/css/pages/achievement-cards.css?v=20260917-artwork-3">
 </head>
 <body>
+    <div class="home-page-background" aria-hidden="true"></div>
     <!-- 占位：main.js 为 type=module 异步加载，此前点击导航不报错。全局能力挂到 window 供 onclick 使用，尽量通过 ES Modules 管理。 -->
     <script>window.App = window.App || {}; window.showSection = window.showSection || function(){}; window.openSettings = window.openSettings || function(){}; window.toggleMobileMenu = window.toggleMobileMenu || function(){};</script>
 
@@ -158,10 +161,10 @@
         </div>
     </div>
 
-    <!-- 顶部更新消息：v0.4.4 -->
+    <!-- 顶部更新消息：v0.4.5 -->
     <div class="agent-update-banner" id="agent-update-banner">
-        <span class="agent-update-text">新功能：分步解题、教学课包与错题复习已打通，让学习与创作连起来</span>
-        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志', 'update-v-0.4.4')" class="agent-update-detail" title="查看更新详情（定位到 v0.4.4）">v0.4.4 更新详情</a>
+        <span class="agent-update-text">新更新：首页全屏渐变、解题进度与日志阅读优化，部署和数据库升级更方便</span>
+        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志', 'update-v-0.4.5')" class="agent-update-detail" title="查看更新详情（定位到 v0.4.5）">v0.4.5 更新详情</a>
         <button type="button" class="agent-update-close" onclick="closeAgentBanner()" title="关闭" aria-label="关闭"><i class="fa-solid fa-times"></i></button>
     </div>
 
@@ -1863,6 +1866,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.79.1/dist/3d-force-graph.min.js"></script>
     <!-- 模块化 JS 入口 -->
-    <script type="module" src="/static/js/main.js?v=20260917-ecosystem-6"></script>
+    <script type="module" src="/static/js/main.js?v=20260918-release-045"></script>
 </body>
 </html>

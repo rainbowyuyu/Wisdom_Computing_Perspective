@@ -215,19 +215,6 @@
     position: relative;
 }
 
-.hero::before {
-    content: '';
-    position: absolute;
-    width: 600px; height: 600px;
-    background: radial-gradient(circle at center, var(--primary-color) 0%, transparent 70%);
-    opacity: 0.15;
-    top: -20%; left: 50%;
-    transform: translateX(-50%);
-    z-index: -1;
-    filter: blur(60px);
-    pointer-events: none;
-}
-
 .animate-text {
     font-size: 4rem;
     font-weight: 800;

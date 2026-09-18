@@ -18,7 +18,9 @@ def test_fresh_sql_and_repeatable_migrations_preserve_legacy(monkeypatch):
         sql=Path('visdom_db.sql').read_text(encoding='utf-8')
         for statement in sql.split(';'):
             meaningful='\n'.join(line for line in statement.splitlines() if not line.strip().startswith('--')).strip()
-            if meaningful and not meaningful.startswith(('CREATE DATABASE','USE ')):cursor.execute(meaningful)
+            if meaningful and not meaningful.startswith(('CREATE DATABASE','USE ')):
+                cursor.execute(meaningful)
+                if cursor.with_rows: cursor.fetchall()
         cursor.execute("INSERT INTO users(username,hashed_password) VALUES('schema_test','not-a-login-hash')")
         cursor.execute("INSERT INTO user_wrongbook(user_id,video_id,title,time_sec,note) VALUES('schema_test','example','旧题',4,'原始笔记')")
         admin.commit()

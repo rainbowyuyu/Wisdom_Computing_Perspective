@@ -1,16 +1,13 @@
--- 智算视界完整数据库结构 · MySQL 8.0+
--- 单文件初始化入口：创建数据库及全部 25 张表、主键、外键、唯一约束与索引。
--- 无需 SOURCE 其他 SQL，也无需先启动 Python 服务或执行迁移文件。
--- 按外键依赖顺序创建，可重复导入，不包含用户数据，不清空现有表。
--- CREATE TABLE IF NOT EXISTS 不改变已存在表的结构；旧库升级仍使用迁移工具。
--- 新安装（任意终端）：mysql -u USER -p --default-character-set=utf8mb4 --execute="source visdom_db.sql"
--- 也可在 MySQL 客户端执行：SOURCE D:/项目目录/html_root/visdom_db.sql
--- 更换数据库名称时，同时修改下方 CREATE DATABASE 与 USE。
--- 现有数据库升级：python scripts/migrate_database.py --apply
-CREATE DATABASE IF NOT EXISTS visdom_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-USE visdom_db;
+-- 智算视界 · 单文件安装与升级 · MySQL 8.0+
+-- 宝塔：先备份当前库，在 phpMyAdmin 左侧选中 wiscomper_com，再点 SQL，粘贴本文件全部内容执行。
+-- 使用当前选中的数据库，不创建数据库、不切换库名，不需要 CREATE DATABASE 权限。
+-- 支持新库与原网站 18 表版本，补齐至 25 表，保留账户、算式、课包和旧错题。
+-- 不执行 DROP TABLE、TRUNCATE、DELETE，不关闭外键检查，可重复执行。
+-- 命令行：mysql -u USER -p --default-character-set=utf8mb4 DATABASE_NAME < visdom_db.sql
+-- 要求已选中数据库。原库排序规则保持不变，新表默认兼容 utf8mb4_general_ci。
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
+SET @wisdom_username_collation = COALESCE((SELECT COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='username'), 'utf8mb4_general_ci');
 
 -- 1. 账户与偏好
 -- users
@@ -21,7 +18,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- user_settings
 CREATE TABLE IF NOT EXISTS `user_settings` (
@@ -29,30 +26,38 @@ CREATE TABLE IF NOT EXISTS `user_settings` (
   `settings_json` text,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- user_profiles
+SET @wisdom_create = REPLACE('
 CREATE TABLE IF NOT EXISTS `user_profiles` (
-  `user_id` varchar(255) NOT NULL,
+  `user_id` varchar(255) CHARACTER SET utf8mb4 COLLATE WISDOM_USERNAME_COLLATION NOT NULL,
   `avatar_url` varchar(512) DEFAULT NULL,
   `nickname` varchar(128) DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`),
   CONSTRAINT `fk_user_profiles_username` FOREIGN KEY (`user_id`) REFERENCES `users` (`username`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci', 'WISDOM_USERNAME_COLLATION', @wisdom_username_collation);
+PREPARE wisdom_create_statement FROM @wisdom_create;
+EXECUTE wisdom_create_statement;
+DEALLOCATE PREPARE wisdom_create_statement;
 
 -- 2. 算式、完整题解、脚本、智能体模板与成就
 -- formulas
+SET @wisdom_create = REPLACE('
 CREATE TABLE IF NOT EXISTS `formulas` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `user_id` varchar(255) NOT NULL,
+  `user_id` varchar(255) CHARACTER SET utf8mb4 COLLATE WISDOM_USERNAME_COLLATION NOT NULL,
   `latex` text NOT NULL,
   `note` varchar(255) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_formulas_owner_created` (`user_id`,`created_at`,`id`),
   CONSTRAINT `fk_formulas_username` FOREIGN KEY (`user_id`) REFERENCES `users` (`username`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci', 'WISDOM_USERNAME_COLLATION', @wisdom_username_collation);
+PREPARE wisdom_create_statement FROM @wisdom_create;
+EXECUTE wisdom_create_statement;
+DEALLOCATE PREPARE wisdom_create_statement;
 
 -- formula_topics
 CREATE TABLE IF NOT EXISTS `formula_topics` (
@@ -66,7 +71,7 @@ CREATE TABLE IF NOT EXISTS `formula_topics` (
   KEY `idx_user_tag` (`user_id`,`tag`),
   KEY `idx_formula` (`formula_id`),
   CONSTRAINT `fk_topic_formula` FOREIGN KEY (`formula_id`) REFERENCES `formulas` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- formula_solutions
 CREATE TABLE IF NOT EXISTS `formula_solutions` (
@@ -78,32 +83,40 @@ CREATE TABLE IF NOT EXISTS `formula_solutions` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`formula_id`),
   CONSTRAINT `fk_solution_formula` FOREIGN KEY (`formula_id`) REFERENCES `formulas` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- animation_scripts
+SET @wisdom_create = REPLACE('
 CREATE TABLE IF NOT EXISTS `animation_scripts` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `user_id` varchar(255) NOT NULL,
-  `note` varchar(255) DEFAULT '',
+  `user_id` varchar(255) CHARACTER SET utf8mb4 COLLATE WISDOM_USERNAME_COLLATION NOT NULL,
+  `note` varchar(255) DEFAULT '''',
   `code` mediumtext NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_scripts_owner_created` (`user_id`,`created_at`,`id`),
   CONSTRAINT `fk_animation_scripts_username` FOREIGN KEY (`user_id`) REFERENCES `users` (`username`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci', 'WISDOM_USERNAME_COLLATION', @wisdom_username_collation);
+PREPARE wisdom_create_statement FROM @wisdom_create;
+EXECUTE wisdom_create_statement;
+DEALLOCATE PREPARE wisdom_create_statement;
 
 -- agent_templates
+SET @wisdom_create = REPLACE('
 CREATE TABLE IF NOT EXISTS `agent_templates` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `user_id` varchar(255) NOT NULL,
-  `name` varchar(256) NOT NULL DEFAULT '未命名',
+  `user_id` varchar(255) CHARACTER SET utf8mb4 COLLATE WISDOM_USERNAME_COLLATION NOT NULL,
+  `name` varchar(256) NOT NULL DEFAULT ''未命名'',
   `prompt` text NOT NULL,
   `steps_json` mediumtext,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_templates_owner_created` (`user_id`,`created_at`,`id`),
   CONSTRAINT `fk_agent_templates_username` FOREIGN KEY (`user_id`) REFERENCES `users` (`username`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci', 'WISDOM_USERNAME_COLLATION', @wisdom_username_collation);
+PREPARE wisdom_create_statement FROM @wisdom_create;
+EXECUTE wisdom_create_statement;
+DEALLOCATE PREPARE wisdom_create_statement;
 
 -- user_achievements
 CREATE TABLE IF NOT EXISTS `user_achievements` (
@@ -115,7 +128,7 @@ CREATE TABLE IF NOT EXISTS `user_achievements` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_user_ach` (`user_id`,`achievement_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 3. 课包、教案与课堂视频
 -- course_packs
@@ -126,7 +139,7 @@ CREATE TABLE IF NOT EXISTS `course_packs` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_packs_owner_created` (`user_id`,`created_at`,`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- course_pack_documents
 CREATE TABLE IF NOT EXISTS `course_pack_documents` (
@@ -137,7 +150,7 @@ CREATE TABLE IF NOT EXISTS `course_pack_documents` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`pack_id`),
   CONSTRAINT `fk_pack_document` FOREIGN KEY (`pack_id`) REFERENCES `course_packs` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- course_pack_videos
 CREATE TABLE IF NOT EXISTS `course_pack_videos` (
@@ -147,7 +160,7 @@ CREATE TABLE IF NOT EXISTS `course_pack_videos` (
   PRIMARY KEY (`pack_id`,`video_id`),
   KEY `ix_pack_order` (`pack_id`,`sort_order`),
   CONSTRAINT `fk_pack_video` FOREIGN KEY (`pack_id`) REFERENCES `course_packs` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 4. 视频互动、观看进度、收藏与笔记
 -- example_video_likes
@@ -156,7 +169,7 @@ CREATE TABLE IF NOT EXISTS `example_video_likes` (
   `user_id` varchar(64) NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`video_id`,`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- example_video_comments
 CREATE TABLE IF NOT EXISTS `example_video_comments` (
@@ -167,7 +180,7 @@ CREATE TABLE IF NOT EXISTS `example_video_comments` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_comments_video_created` (`video_id`,`created_at`,`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- example_video_danmaku
 CREATE TABLE IF NOT EXISTS `example_video_danmaku` (
@@ -181,7 +194,7 @@ CREATE TABLE IF NOT EXISTS `example_video_danmaku` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_danmaku_video_time` (`video_id`,`time`,`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- example_play_history
 CREATE TABLE IF NOT EXISTS `example_play_history` (
@@ -190,7 +203,7 @@ CREATE TABLE IF NOT EXISTS `example_play_history` (
   `progress` double NOT NULL DEFAULT '0',
   `last_active` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`,`video_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- example_video_notes
 CREATE TABLE IF NOT EXISTS `example_video_notes` (
@@ -202,7 +215,7 @@ CREATE TABLE IF NOT EXISTS `example_video_notes` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_notes_owner_video_time` (`user_id`,`video_id`,`time_sec`,`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- user_favorites
 CREATE TABLE IF NOT EXISTS `user_favorites` (
@@ -210,7 +223,7 @@ CREATE TABLE IF NOT EXISTS `user_favorites` (
   `video_id` varchar(128) NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`,`video_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- watch_later
 CREATE TABLE IF NOT EXISTS `watch_later` (
@@ -218,7 +231,7 @@ CREATE TABLE IF NOT EXISTS `watch_later` (
   `video_id` varchar(128) NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`,`video_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 5. 错题归档、学习记录与复习计划
 -- user_wrongbook
@@ -231,7 +244,7 @@ CREATE TABLE IF NOT EXISTS `user_wrongbook` (
   `note` text,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- learning_wrongbook
 CREATE TABLE IF NOT EXISTS `learning_wrongbook` (
@@ -267,7 +280,7 @@ CREATE TABLE IF NOT EXISTS `learning_wrongbook` (
   CONSTRAINT `fk_wrongbook_formula` FOREIGN KEY (`formula_id`) REFERENCES `formulas` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_wrongbook_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ck_wrongbook_difficulty` CHECK ((`difficulty` between 1 and 5))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- learning_wrongbook_tags
 CREATE TABLE IF NOT EXISTS `learning_wrongbook_tags` (
@@ -276,7 +289,7 @@ CREATE TABLE IF NOT EXISTS `learning_wrongbook_tags` (
   PRIMARY KEY (`entry_id`,`tag`),
   KEY `ix_wrongbook_tag` (`tag`,`entry_id`),
   CONSTRAINT `fk_wrongbook_tag_entry` FOREIGN KEY (`entry_id`) REFERENCES `learning_wrongbook` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- learning_wrongbook_reviews
 CREATE TABLE IF NOT EXISTS `learning_wrongbook_reviews` (
@@ -290,7 +303,7 @@ CREATE TABLE IF NOT EXISTS `learning_wrongbook_reviews` (
   PRIMARY KEY (`id`),
   KEY `ix_wrongbook_review` (`entry_id`,`reviewed_at`,`id`),
   CONSTRAINT `fk_wrongbook_review_entry` FOREIGN KEY (`entry_id`) REFERENCES `learning_wrongbook` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 6. 跨模块学习材料（依赖课包、算式与错题表）
 -- course_pack_resources：有序学习材料，来源删除时保留内容快照。
@@ -309,13 +322,195 @@ CREATE TABLE IF NOT EXISTS course_pack_resources (
     CONSTRAINT fk_resource_pack FOREIGN KEY(pack_id) REFERENCES course_packs(id) ON DELETE CASCADE,
     CONSTRAINT fk_resource_formula FOREIGN KEY(formula_id) REFERENCES formulas(id) ON DELETE SET NULL,
     CONSTRAINT fk_resource_wrongbook FOREIGN KEY(wrongbook_id) REFERENCES learning_wrongbook(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- 7. 应用升级记录（保持为空，由迁移程序按实际执行情况登记）
+-- 7. 应用升级记录（保留已有记录，由应用按校验和确认迁移）
 -- schema_migrations
 CREATE TABLE IF NOT EXISTS `schema_migrations` (
   `version` varchar(128) NOT NULL,
   `checksum` char(64) NOT NULL,
   `applied_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`version`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 8. 可重复执行的旧库升级
+
+-- 使用普通 SQL 和会话级 PREPARE，不需要 SOURCE、DELIMITER 或存储过程权限。
+
+-- 如有不合法的旧关联，添加外键会报错并保留数据，请修正归属后重试。
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_danmaku' AND INDEX_NAME='ix_danmaku_video_time'), 'DO 0', 'ALTER TABLE `example_video_danmaku` ADD INDEX `ix_danmaku_video_time` (video_id,time,id)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_comments' AND INDEX_NAME='ix_comments_video_created'), 'DO 0', 'ALTER TABLE `example_video_comments` ADD INDEX `ix_comments_video_created` (video_id,created_at,id)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_notes' AND INDEX_NAME='ix_notes_owner_video_time'), 'DO 0', 'ALTER TABLE `example_video_notes` ADD INDEX `ix_notes_owner_video_time` (user_id,video_id,time_sec,id)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='course_packs' AND INDEX_NAME='ix_packs_owner_created'), 'DO 0', 'ALTER TABLE `course_packs` ADD INDEX `ix_packs_owner_created` (user_id,created_at,id)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='course_pack_videos' AND INDEX_NAME='ix_pack_order'), 'DO 0', 'ALTER TABLE `course_pack_videos` ADD INDEX `ix_pack_order` (pack_id,sort_order)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='formulas' AND INDEX_NAME='ix_formulas_owner_created'), 'DO 0', 'ALTER TABLE `formulas` ADD INDEX `ix_formulas_owner_created` (user_id,created_at,id)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='animation_scripts' AND INDEX_NAME='ix_scripts_owner_created'), 'DO 0', 'ALTER TABLE `animation_scripts` ADD INDEX `ix_scripts_owner_created` (user_id,created_at,id)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='agent_templates' AND INDEX_NAME='ix_templates_owner_created'), 'DO 0', 'ALTER TABLE `agent_templates` ADD INDEX `ix_templates_owner_created` (user_id,created_at,id)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_fk = NULL;
+SET @wisdom_fk_update = NULL;
+SELECT rc.CONSTRAINT_NAME, rc.UPDATE_RULE INTO @wisdom_fk, @wisdom_fk_update
+FROM information_schema.REFERENTIAL_CONSTRAINTS rc
+JOIN information_schema.KEY_COLUMN_USAGE k
+  ON rc.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND rc.TABLE_NAME=k.TABLE_NAME AND rc.CONSTRAINT_NAME=k.CONSTRAINT_NAME
+WHERE rc.CONSTRAINT_SCHEMA=DATABASE() AND rc.TABLE_NAME='formulas'
+  AND k.COLUMN_NAME='user_id' AND k.REFERENCED_TABLE_NAME='users' AND k.REFERENCED_COLUMN_NAME='username'
+LIMIT 1;
+
+SET @wisdom_ddl = IF(@wisdom_fk_update='CASCADE', 'DO 0', CONCAT('ALTER TABLE `formulas` ', IF(@wisdom_fk IS NULL, '', CONCAT('DROP FOREIGN KEY `', REPLACE(@wisdom_fk, '`', '``'), '`, ')), 'ADD CONSTRAINT fk_formulas_username FOREIGN KEY(user_id) REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE'));
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_fk = NULL;
+SET @wisdom_fk_update = NULL;
+SELECT rc.CONSTRAINT_NAME, rc.UPDATE_RULE INTO @wisdom_fk, @wisdom_fk_update
+FROM information_schema.REFERENTIAL_CONSTRAINTS rc
+JOIN information_schema.KEY_COLUMN_USAGE k
+  ON rc.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND rc.TABLE_NAME=k.TABLE_NAME AND rc.CONSTRAINT_NAME=k.CONSTRAINT_NAME
+WHERE rc.CONSTRAINT_SCHEMA=DATABASE() AND rc.TABLE_NAME='animation_scripts'
+  AND k.COLUMN_NAME='user_id' AND k.REFERENCED_TABLE_NAME='users' AND k.REFERENCED_COLUMN_NAME='username'
+LIMIT 1;
+
+SET @wisdom_ddl = IF(@wisdom_fk_update='CASCADE', 'DO 0', CONCAT('ALTER TABLE `animation_scripts` ', IF(@wisdom_fk IS NULL, '', CONCAT('DROP FOREIGN KEY `', REPLACE(@wisdom_fk, '`', '``'), '`, ')), 'ADD CONSTRAINT fk_animation_scripts_username FOREIGN KEY(user_id) REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE'));
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_fk = NULL;
+SET @wisdom_fk_update = NULL;
+SELECT rc.CONSTRAINT_NAME, rc.UPDATE_RULE INTO @wisdom_fk, @wisdom_fk_update
+FROM information_schema.REFERENTIAL_CONSTRAINTS rc
+JOIN information_schema.KEY_COLUMN_USAGE k
+  ON rc.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND rc.TABLE_NAME=k.TABLE_NAME AND rc.CONSTRAINT_NAME=k.CONSTRAINT_NAME
+WHERE rc.CONSTRAINT_SCHEMA=DATABASE() AND rc.TABLE_NAME='agent_templates'
+  AND k.COLUMN_NAME='user_id' AND k.REFERENCED_TABLE_NAME='users' AND k.REFERENCED_COLUMN_NAME='username'
+LIMIT 1;
+
+SET @wisdom_ddl = IF(@wisdom_fk_update='CASCADE', 'DO 0', CONCAT('ALTER TABLE `agent_templates` ', IF(@wisdom_fk IS NULL, '', CONCAT('DROP FOREIGN KEY `', REPLACE(@wisdom_fk, '`', '``'), '`, ')), 'ADD CONSTRAINT fk_agent_templates_username FOREIGN KEY(user_id) REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE'));
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_fk = NULL;
+SET @wisdom_fk_update = NULL;
+SELECT rc.CONSTRAINT_NAME, rc.UPDATE_RULE INTO @wisdom_fk, @wisdom_fk_update
+FROM information_schema.REFERENTIAL_CONSTRAINTS rc
+JOIN information_schema.KEY_COLUMN_USAGE k
+  ON rc.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND rc.TABLE_NAME=k.TABLE_NAME AND rc.CONSTRAINT_NAME=k.CONSTRAINT_NAME
+WHERE rc.CONSTRAINT_SCHEMA=DATABASE() AND rc.TABLE_NAME='user_profiles'
+  AND k.COLUMN_NAME='user_id' AND k.REFERENCED_TABLE_NAME='users' AND k.REFERENCED_COLUMN_NAME='username'
+LIMIT 1;
+
+SET @wisdom_ddl = IF(@wisdom_fk_update='CASCADE', 'DO 0', CONCAT('ALTER TABLE `user_profiles` ', IF(@wisdom_fk IS NULL, '', CONCAT('DROP FOREIGN KEY `', REPLACE(@wisdom_fk, '`', '``'), '`, ')), 'ADD CONSTRAINT fk_user_profiles_username FOREIGN KEY(user_id) REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE'));
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.KEY_COLUMN_USAGE WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='course_pack_documents' AND COLUMN_NAME='pack_id' AND REFERENCED_TABLE_NAME='course_packs'), 'DO 0', 'ALTER TABLE `course_pack_documents` ADD CONSTRAINT `fk_pack_document` FOREIGN KEY(`pack_id`) REFERENCES `course_packs`(id) ON DELETE CASCADE');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.KEY_COLUMN_USAGE WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='course_pack_videos' AND COLUMN_NAME='pack_id' AND REFERENCED_TABLE_NAME='course_packs'), 'DO 0', 'ALTER TABLE `course_pack_videos` ADD CONSTRAINT `fk_pack_video` FOREIGN KEY(`pack_id`) REFERENCES `course_packs`(id) ON DELETE CASCADE');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.KEY_COLUMN_USAGE WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='formula_topics' AND COLUMN_NAME='formula_id' AND REFERENCED_TABLE_NAME='formulas'), 'DO 0', 'ALTER TABLE `formula_topics` ADD CONSTRAINT `fk_topic_formula` FOREIGN KEY(`formula_id`) REFERENCES `formulas`(id) ON DELETE CASCADE');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+-- 保留原错题表，将可匹配账户的记录导入新错题本，重复执行不重复导入。
+INSERT INTO learning_wrongbook
+    (owner_id,legacy_id,source_type,video_id,time_sec,title,problem,answer,note,fingerprint,created_at)
+SELECT u.id,w.id,'video',w.video_id,GREATEST(w.time_sec,0),
+    COALESCE(w.title,''),COALESCE(w.title,''),'',COALESCE(w.note,''),
+    SHA2(CONCAT('legacy:',w.id),256),COALESCE(w.created_at,CURRENT_TIMESTAMP)
+FROM user_wrongbook w JOIN users u
+    ON BINARY u.username = BINARY w.user_id
+WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id);
+COMMIT;
+
+-- phpMyAdmin 最后显示当前库、已建表数量和保留待处理的旧错题数量。
+SELECT DATABASE() AS current_database,
+    (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()) AS total_tables,
+    (SELECT COUNT(*) FROM user_wrongbook w WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id)) AS unmatched_legacy_wrongbook;

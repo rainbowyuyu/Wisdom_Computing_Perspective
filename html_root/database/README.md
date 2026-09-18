@@ -4,24 +4,26 @@
 
 ## 安装与升级
 
-新安装只需执行根目录的 `visdom_db.sql`，不需要逐个执行 migrations 中的文件，也不依赖先启动网站：
+宝塔 / phpMyAdmin：先备份，左侧选中自己的库（截图为 `wiscomper_com`），点击「SQL」，复制 `html_root/visdom_db.sql` 全文执行。也可在「导入」中选择这个文件。无需创建或切换数据库，不需要逐个执行 migrations，也不依赖先启动网站。
+
+命令行指定已存在的数据库：
 
 ```sh
-mysql -u YOUR_USER -p --default-character-set=utf8mb4 --execute="source visdom_db.sql"
+mysql -u YOUR_USER -p --default-character-set=utf8mb4 YOUR_DATABASE < visdom_db.sql
 ```
 
-可在 MySQL Workbench 中直接打开并执行整个文件，或在 MySQL 客户端使用 `SOURCE D:/项目目录/html_root/visdom_db.sql`。表按外键依赖排序；重复导入不会删除数据。
+同一个脚本同时支持空库安装与原网站 18 表结构升级：补齐到 25 表、索引及外键，并导入能精确匹配用户名的旧错题。保留原表与数据，支持重复执行。旧库排序规则保留，新表使用 `utf8mb4_general_ci`，用户名外键列跟随已有 users.username 的排序规则。要求 MySQL 8.0+；未验证 MariaDB / MySQL 5.7。
 
-默认数据库名为 `visdom_db`；使用其他名称时调整脚本开头的 CREATE DATABASE / USE，并让后端的 `MYSQL_DB` 一致。数据库连接由部署环境或 `.env.local` 配置，SQL 文件不包含连接凭据。
+末尾查询显示当前数据库、表数和未匹配的旧错题数。若有手工改过的字段或孤儿数据导致报错，核实修复后重试，不通过删除原数据或关闭外键检查绕过。MySQL DDL 逐条提交，部署前保留数据库备份。
 
-现有安装在 `html_root` 下执行：
+数据库连接通过环境变量或 `.env.local` 配置，让 `MYSQL_DB` 与面板当前库一致。完整部署步骤见 `../deploy/BAOTA.md`。应用仍保留自动迁移和以下维护命令：
 
 ```sh
 python scripts/migrate_database.py
 python scripts/migrate_database.py --apply
 ```
 
-第一条只显示迁移状态；第二条应用迁移。应用启动时也会检查并应用未执行的迁移。部署前保留数据库备份。MySQL DDL 会隐式提交，迁移不承诺跨多个 ALTER 的整体回滚；迁移语句和检查支持失败后重试。
+第一条显示状态，第二条应用未执行的迁移；手动执行完整 SQL 后无需另行复制历史迁移文件。
 
 `schema_migrations` 保存版本、SHA-256 校验和及执行时间；已执行迁移不可直接改写，应新增版本。迁移通过数据库命名锁串行执行，业务请求不执行错题表的建表操作。
 

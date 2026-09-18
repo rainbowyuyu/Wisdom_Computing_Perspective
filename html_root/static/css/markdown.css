@@ -296,9 +296,12 @@
     border-radius: 0 0 20px 20px; /* 底部圆角 */
 }
 
-/* 更新日志沿用网站配色，导航与正文在同一个滚动容器中。 */
-#docs-modal .modal-content{width:min(900px,calc(100vw - 28px));max-height:88dvh;overflow:hidden;transform:none;border:1px solid var(--border-color);border-radius:20px}
-#docs-content{min-height:0;overscroll-behavior:contain;scrollbar-gutter:stable;overflow-wrap:anywhere}
+/* Only the document body scrolls; headings and version navigation stay outside it. */
+#docs-modal .modal-content{width:min(900px,calc(100vw - 28px));height:80dvh;max-height:88dvh;overflow:hidden;transform:none;backdrop-filter:none;-webkit-backdrop-filter:none;border:1px solid var(--border-color);border-radius:20px}
+#docs-content{min-height:0;min-width:0;flex:1 1 auto;overscroll-behavior:contain;scrollbar-gutter:stable;overflow-wrap:anywhere;overflow-anchor:none}
+.docs-footer{flex-shrink:0}
+.docs-changelog>.docs-release:last-child{margin-bottom:0}
+.docs-release>:last-child{margin-bottom:0}
 .docs-header{flex-shrink:0;gap:16px}.docs-header .close-modal{border:0;background:transparent;color:var(--text-secondary);font-size:26px;cursor:pointer}
 .docs-update-jump{flex-shrink:0;z-index:3;display:flex;align-items:center;gap:12px;padding:12px 32px;margin:0;background:var(--bg-surface);border-bottom:1px solid var(--border-color)}
 .docs-update-jump label{font-size:12px;color:var(--text-secondary);white-space:nowrap}

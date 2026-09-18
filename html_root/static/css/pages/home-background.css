@@ -1,0 +1,26 @@
+/* Full-width hero glow, fading back to the page colour below the introduction. */
+body { isolation:isolate; }
+.home-page-background {
+    display:none;
+    position:absolute;
+    inset:0 0 auto;
+    height:clamp(760px,100vh,1000px);
+    z-index:-1;
+    pointer-events:none;
+    background:
+        radial-gradient(ellipse 140% 60% at 45% 40%, color-mix(in srgb,var(--primary-color) 16%,transparent), transparent 85%),
+        radial-gradient(ellipse 130% 50% at 60% 65%, color-mix(in srgb,var(--secondary-color) 12%,transparent), transparent 85%);
+    mask-image:linear-gradient(to bottom,transparent,black 24%,black 55%,transparent);
+    -webkit-mask-image:linear-gradient(to bottom,transparent,black 24%,black 55%,transparent);
+}
+body:has(#home.active-section),
+body:has(.app-root #home) {
+    background-image:none;
+}
+body:has(#home.active-section)>.home-page-background,
+body:has(.app-root #home)>.home-page-background { display:block; }
+
+/* Retire the old glow even when earlier imported styles are cached. */
+#home .hero::before,
+#home .hero::after { content:none; }
+#home .hero-decoration { display:none; }

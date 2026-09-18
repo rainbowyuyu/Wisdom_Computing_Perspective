@@ -1,11 +1,32 @@
 """Versioned, additive MySQL migrations and transaction-scoped connections."""
 import hashlib
+import logging
 import re
 from contextlib import contextmanager
 from pathlib import Path
 from .config import get_db_connection
 
 MIGRATIONS = Path(__file__).resolve().parents[1] / 'database' / 'migrations'
+logger = logging.getLogger(__name__)
+
+
+def migration_collation(cursor):
+    """Older BaoTa MySQL/MariaDB servers do not implement MySQL 8's 0900 collation."""
+    cursor.execute("""SELECT COLLATION_NAME AS name FROM information_schema.COLLATIONS
+        WHERE COLLATION_NAME IN ('utf8mb4_0900_ai_ci','utf8mb4_general_ci')""")
+    supported = {row['name'].lower() for row in cursor.fetchall()}
+    if 'utf8mb4_0900_ai_ci' in supported:
+        return 'utf8mb4_0900_ai_ci'
+    if 'utf8mb4_general_ci' in supported:
+        logger.info('数据库不支持 utf8mb4_0900_ai_ci，迁移使用 utf8mb4_general_ci')
+        return 'utf8mb4_general_ci'
+    raise RuntimeError('数据库缺少所需的 utf8mb4 排序规则，请检查数据库版本与字符集支持')
+
+
+def compatible_migration_statement(statement, collation):
+    # Only adapt the DDL collation clause, never user data or other column collations.
+    return re.sub(r'(\bCOLLATE\s*(?:=\s*)?)utf8mb4_0900_ai_ci\b',
+                  lambda match: match.group(1) + collation, statement, flags=re.I)
 
 
 @contextmanager
@@ -34,7 +55,7 @@ def backfill_legacy(cursor):
         SELECT u.id,w.id,'video',w.video_id,GREATEST(w.time_sec,0),
             COALESCE(w.title,''),COALESCE(w.title,''),'',COALESCE(w.note,''),
             SHA2(CONCAT('legacy:',w.id),256),COALESCE(w.created_at,CURRENT_TIMESTAMP)
-        FROM user_wrongbook w JOIN users u ON u.username=w.user_id""")
+        FROM user_wrongbook w JOIN users u ON BINARY u.username=BINARY w.user_id""")
 
 
 INDEXES = {
@@ -55,6 +76,7 @@ def apply_migrations():
         if cursor.fetchone()['acquired'] != 1:
             raise RuntimeError('无法取得数据库迁移锁')
         try:
+            collation = migration_collation(cursor)
             cursor.execute("""CREATE TABLE IF NOT EXISTS schema_migrations(
                 version VARCHAR(128) PRIMARY KEY, checksum CHAR(64) NOT NULL,
                 applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -84,7 +106,8 @@ def apply_migrations():
                         if fk and fk['UPDATE_RULE']=='CASCADE':continue
                         if fk:statement=re.sub(r'DROP FOREIGN KEY \w+', 'DROP FOREIGN KEY `'+fk['CONSTRAINT_NAME'].replace('`','``')+'`',statement)
                         else:statement=re.sub(r'DROP FOREIGN KEY \w+,\s*','',statement)
-                    cursor.execute(statement)
+                    # Hash the original migration above; adapt only its execution copy.
+                    cursor.execute(compatible_migration_statement(statement, collation))
                 if path.name=='001_learning_records.sql': backfill_legacy(cursor)
                 cursor.execute('INSERT INTO schema_migrations(version,checksum) VALUES(%s,%s)',(path.name,checksum))
                 conn.commit()

@@ -1,12 +1,12 @@
 /* static/css/main.css */
 
 @import url('base.css');
-@import url('layout.css');
+@import url('layout.css?v=20260918-hero-1');
 @import url('components.css');
-@import url('markdown.css');
+@import url('markdown.css?v=20260918-changelog-2');
 
 /* Pages */
-@import url('pages/home.css');
+@import url('pages/home.css?v=20260918-hero-1');
 @import url('pages/agent.css');
 @import url('pages/workspace.css');
 @import url('pages/calculate.css');

@@ -5,7 +5,7 @@ body { background-image:radial-gradient(circle at 10% 0,color-mix(in srgb,var(--
 [data-theme="dark"] { --shadow-md:0 6px 22px rgb(0 0 0 / 16%); --shadow-lg:0 12px 32px rgb(0 0 0 / 22%); }
 .navbar { border-bottom:1px solid var(--border-color); box-shadow:0 1px 12px rgb(15 23 42 / 2%); }
 .desktop-nav { gap:3px; }
-#home { overflow-x:clip; }
+#home { overflow:visible; }
 .nav-btn { transition:color .18s,background .18s,box-shadow .18s; }
 .section>.section-title { font-size:clamp(1.65rem,3vw,2.2rem); line-height:1.45; letter-spacing:-.035em; margin:2.25rem 0 .7rem; font-weight:750; }
 .section>.section-subtitle { color:var(--text-secondary); text-align:center; font-size:.9rem; line-height:1.8; margin:0 auto 1.5rem; }

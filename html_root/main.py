@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +18,8 @@ if sys.platform == "win32":
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+ROOT_DIR = Path(__file__).resolve().parent
+STATIC_DIR = ROOT_DIR / "static"
 
 @asynccontextmanager
 async def lifespan(app):
@@ -65,25 +68,20 @@ from app.routers import course_packs
 app.include_router(course_packs.router, prefix="/api")
 
 # 静态资源
-app.mount("/css", StaticFiles(directory="static/css"), name="css")
-app.mount("/js", StaticFiles(directory="static/js"), name="js")
-app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
-app.mount("/docs", StaticFiles(directory="static/docs"), name="docs")
-app.mount("/videos", StaticFiles(directory="static/videos"), name="videos")
-app.mount("/static", StaticFiles(directory="static"), name="static_root")
+for name in ("css", "js", "assets", "docs", "videos"):
+    app.mount(f"/{name}", StaticFiles(directory=STATIC_DIR / name), name=name)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static_root")
 
 
 @app.get("/")
 async def read_index():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/update.md")
 async def read_update_log():
-    if os.path.exists("static/docs/update.md"):
-        return FileResponse("static/docs/update.md")
-    if os.path.exists("update.md"):
-        return FileResponse("update.md")
+    if (STATIC_DIR / "docs/update.md").exists():
+        return FileResponse(STATIC_DIR / "docs/update.md")
     from fastapi import HTTPException
     raise HTTPException(status_code=404)
 
@@ -93,8 +91,17 @@ async def not_found_exception_handler(request, exc):
     path = request.url.path
     if path.startswith("/api/") or "." in path.split("/")[-1]:
         return JSONResponse(status_code=404, content={"message": "Not Found"})
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+def run():
+    """Start every website route from the same application and working directory."""
+    os.chdir(ROOT_DIR)
+    # Sessions, rendering tasks and WebSocket rooms share this single process.
+    # Passing the app avoids importing main a second time and creating another DB pool.
+    uvicorn.run(app, host=os.getenv("HOST", "127.0.0.1"),
+                port=int(os.getenv("PORT", "8000")), workers=1, reload=False)
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    run()

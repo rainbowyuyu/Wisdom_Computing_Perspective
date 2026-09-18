@@ -44,16 +44,16 @@ export function renderFormula(element,value='',options={}) {
     }
 }
 
-export function renderMathIn(container) {
+export function renderMathIn(container, { detectBareMath = true } = {}) {
     if(!container)return;
     pending.delete(container);
-    if(!window.renderMathInElement){deferRender(container,()=>renderMathIn(container));return;}
+    if(!window.renderMathInElement){deferRender(container,()=>renderMathIn(container,{detectBareMath}));return;}
     // Only visit text nodes; preserve links, controls, code and rendered formula DOM.
     const walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,{acceptNode(node){
         return node.parentElement?.closest('pre,code,textarea,script,style,math-field,.katex,.katex-error')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT;
     }});
     const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
-    nodes.forEach(node=>node.textContent=normalizeMathText(node.textContent));
+    if(detectBareMath)nodes.forEach(node=>node.textContent=normalizeMathText(node.textContent));
     container.classList.remove('math-render-error');
     container.removeAttribute('title');
     window.renderMathInElement(container,{

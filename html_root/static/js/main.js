@@ -9,7 +9,7 @@ import * as Settings from './settings.js';
 import * as Tutorial from './tutorial.js';
 import * as Formulas from './formulas.js?v=20260917-creator-2';
 import * as Examples from './examples.js';
-import * as Docs from './docs.js?v=20260917-release-044';
+import * as Docs from './docs.js?v=20260918-doc-math-1';
 import * as Theme from './theme.js';
 import * as DevTools from '/static/js/devtools.js?v=20260917-creator-2';
 import * as Agent from './agent.js';
@@ -23,7 +23,7 @@ import * as SectionHistory from './section-history.js';
 import * as MathLiveKeyboard from './mathlive/mathlive-keyboard.js';
 import * as MathLiveMenu from './mathlive/mathlive-menu.js';
 import * as MathLiveLocale from './mathlive/mathlive-locale.js';
-import { initStepTutor } from './step-tutor.js';
+import { initStepTutor } from './step-tutor.js?v=20260918-progress-1';
 import { initFloatingPanel } from './floating-panel.js?v=20260917-nebula-math-7';
 
 // 将常用 UI 能力挂到 window，便于各处统一使用（如 Toast）
@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // 新增功能条：若用户曾关闭则不再显示
-    if (localStorage.getItem('wisdom.release.dismissed')==='0.4.4') {
+    if (localStorage.getItem('wisdom.release.dismissed')==='0.4.5') {
       const el = document.getElementById('agent-update-banner');
       if (el) el.style.display = 'none';
     }
@@ -254,7 +254,7 @@ window.closeAgentBanner = function () {
   const el = document.getElementById('agent-update-banner');
   if (el) {
     el.style.display = 'none';
-    localStorage.setItem('wisdom.release.dismissed', '0.4.4');
+    localStorage.setItem('wisdom.release.dismissed', '0.4.5');
   }
 };
 

@@ -40,6 +40,20 @@
 .tutor-status-row:has(.tutor-status:empty) { display:none; }
 .tutor-status { font-size:.82rem; line-height:1.7; color:var(--text-secondary); }
 .tutor-has-error .tutor-status { color:#dc6a49; }
+.tutor-job { padding:1rem 1.2rem; margin:0 0 1.4rem; border:1px solid color-mix(in srgb,var(--primary-color) 24%,var(--border-color)); border-radius:12px; background:var(--bg-surface); }
+.tutor-job-heading { display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; font-size:.82rem; line-height:1.6; }
+.tutor-job-heading strong { color:var(--primary-color); font-weight:650; }
+.tutor-job-heading span { color:var(--text-secondary); font-variant-numeric:tabular-nums; }
+.tutor-job-track { position:relative; height:9px; border-radius:9px; margin:.8rem 0; overflow:hidden; background:color-mix(in srgb,var(--primary-color) 12%,var(--bg-input)); }
+.tutor-job-fill { height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--primary-color),var(--secondary-color)); transition:width .3s ease; }
+.tutor-job.is-indeterminate .tutor-job-fill { animation:tutor-job-wait 1.5s ease-in-out infinite; }
+.tutor-job-note { font-size:.74rem; color:var(--text-secondary); line-height:1.7; }
+.tutor-job[data-phase=error] { border-color:#dc6a49; }
+.tutor-job[data-phase=error] strong { color:#dc6a49; }
+.tutor-job[data-phase=error] .tutor-job-fill { background:#dc6a49; }
+.tutor-job[data-phase=cancelled] .tutor-job-fill { background:var(--text-secondary); }
+@keyframes tutor-job-wait { from { transform:translateX(-110%); } to { transform:translateX(390%); } }
+@media(prefers-reduced-motion:reduce) { .tutor-job.is-indeterminate .tutor-job-fill { animation:none; transform:none; } .tutor-job-fill { transition:none; } }
 .tutor-workspace { display:grid; grid-template-columns:210px minmax(0,1fr); gap:1.5rem; align-items:start; }
 .tutor-step-list { display:flex; flex-direction:column; gap:.3rem; position:sticky; top:100px; padding:.35rem 0; }
 .tutor-step-list button { display:flex; align-items:baseline; gap:.75rem; text-align:left; background:transparent; border-color:transparent; padding:.85rem .9rem; line-height:1.65; font-size:.82rem; }

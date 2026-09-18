@@ -1,6 +1,6 @@
 import { toggleModal } from './ui.js';
 import { sanitizeMarkdownHtml } from './sanitize.js';
-import { renderMathIn } from './math-text.js';
+import { renderMathIn } from './math-text.js?v=20260918-doc-math-1';
 
 let requestVersion=0,controller,disposeView=()=>{};
 const behavior=()=>matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth';
@@ -98,26 +98,60 @@ function buildChangelog(content,scrollToId){
         while(card.nextSibling&&!(card.nextSibling.nodeType===1&&card.nextSibling.tagName==='H2'))card.append(card.nextSibling);
         return {h,card,version};
     });
-    const versions=sections.filter(x=>x.version),latest=versions.at(-1);
+    // Keep the source log append-only, but render numeric versions newest first.
+    sections.sort((a,b)=>{
+        if(!a.version)return b.version?1:0;
+        if(!b.version)return -1;
+        const left=a.version.split('.').map(Number),right=b.version.split('.').map(Number);
+        for(let i=0;i<3;i++){if(left[i]!==right[i])return right[i]-left[i];}
+        return 0;
+    });
+    content.querySelectorAll(':scope > hr').forEach(el=>el.remove());
+    content.append(...sections.map(section=>section.card));
+    const latest=sections.find(x=>x.version);
     latest?.card.classList.add('docs-release-latest');
     const bar=document.createElement('nav');bar.className='docs-update-jump';bar.setAttribute('aria-label','更新日志版本导航');
     const label=document.createElement('label');label.textContent='跳转到版本';label.htmlFor='docs-version-select';
     const select=document.createElement('select');select.id='docs-version-select';
-    [...sections].reverse().forEach(({h,version})=>{const option=document.createElement('option');option.value=h.id;option.textContent=h.textContent+(version===latest?.version?' · 最新':'');select.append(option);});
+    sections.forEach(({h,version})=>{const option=document.createElement('option');option.value=h.id;option.textContent=h.textContent+(version===latest?.version?' · 最新':'');select.append(option);});
     const newest=document.createElement('button');newest.type='button';newest.className='docs-update-jump-btn';newest.textContent='最新版本';
     bar.append(label,select,newest);content.before(bar);
     const find=id=>sections.find(x=>x.h.id===id)?.h;
     const jump=(h,animated=true)=>{if(!h?.isConnected)return;select.value=h.id;newest.classList.toggle('active',h===latest?.h);newest.setAttribute('aria-pressed',String(h===latest?.h));scrollWithin(content,h,animated);};
     select.onchange=()=>jump(find(select.value));newest.onclick=()=>jump(latest?.h);
     let frame=0;
-    const onScroll=()=>{if(frame)return;frame=requestAnimationFrame(()=>{frame=0;const line=bar.getBoundingClientRect().bottom+35;let current=sections[0];for(const section of sections){if(section.h.getBoundingClientRect().top<=line)current=section;else break;}if(current){select.value=current.h.id;newest.classList.toggle('active',current===latest);newest.setAttribute('aria-pressed',String(current===latest));}});};
+    const onScroll=()=>{
+        if(frame)return;
+        frame=requestAnimationFrame(()=>{
+            frame=0;
+            const line=content.getBoundingClientRect().top+35;
+            let current=sections[0];
+            for(const section of sections){
+                if(section.h.getBoundingClientRect().top<=line)current=section;
+                else break;
+            }
+            if(content.scrollTop>0&&content.scrollHeight-content.clientHeight-content.scrollTop<=2)current=sections.at(-1);
+            if(current){
+                select.value=current.h.id;
+                newest.classList.toggle('active',current===latest);
+                newest.setAttribute('aria-pressed',String(current===latest));
+            }
+        });
+    };
     content.addEventListener('scroll',onScroll,{passive:true});
     content.querySelectorAll('a[href^="#"]').forEach(link=>{
         link.classList.add('docs-internal-link');
         link.onclick=async e=>{e.preventDefault();const id=link.getAttribute('href').slice(1);try{if(id.startsWith('section-'))await navigateDocLink(id);else jump(find(id));}catch(error){window.showToast?.(error.message,'error');}};
     });
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{if(content.isConnected&&content.classList.contains('docs-changelog'))jump(find(scrollToId)||latest?.h,false);}));
-    return ()=>{content.removeEventListener('scroll',onScroll);cancelAnimationFrame(frame);};
+    let initialFrame=requestAnimationFrame(()=>{
+        initialFrame=requestAnimationFrame(()=>{
+            if(!content.isConnected||!content.classList.contains('docs-changelog'))return;
+            const target=find(scrollToId);
+            if(target&&target!==latest?.h)jump(target,false);
+            else {content.scrollTo({top:0,behavior:'instant'});onScroll();}
+        });
+    });
+    return ()=>{content.removeEventListener('scroll',onScroll);cancelAnimationFrame(frame);cancelAnimationFrame(initialFrame);};
 }
 export async function openDoc(fileName,title,scrollToId){
     if(!/^[a-zA-Z0-9_-]+\.md$/.test(fileName))return;
@@ -125,7 +159,9 @@ export async function openDoc(fileName,title,scrollToId){
     const run=++requestVersion;controller?.abort();controller=new AbortController();disposeView();
     document.getElementById('docs-title').textContent=title;
     modal.querySelector('.docs-update-jump')?.remove();
-    content.classList.remove('docs-changelog');content.style.whiteSpace='';content.scrollTop=0;
+    // Stop any in-flight smooth jump before replacing a long document with a short one.
+    content.scrollTo({top:0,behavior:'instant'});
+    content.classList.remove('docs-changelog','math-render-error');content.removeAttribute('title');content.style.whiteSpace='';
     content.innerHTML='<div class="docs-loading" role="status">正在加载文档…</div>';toggleModal('docs-modal',true);
     modal.querySelector('.close-modal')?.focus();
     const timer=setTimeout(()=>controller?.abort(),8000);
@@ -138,7 +174,8 @@ export async function openDoc(fileName,title,scrollToId){
         content.innerHTML=sanitizeMarkdownHtml(window.marked.parse(markdown,{gfm:true,breaks:true}));
         content.querySelectorAll('pre code').forEach(block=>window.hljs?.highlightElement(block));
         content.querySelectorAll('a:not([href^="#"])').forEach(a=>{a.target='_blank';a.rel='noopener noreferrer';});
-        renderMathIn(content);
+        // Documentation contains API names and configuration keys, not implicit equations.
+        renderMathIn(content,{detectBareMath:false});
         if(fileName==='update.md')disposeView=buildChangelog(content,scrollToId);
     }catch(error){if(run!==requestVersion)return;content.replaceChildren();const p=document.createElement('p');p.className='docs-error';p.textContent=error.name==='AbortError'?'文档加载超时，请重新打开':error.message;content.append(p);}
     finally{clearTimeout(timer);}

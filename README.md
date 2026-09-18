@@ -122,91 +122,25 @@
 
 ---
 
-## 🚀 本地部署指南
+## 🚀 本地与宝塔部署
 
-### 1. 环境准备
+网站全部源码和部署资源均在 **`html_root/`**，只上传这个目录即可。Vue 源码已从仓库外的 `vue_root` 移入 `html_root/frontend/`；正式网页由 Python 直接提供，无需启动 Vue。
 
-确保您的系统已安装 **Python 3.10+**。
+- [网站目录与快速启动](html_root/README.md)
+- [宝塔部署、环境配置与反向代理](html_root/deploy/BAOTA.md)
+- [单文件数据库安装与升级](html_root/visdom_db.sql)
 
-由于 Manim 的渲染依赖底层系统库，请务必先配置以下环境：
+在宝塔 / phpMyAdmin 中先备份并选中现有数据库（例如 `wiscomper_com`），点击「SQL」，粘贴 `visdom_db.sql` 全文执行。脚本使用当前选中的库，支持空库建表和原网站 18 表升级至 25 表，保留原数据，支持重复执行。要求 MySQL 8.0+。
 
-1.  **FFmpeg**: 用于视频合成。
-    *   下载并配置环境变量：[FFmpeg 官网](https://ffmpeg.org/)
-    *   验证：终端输入 `ffmpeg -version`
-2.  **LaTeX 环境**: 用于渲染数学公式。
-    *   推荐安装 [MiKTeX](https://miktex.org/) (Windows) 或 [TeX Live](https://tug.org/texlive/) (Linux/macOS)。
-    *   验证：终端输入 `latex --version`
+配置 `html_root/.env.local` 后，在网站目录启动：
 
-### 2. 安装 Python 依赖
-
-在项目根目录下运行：
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. 配置数据库 (MySQL)
-
-1.  确保本地或远程 MySQL 服务已启动。
-2.  创建一个新的数据库（例如命名为 `wiscomper_db`）。
-3.  执行以下 SQL 初始化表结构：
-
-```sql
-CREATE DATABASE IF NOT EXISTS wiscomper_db;
-USE wiscomper_db;
-
--- 用户表
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) NOT NULL UNIQUE,
-    hashed_password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 算式表
-CREATE TABLE IF NOT EXISTS formulas (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL,
-    latex TEXT NOT NULL,
-    note VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(username) ON DELETE CASCADE
-);
-```
-
-### 4. 配置环境变量 (.env)
-
-在项目根目录下创建 `.env` 文件，填入您的配置：
-
-```ini
-# 阿里云 DashScope API Key (用于 OCR 和代码生成)
-ALIYUN_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# MySQL 数据库配置
-MYSQL_HOST=localhost
-MYSQL_USER=root
-MYSQL_PASSWORD=your_password
-MYSQL_DB=wiscomper_db
-MYSQL_PORT=3306
-```
-
-### 5. 启动项目
-
-使用 Python 直接运行入口文件：
-
-```bash
+```sh
+cd html_root
+python -m pip install -r requirements.txt
 python main.py
 ```
 
-或者使用 Uvicorn 命令行：
-
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-启动成功后，访问浏览器：`http://localhost:8000`
-
----
+Manim 的系统依赖、服务器数据库凭据和域名设置按部署文档配置；服务器使用自己的虚拟环境，不上传本机环境目录或凭据文件。
 
 ## 📂 代码结构概览（html_root）
 
