@@ -29,11 +29,11 @@ def _ensure_table(cursor):
             """
         )
     except Exception as e:
-        logger.warning(f"ensure agent_templates table failed: {e}")
+        logger.warning("ensure agent_templates table failed: %s", type(e).__name__)
 
 
 @router.post("/save")
-async def save_agent_template(data: AgentTemplateCreate, auth_session: str | None = Cookie(None)):
+def save_agent_template(data: AgentTemplateCreate, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != data.username:
         raise HTTPException(status_code=403, detail="无权访问其他账户的模板")
     conn = None
@@ -50,8 +50,8 @@ async def save_agent_template(data: AgentTemplateCreate, auth_session: str | Non
         conn.commit()
         return {"status": "success", "message": "已存为模板", "id": cursor.lastrowid}
     except Exception as e:
-        logger.error(f"save_agent_template: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("save_agent_template: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -103,12 +103,12 @@ async def list_agent_templates(username: str, auth_session: str | None = Cookie(
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _list_agent_templates_sync, username)
     except Exception as e:
-        logger.error(f"list_agent_templates: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("list_agent_templates: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
 
 
 @router.get("/get")
-async def get_agent_template(id: int, username: str, auth_session: str | None = Cookie(None)):
+def get_agent_template(id: int, username: str, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != username:
         raise HTTPException(status_code=403, detail="无权访问其他账户的模板")
     conn = None
@@ -139,8 +139,8 @@ async def get_agent_template(id: int, username: str, auth_session: str | None = 
             },
         }
     except Exception as e:
-        logger.error(f"get_agent_template: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_agent_template: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -149,7 +149,7 @@ async def get_agent_template(id: int, username: str, auth_session: str | None = 
 
 
 @router.delete("/delete")
-async def delete_agent_template(id: int, username: str, auth_session: str | None = Cookie(None)):
+def delete_agent_template(id: int, username: str, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != username:
         raise HTTPException(status_code=403, detail="无权访问其他账户的模板")
     conn = None
@@ -161,8 +161,8 @@ async def delete_agent_template(id: int, username: str, auth_session: str | None
         conn.commit()
         return {"status": "success"}
     except Exception as e:
-        logger.error(f"delete_agent_template: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("delete_agent_template: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()

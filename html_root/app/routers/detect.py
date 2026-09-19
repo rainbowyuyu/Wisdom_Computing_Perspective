@@ -18,6 +18,7 @@ from .agent import sanitize_latex_for_mathlive
 from ..llm_errors import llm_error_message
 from ..usage_guard import run_with_context
 from ..async_cleanup import finish_cleanup
+from ..host_resources import HostBusy
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["detect"])
@@ -100,67 +101,21 @@ def _inject_autoscale_into_construct(code: str) -> str:
 
 @router.post("/detect")
 async def detect_image(file: UploadFile = File(...)):
+    from ..recognition import recognize, RecognitionIssue
+    from ..usage_guard import UsageDenied
+    from .solve import ai_client
     try:
-        image_content = await file.read(5_000_001)
-        if len(image_content) > 5_000_000:
-            return JSONResponse(status_code=413, content={"status":"error","message":"图片请控制在 5 MB 以内。"})
-        base64_image = base64.b64encode(image_content).decode("utf-8")
         if not api_key:
-            return {"status": "error", "message": "图片识别需要配置 ALIYUN_KEY；也可以直接输入文字题目进行分步解答。"}
-
-        # 使用多模态大模型一次性返回：
-        # - latex: 识别出的 LaTeX 公式
-        # - vision_prompt: 面向后续 Manim 代码生成的几何/结构自然语言描述
-        prompt_text = (
-            "你是一名数学视觉理解助手。请仔细、逐符号比对图片中的公式和几何/图像结构，只根据图片内容输出一个 JSON 对象：\n"
-            '{ "latex": "...", "problem_text": "...", "vision_prompt": "..." }\n\n'
-            "- problem_text：完整转写题面文字、所有条件、选项和问题，不求解；如果只有公式则与 latex 相同。\n"
-            "- latex：只包含主要的数学表达式或题目中的核心公式，使用标准 LaTeX，不要任何解释或多余文字；\n"
-            "- 严格按照图片中的公式抄写，**不要自行添加/删除/修改任何数字、系数、上下标或积分上下限**，看不清时用 ? 占位而不要猜测；\n"
-            "- 特别注意区分 **1 与 \\infty、0 与 6/9** 等相似符号：例如图片为 “∫_0^1 x^2 dx”，则 latex 必须是 `\\\\int_0^1 x^{2} \\\\, dx`，绝不能写成 `\\\\int_0^\\\\infty 3x^{2} dx` 之类；\n"
-            "- vision_prompt：用中文简洁描述图像中的空间/几何/函数关系，例如坐标轴、曲线形状、圆/直线/点的位置关系等，"
-            "便于后续根据该描述生成 Manim 动画（不要写成解题步骤，只描述“画面里有哪些对象、它们大致长什么样、彼此关系如何”）。\n"
-            "务必保证输出是合法的 JSON，且只输出这一行 JSON，不要解释。"
-        )
-        loop = asyncio.get_event_loop()
-        completion = await run_with_context(
-            None,
-            lambda: client.with_options(timeout=70, max_retries=0).chat.completions.create(
-                model="qwen-vl-max",
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt_text},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
-                    ],
-                }],
-            ),
-        )
-        raw = completion.choices[0].message.content.strip()
-        # 兼容 ```json ... ``` 包裹的情况
-        if "```" in raw:
-            parts = raw.split("```")
-            if len(parts) >= 2:
-                raw = parts[1]
-            raw = raw.replace("json", "").strip()
-        vision_prompt = None
-        problem_text = ""
-        try:
-            parsed = json.loads(raw)
-            latex = str(parsed.get("latex", "")).strip()
-            problem_text = str(parsed.get("problem_text", latex)).strip()
-            vision_prompt = str(parsed.get("vision_prompt", "")).strip() or None
-        except Exception:
-            # JSON 解析失败则退化到旧逻辑：整个内容视为 LaTeX，仅做简单清洗
-            latex = raw
-            vision_prompt = None
-
-        # 统一对识别出的 LaTeX 做规范化处理，去掉 $$、\[ \]、```latex 等包裹，便于 MathLive 正确解析
-        latex = sanitize_latex_for_mathlive(latex)
-        return {"status": "success", "latex": latex, "problem_text": problem_text or latex, "vision_prompt": vision_prompt}
-    except Exception as e:
-        logger.warning("Image recognition failed: %s", type(e).__name__)
-        return {"status": "error", "message": llm_error_message(e)}
+            return JSONResponse(status_code=503, content={'status':'error','message':'图片识别暂不可用，也可以手动输入完整题面后计算。','retryable':False})
+        result = await recognize(await file.read(5_000_001), ai_client)
+        return result
+    except RecognitionIssue as error:
+        return JSONResponse(status_code=422, content={'status':'error','code':'recognition_needs_input','message':str(error),'retryable':False})
+    except UsageDenied as error:
+        return JSONResponse(status_code=503, content={'status':'error','message':str(error),'retryable':False}, headers={'Retry-After':'10'})
+    except Exception as error:
+        logger.warning('Image recognition failed: %s', type(error).__name__)
+        return JSONResponse(status_code=503, content={'status':'error','message':llm_error_message(error),'retryable':False})
 
 
 @router.post("/animate")
@@ -180,6 +135,8 @@ async def generate_animation(data: CalcModel, request: Request):
             filename = os.path.basename(video_path)
             return {"status": "success", "video_url": f"/videos/{filename}"}
         return JSONResponse(status_code=500,content={'status':'error','message':'矩阵动画未能完成或渲染超时，请检查矩阵并稍后重试。'})
+    except HostBusy as error:
+        return JSONResponse(status_code=503,content={'status':'error','message':str(error),'retryable':False},headers={'Retry-After':'10'})
     except asyncio.TimeoutError:
         return JSONResponse(status_code=503,content={'status':'error','message':'渲染资源繁忙，排队超时，请稍后重试。'})
     except ValueError as error:

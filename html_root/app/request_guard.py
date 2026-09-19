@@ -33,6 +33,7 @@ FEATURE_ROUTES={'/api/solve/stream':'calculate','/api/animate':'calculate','/api
 CODE_ROUTES = {'/api/devtools/run_manim', '/api/devtools/run_manim_stream', '/api/devtools/render_keyframe', '/api/animate/stream'}
 EXPENSIVE = CODE_ROUTES | {'/api/solve/stream', '/api/solve/render', '/api/agent/execute', '/api/detect', '/api/animate', '/api/devtools/edit_code', '/api/devtools/generate_video_copy', '/api/login', '/api/register'}
 EXPENSIVE |= {'/api/email/send-code', '/api/email/verify', '/api/email/change', '/api/password/forgot/request', '/api/password/forgot/reset'}
+EXPENSIVE |= {'/api/user/password', '/api/user/username', '/api/user/avatar'}
 
 # 未完成邮箱验证的账户只保留恢复账户所需的基础接口。
 EMAIL_RECOVERY_ROUTES = {
@@ -86,7 +87,7 @@ class RequestGuard:
         retry_started = False
         server_failed = False
         async def reject(message, status=429, retry=60,code='access_denied'):
-            response = JSONResponse({'status':'error', 'message':message,'code':code}, status_code=status,
+            response = JSONResponse({'status':'error', 'message':message,'code':code,'retryable':False}, status_code=status,
                 headers={'Retry-After': str(retry), 'Cache-Control':'no-store','X-Wisdom-Access':code})
             await response(scope, receive, send)
         try:
@@ -107,6 +108,10 @@ class RequestGuard:
                     runners = {v.strip() for v in os.getenv('WISDOM_CODE_RUNNERS', '').split(',') if v.strip()}
                     if not user or not access.is_owner(principal) and user not in runners:
                         return await reject('自定义 Python 渲染仅对管理员开放。请使用数学运算中的分步动画；代码助手仍可生成和下载代码。', 403)
+                if path in INPUT_MODELS or path in {'/api/detect','/api/agent/tasks'}:
+                    from .host_resources import pressure_message
+                    pressure = pressure_message()
+                    if pressure: return await reject(pressure, 503, retry=10, code='server_busy')
                 if path in EXPENSIVE or path.startswith(('/api/agent/tasks','/api/admin/')):
                     try:
                         admission=asyncio.create_task(asyncio.to_thread(ledger.admit,'request',who))
@@ -150,6 +155,9 @@ class RequestGuard:
                     except (ValidationError,ValueError):return await reject('输入格式不正确或内容过长，请检查后重试；本次未扣功能额度。',422,code='invalid_input')
                     if path=='/api/agent/execute' and not validated.prompt.strip() and not validated.image_base64:
                         return await reject('请填写需求或上传题目图片。',422,code='invalid_input')
+                    from logic.single_problem import multiple_problems, SINGLE_PROBLEM_MESSAGE
+                    if multiple_problems(getattr(validated,'problem',getattr(validated,'prompt',''))):
+                        return await reject(SINGLE_PROBLEM_MESSAGE,422,code='single_problem_required')
                     canonical=validated.model_dump_json()
                     owner='u:'+str(principal['id']) if principal else 'ip:'+who[0]
                     digest=hashlib.sha256((owner+'\0'+path+'\0'+canonical).encode()).hexdigest()

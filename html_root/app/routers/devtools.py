@@ -1,6 +1,6 @@
 # 开发者工具：Manim 云端渲染（同步与流式）
-# [安全] RCE 高危：用户代码在服务端执行。当前有简单关键字拦截与超时。
-# 推荐：Docker/Firecracker 沙箱隔离 + 网络限制 + 资源限制，详见项目根目录 SECURITY.md
+# 自定义 Python 执行由 RequestGuard 限制为主管理员/显式可信账号，并校验 AST。
+# 资源限制不能代替安全沙箱；开放给不可信账号前仍需容器/系统权限与网络隔离。
 import ast
 import tempfile
 import time
@@ -21,7 +21,9 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from ..config import VIDEOS_DIR, client, api_key
 from ..llm_errors import llm_error_message
 from ..async_cleanup import finish_cleanup
-from .solve import ai_client, stop_process, RENDER_SLOTS
+from .solve import ai_client, stop_process, RENDER_SLOTS, RENDER_WORKER
+from ..process_output import log_tail, resource_failure, RenderResourceError
+from ..host_resources import require_capacity, require_emergency_capacity, HostBusy
 from ..models import ManimCodeModel, ManimCodeEditModel, ManimKeyframeModel
 
 logger = logging.getLogger(__name__)
@@ -128,26 +130,31 @@ async def _render_keyframe_once(data: ManimKeyframeModel, request: Request):
             if await request.is_disconnected(): return JSONResponse(status_code=499,content={'status':'error','message':'已停止预览'})
             try: await asyncio.wait_for(DEV_RENDER_SLOTS.acquire(),2);acquired=True
             except asyncio.TimeoutError: pass
+        require_capacity()
         temporary=tempfile.TemporaryDirectory(prefix='wisdom-preview-');folder=Path(temporary.name)
         script=folder/'scene.py';script.write_text(code,encoding='utf-8')
         output=uuid.uuid4().hex+'_preview.png';log=folder/'render.log'
-        cmd=[sys.executable,'-m','manim','-ql','-s','--disable_caching','--media_dir',str(folder),'-o',output,str(script),'GenScene']
+        cmd=[sys.executable,str(RENDER_WORKER),'-ql','-s','--disable_caching','--media_dir',str(folder),'-o',output,str(script),'GenScene']
         with log.open('w',encoding='utf-8') as writer:
             proc=subprocess.Popen(cmd,stdout=writer,stderr=subprocess.STDOUT,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name=='nt' else 0,start_new_session=os.name!='nt')
             started=time.monotonic()
             while proc.poll() is None:
+                require_emergency_capacity()
                 if await request.is_disconnected(): return JSONResponse(status_code=499,content={'status':'error','message':'已停止预览'})
                 if time.monotonic()-started>90: raise TimeoutError('预览超过90秒，请简化动画后重试')
                 await asyncio.sleep(.2)
-        if proc.returncode: raise ValueError(log.read_text(encoding='utf-8',errors='replace')[-2500:])
+        if proc.returncode:
+            failure=log_tail(log,2500)
+            if resource_failure(proc.returncode,failure):raise RenderResourceError('动画达到资源上限，已停止任务，请简化后再试。')
+            raise ValueError(failure)
         candidates=list(folder.rglob(output))
         if not candidates: raise ValueError('未找到关键帧图像')
         import shutil
         shutil.copy2(candidates[0],Path(VIDEOS_DIR)/output)
         return {'status':'success','preview_url':'/videos/'+output}
     except asyncio.CancelledError: raise
-    except Exception as error: return JSONResponse(status_code=400,content={'status':'error','message':type(error).__name__+': '+str(error)[-2500:]})
+    except Exception as error: return JSONResponse(status_code=400,content={'status':'error','message':type(error).__name__+': '+str(error)[-2500:],'retryable':not isinstance(error,(RenderResourceError,TimeoutError,HostBusy))})
     finally:
         await finish_cleanup(cleanup_renderer(proc,temporary,acquired))
 
@@ -160,7 +167,7 @@ async def run_custom_manim(data: ManimCodeModel, request: Request):
         async for frame in response.body_iterator:
             event=json.loads(frame[6:])
             if event['type']=='complete':return {'status':'success','video_url':event['video_url'],**{k:event[k] for k in ('code','repaired') if k in event}}
-            if event['type']=='error':return JSONResponse(status_code=400,content={'status':'error','message':event['message']})
+            if event['type']=='error':return JSONResponse(status_code=400,content={'status':'error','message':event['message'],'retryable':event.get('retryable',True)})
     finally:
         await response.body_iterator.aclose()
     return JSONResponse(status_code=408,content={'status':'error','message':'渲染已停止，请重试。'})
@@ -171,7 +178,7 @@ DEV_RENDER_SLOTS = RENDER_SLOTS
 
 async def cleanup_renderer(proc, temporary, acquired):
     try:
-        if proc and proc.poll() is None:
+        if proc:
             await asyncio.to_thread(stop_process,proc)
     finally:
         try:
@@ -195,10 +202,11 @@ async def _run_manim_stream_once(data: ManimCodeModel, request: Request):
                 if await request.is_disconnected(): return
                 try: await asyncio.wait_for(DEV_RENDER_SLOTS.acquire(),5);acquired=True
                 except asyncio.TimeoutError: yield event('heartbeat',message='正在等待渲染资源…')
+            require_capacity()
             temporary=tempfile.TemporaryDirectory(prefix='wisdom-code-')
             folder=Path(temporary.name);script=folder/'scene.py';script.write_text(code,encoding='utf-8')
             output=uuid.uuid4().hex+'.mp4'
-            cmd=[sys.executable,'-m','manim','-ql','--disable_caching','--media_dir',str(folder),'-o',output,str(script),'GenScene']
+            cmd=[sys.executable,str(RENDER_WORKER),'-ql','--disable_caching','--media_dir',str(folder),'-o',output,str(script),'GenScene']
             log=folder/'render.log'
             with log.open('w',encoding='utf-8') as writer:
                 proc=subprocess.Popen(cmd,stdout=writer,stderr=subprocess.STDOUT,
@@ -206,21 +214,24 @@ async def _run_manim_stream_once(data: ManimCodeModel, request: Request):
                     start_new_session=os.name!='nt')
                 started=time.monotonic();offset=0
                 while proc.poll() is None:
+                    require_emergency_capacity()
                     if await request.is_disconnected(): return
                     if time.monotonic()-started>240: raise TimeoutError('渲染超过4分钟，请缩短动画后重试。')
                     await asyncio.sleep(.3)
                     with log.open(encoding='utf-8',errors='replace') as reader:
                         reader.seek(offset);chunk=reader.read(16000);offset=reader.tell()
                     if chunk: yield event('log',message=chunk)
-            logs=log.read_text(encoding='utf-8',errors='replace')
-            if proc.returncode: raise ValueError(logs[-4000:] or 'Manim 渲染失败')
+            logs=log_tail(log,4000)
+            if proc.returncode:
+                if resource_failure(proc.returncode,logs):raise RenderResourceError('动画达到资源上限，已停止任务，请简化后再试。')
+                raise ValueError(logs or 'Manim 渲染失败')
             candidates=list(folder.rglob(output))
             if not candidates: raise ValueError('渲染完成但未找到视频')
             import shutil
             shutil.copy2(candidates[0],Path(VIDEOS_DIR)/output)
             yield event('complete',video_url='/videos/'+output,message='渲染完成')
         except asyncio.CancelledError: raise
-        except Exception as error: yield event('error',message=type(error).__name__+': '+str(error)[-4000:])
+        except Exception as error: yield event('error',message=type(error).__name__+': '+str(error)[-4000:],retryable=not isinstance(error,(RenderResourceError,TimeoutError,HostBusy)))
         finally:
             await finish_cleanup(cleanup_renderer(proc,temporary,acquired))
     return StreamingResponse(generate(),media_type='text/event-stream',headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
@@ -246,6 +257,7 @@ async def _render_keyframe_with_repair(data,request,budget):
     from ..render_repair import eligible, repair_progress
     result=await _render_keyframe_once(data,request)
     if not isinstance(result,JSONResponse) or data.breakpoint_line is not None:return result
+    if json.loads(result.body).get('retryable') is False:return result
     message=json.loads(result.body).get('message','')
     if budget['used'] or not eligible(message) or await request.is_disconnected():return result
     fixed=None
@@ -285,8 +297,8 @@ async def _run_manim_with_repair(data,request,budget):
                         yield event(item.pop('type'),**item)
             finally:await finish_cleanup(response.body_iterator.aclose())
             if not failed:return
-            if budget['used'] or attempt or not eligible(failed['message']):
-                yield event('error',message=('自动修复后仍未完成。' if repaired else '')+failed['message']);return
+            if failed.get('retryable') is False or budget['used'] or attempt or not eligible(failed['message']):
+                yield event('error',message=('自动修复后仍未完成。' if repaired else '')+failed['message'],retryable=failed.get('retryable',True));return
             yield event('repair',message='正在请模型判断渲染错误并修复脚本（最多一次）…')
             fixed=None
             async for update in repair_progress(lambda:repair_code(code,failed['message'],budget),request):

@@ -93,6 +93,8 @@ export async function openChangeEmailModal() {
     const form = document.getElementById('change-email-form');
     const email = document.getElementById('change-email-new');
     const code = document.getElementById('change-email-code');
+    const password = document.getElementById('change-email-password');
+    if (password) password.value = '';
     if (email) email.value = '';
     if (code) code.value = '';
     setEmailHint('');
@@ -110,6 +112,8 @@ export async function openChangeEmailModal() {
 }
 
 export function closeChangeEmailModal() {
+    const password = document.getElementById('change-email-password');
+    if (password) password.value = '';
     toggleModal('change-email-modal', false);
     if (emailChangeTimer) { clearInterval(emailChangeTimer); emailChangeTimer = null; }
     const button = document.getElementById('btn-change-email-code');
@@ -117,6 +121,8 @@ export function closeChangeEmailModal() {
 }
 
 export async function sendChangeEmailCode() {
+    const current_password = document.getElementById('change-email-password')?.value || '';
+    if (!current_password) { setEmailHint('请输入当前密码，确认是本人操作。', true); return; }
     const email = (document.getElementById('change-email-new')?.value || '').trim();
     const button = document.getElementById('btn-change-email-code');
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -130,7 +136,7 @@ export async function sendChangeEmailCode() {
         const res = await fetch('/api/email/send-code', {
             method: 'POST', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, purpose: 'change_email' })
+            body: JSON.stringify({ email, purpose: 'change_email', current_password })
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.status !== 'success') {
@@ -156,6 +162,8 @@ export async function sendChangeEmailCode() {
 }
 
 export async function submitChangeEmailModal() {
+    const current_password = document.getElementById('change-email-password')?.value || '';
+    if (!current_password) { setEmailHint('请输入当前密码，确认是本人操作。', true); return; }
     const email = (document.getElementById('change-email-new')?.value || '').trim();
     const code = (document.getElementById('change-email-code')?.value || '').trim();
     const button = document.getElementById('btn-change-email-submit');
@@ -171,7 +179,7 @@ export async function submitChangeEmailModal() {
         const res = await fetch('/api/email/change', {
             method: 'POST', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, code })
+            body: JSON.stringify({ email, code, current_password })
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.status !== 'success') {
@@ -356,8 +364,12 @@ export async function submitChangePasswordModal() {
         });
         const data = await res.json();
         if (data.status === 'success') {
-            if (typeof showToast === 'function') showToast('密码已修改', 'success');
+            if (typeof showToast === 'function') showToast(data.message || '密码已修改，请重新登录', 'success');
             closeChangePasswordModal();
+            if (data.reauthenticate) {
+                // A reload clears all cached account UI after server-side revocation.
+                window.location.reload();
+            }
         } else {
             setHint(data.message || '修改失败', true);
         }

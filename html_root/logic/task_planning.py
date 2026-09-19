@@ -39,14 +39,14 @@ async def plan_problem(problem, context='', force_decompose=False):
 
 async def solve_subtask(job, node):
     from app.routers.solve import ai_solution, LOCAL_TIMEOUT
-    from logic.curriculum import exact_example
-    from logic.solution_engine import local_solution
+    from app.math_runtime import run_math
+    from app.solution_models import Solution
     import asyncio
     if len(job['nodes']) == 1 and not job['context']:
         try:
-            local = await asyncio.wait_for(asyncio.to_thread(lambda:exact_example(job['problem']) or local_solution(job['problem'])), LOCAL_TIMEOUT)
+            local = await run_math('local',{'problem':job['problem']},LOCAL_TIMEOUT)
             if local:
-                return local
+                return Solution.model_validate(local)
         except (ValueError,TypeError,SyntaxError,OverflowError,asyncio.TimeoutError):
             pass
     dependencies = [{'goal':job['nodes'][i]['goal'], 'summary':job['nodes'][i]['solution']['summary'],

@@ -56,7 +56,7 @@ export async function queueMathTask(problem,context='',autoRender=true,forceDeco
 }
 
 export function mountTaskBoard(host){
-    host.innerHTML=`<section class="math-task-board"><header><div><span class="assistant-eyebrow">后台解题任务</span><h3>拆开难题，一步步完成。</h3><p>最多同时安排 3 道题；独立小问并行，有依赖的步骤按顺序生成。切换页面不影响后台任务。</p></div><button type="button" data-task-new>新增题目</button></header><p class="math-task-feedback" role="status"></p><div class="math-task-pending" hidden><p></p><button type="button" data-task-submit>继续提交</button></div><div class="math-task-list"></div></section>`;
+    host.innerHTML=`<section class="math-task-board"><header><div><span class="assistant-eyebrow">后台解题任务</span><h3>拆开难题，一步步完成。</h3><p>每次专注一道题。保留完整题干与本题小问，按依赖逐步解答；切换页面不影响进度。</p></div><button type="button" data-task-new>开始下一题</button></header><p class="math-task-feedback" role="status"></p><div class="math-task-pending" hidden><p></p><button type="button" data-task-submit>继续提交</button></div><div class="math-task-list"></div></section>`;
     let last='',alive=true;const binding=new AbortController();
     const $=selector=>host.querySelector(selector);
     const update=()=>{
@@ -65,6 +65,9 @@ export function mountTaskBoard(host){
         $('.math-task-pending').hidden=!state.pending;
         if(state.pending)textWithMath($('.math-task-pending p'),'待提交题目：'+state.pending.problem);
         $('[data-task-submit]').disabled=submitting;
+        const busy=submitting||state.jobs.some(active);
+        $('[data-task-new]').disabled=busy;
+        $('[data-task-new]').title=busy?'请等待当前题目完成，或先停止本题。':'开始下一道完整题目';
         const key=JSON.stringify(state.jobs);if(key===last)return;last=key;
         const expanded=new Set([...host.querySelectorAll('[data-job] details[open]')].map(el=>el.closest('[data-job]').dataset.job));
         $('.math-task-list').innerHTML=state.jobs.map(job=>{

@@ -189,3 +189,16 @@ body { background-image:radial-gradient(circle at 10% 0,color-mix(in srgb,var(--
   .navbar .mobile-account-access .header-admin-link { white-space:normal; }
   .navbar .mobile-menu-btn { padding:6px; }
 }
+
+/* Recognition: keep recovery hints outside the editable equation. */
+.detect-problem-label { display:block; margin:1rem 0 .5rem; font-weight:600; color:var(--text-main); }
+.detect-problem { width:100%; box-sizing:border-box; resize:vertical; min-height:110px; line-height:1.7; }
+.detect-feedback { margin:.8rem 0; color:var(--text-secondary); line-height:1.65; overflow-wrap:anywhere; }
+.detect-feedback[data-error="true"] { color:var(--error-color,#dc6060); }
+.detect-review { display:flex; align-items:flex-start; gap:.5rem; margin:.8rem 0; color:var(--text-main); font-size:.9rem; }
+.detect-review[hidden],.detect-loading[hidden] { display:none; }
+.result-panel #detect-cancel[hidden] { display:none; }
+.detect-loading { height:4px; overflow:hidden; border-radius:8px; background:var(--border-color); margin-top:.8rem; }
+.detect-loading span { display:block; height:100%; width:35%; background:var(--primary-color); border-radius:inherit; animation:detect-wait 1.8s ease-in-out infinite; }
+@keyframes detect-wait { from{transform:translateX(-110%)} to{transform:translateX(390%)} }
+@media(prefers-reduced-motion:reduce){.detect-loading span{animation:none;width:100%;opacity:.55;}}

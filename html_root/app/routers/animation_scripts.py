@@ -13,7 +13,7 @@ router = APIRouter(prefix="/animation_scripts", tags=["animation_scripts"])
 
 
 @router.post("/save")
-async def save_animation_script(data: AnimationScriptModel, auth_session: str | None = Cookie(None)):
+def save_animation_script(data: AnimationScriptModel, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != data.username:
         raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     conn = None
@@ -28,7 +28,7 @@ async def save_animation_script(data: AnimationScriptModel, auth_session: str | 
         conn.commit()
         return {"status": "success", "message": "保存成功", "id": cursor.lastrowid}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -66,11 +66,11 @@ async def list_animation_scripts(username: str, auth_session: str | None = Cooki
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _list_animation_scripts_sync, username)
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
 
 
 @router.get("/get")
-async def get_animation_script(id: int, username: str, auth_session: str | None = Cookie(None)):
+def get_animation_script(id: int, username: str, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != username:
         raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     conn = None
@@ -88,7 +88,7 @@ async def get_animation_script(id: int, username: str, auth_session: str | None 
         row["created_at"] = row["created_at"].isoformat()
         return {"status": "success", "data": row}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -97,7 +97,7 @@ async def get_animation_script(id: int, username: str, auth_session: str | None 
 
 
 @router.delete("/delete")
-async def delete_animation_script(id: int, username: str, auth_session: str | None = Cookie(None)):
+def delete_animation_script(id: int, username: str, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != username:
         raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     conn = None
@@ -109,7 +109,7 @@ async def delete_animation_script(id: int, username: str, auth_session: str | No
         conn.commit()
         return {"status": "success"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -118,7 +118,7 @@ async def delete_animation_script(id: int, username: str, auth_session: str | No
 
 
 @router.put("/update")
-async def update_animation_script(data: AnimationScriptUpdateModel, auth_session: str | None = Cookie(None)):
+def update_animation_script(data: AnimationScriptUpdateModel, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != data.username:
         raise HTTPException(status_code=403, detail="无权访问其他账户的脚本")
     conn = None
@@ -137,7 +137,7 @@ async def update_animation_script(data: AnimationScriptUpdateModel, auth_session
                 return JSONResponse(status_code=404, content={"status": "error", "message": "未找到脚本或无权修改"})
         return {"status": "success", "message": "更新成功"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()

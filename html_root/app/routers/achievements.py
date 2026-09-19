@@ -1,8 +1,9 @@
 # 星云成就系统：数据库存储，读写 API
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Cookie
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from ..store import SESSION_STORE
 
 from ..config import get_db_connection
 
@@ -141,7 +142,7 @@ def _ensure_table(cursor):
             """
         )
     except Exception as e:
-        logger.warning(f"ensure user_achievements table failed: {e}")
+        logger.warning("ensure user_achievements table failed: %s", type(e).__name__)
 
 
 def _get_db_progress(cursor, user_id):
@@ -188,12 +189,16 @@ def _compute_achievements(stats, db_progress):
 
 
 @router.get("/list")
-async def list_achievements(formulas: int = 0, scripts: int = 0, templates: int = 0, wrongbook: int = 0, tutorial_done: bool = False, username: str = ""):
+def list_achievements(formulas: int = 0, scripts: int = 0, templates: int = 0, wrongbook: int = 0, tutorial_done: bool = False, username: str = "", auth_session: str | None = Cookie(None)):
     """
     获取用户成就列表。
     前端传入 stats（formulas/scripts/templates/wrongbook/tutorial_done），
     服务端合并 DB 中的 tutorial 等状态后返回成就列表。
     """
+    owner = SESSION_STORE.get(auth_session or '')
+    if username and username != owner:
+        return JSONResponse(status_code=403 if owner else 401, content={'status':'error','message':'只能读取自己的成就。'})
+    username = owner or ''
     conn = None
     cursor = None
     try:
@@ -216,8 +221,8 @@ async def list_achievements(formulas: int = 0, scripts: int = 0, templates: int 
         data = _compute_achievements(stats, db_progress)
         return {"status": "success", "data": data}
     except Exception as e:
-        logger.error(f"list_achievements: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("list_achievements: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -226,15 +231,20 @@ async def list_achievements(formulas: int = 0, scripts: int = 0, templates: int 
 
 
 class AchievementUpsert(BaseModel):
-    username: str
-    achievement_id: str
-    progress: int = 0
+    username: str = Field(max_length=64)
+    achievement_id: str = Field(max_length=64)
+    progress: int = Field(default=0, ge=0, le=1000000)
     unlocked: bool = False
 
 
 @router.post("/upsert")
-async def upsert_achievement(data: AchievementUpsert):
+def upsert_achievement(data: AchievementUpsert, auth_session: str | None = Cookie(None)):
     """写入/更新成就进度到数据库。"""
+    owner = SESSION_STORE.get(auth_session or '')
+    if not owner or data.username != owner:
+        return JSONResponse(status_code=403 if owner else 401, content={'status':'error','message':'只能修改自己的成就。'})
+    if data.achievement_id not in {item['id'] for item in ACHIEVEMENT_DEFS}:
+        return JSONResponse(status_code=422, content={'status':'error','message':'成就类型不正确。'})
     conn = None
     cursor = None
     try:
@@ -247,13 +257,13 @@ async def upsert_achievement(data: AchievementUpsert):
             VALUES (%s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE progress = VALUES(progress), unlocked = VALUES(unlocked)
             """,
-            (data.username, data.achievement_id, data.progress, 1 if data.unlocked else 0),
+            (owner, data.achievement_id, data.progress, 1 if data.unlocked else 0),
         )
         conn.commit()
         return {"status": "success", "message": "已更新成就"}
     except Exception as e:
-        logger.error(f"upsert_achievement: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("upsert_achievement: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()

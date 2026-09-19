@@ -1,6 +1,5 @@
 # 用户：设置、资料、修改用户名/密码、头像上传
 import json
-import asyncio
 import logging
 import os
 import re
@@ -43,7 +42,7 @@ def user_stats(auth_session: Optional[str] = Cookie(None)):
 
 
 @router.get("/settings")
-async def get_user_settings(auth_session: Optional[str] = Cookie(None)):
+def get_user_settings(auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
@@ -62,8 +61,8 @@ async def get_user_settings(auth_session: Optional[str] = Cookie(None)):
                 pass
         return {"status": "success", "settings": out}
     except Exception as e:
-        logger.error(f"get_user_settings: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_user_settings: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -72,7 +71,7 @@ async def get_user_settings(auth_session: Optional[str] = Cookie(None)):
 
 
 @router.put("/settings")
-async def put_user_settings(data: UserSettingsModel, auth_session: Optional[str] = Cookie(None)):
+def put_user_settings(data: UserSettingsModel, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
@@ -91,8 +90,8 @@ async def put_user_settings(data: UserSettingsModel, auth_session: Optional[str]
         conn.commit()
         return {"status": "success", "message": "Settings saved"}
     except Exception as e:
-        logger.error(f"put_user_settings: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("put_user_settings: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -101,7 +100,7 @@ async def put_user_settings(data: UserSettingsModel, auth_session: Optional[str]
 
 
 @router.get("/profile")
-async def get_user_profile(auth_session: Optional[str] = Cookie(None)):
+def get_user_profile(auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
@@ -126,8 +125,8 @@ async def get_user_profile(auth_session: Optional[str] = Cookie(None)):
             out["email_verified_at"] = row.get("email_verified_at")
         return {"status": "success", "profile": out}
     except Exception as e:
-        logger.error(f"get_user_profile: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_user_profile: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -136,7 +135,7 @@ async def get_user_profile(auth_session: Optional[str] = Cookie(None)):
 
 
 @router.put("/profile")
-async def put_user_profile(data: UserProfileModel, auth_session: Optional[str] = Cookie(None)):
+def put_user_profile(data: UserProfileModel, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
@@ -147,6 +146,13 @@ async def put_user_profile(data: UserProfileModel, auth_session: Optional[str] =
         cursor = conn.cursor()
         nickname = (data.nickname or "").strip()[:128] if data.nickname else None
         avatar_url = (data.avatar_url or "").strip()[:512] if data.avatar_url else None
+        if avatar_url:
+            # Avatar ownership is established only by the upload transaction.
+            # A profile edit cannot point at somebody else's file or a tracking URL.
+            cursor.execute('SELECT avatar_url FROM user_profiles WHERE user_id=%s', (username,))
+            current = cursor.fetchone()
+            if not current or current[0] != avatar_url:
+                return JSONResponse(status_code=400, content={'status':'error','message':'请通过上传图片更换头像。'})
         cursor.execute(
             """INSERT INTO user_profiles (user_id, avatar_url, nickname, updated_at)
                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
@@ -159,8 +165,8 @@ async def put_user_profile(data: UserProfileModel, auth_session: Optional[str] =
         conn.commit()
         return {"status": "success", "message": "资料已更新"}
     except Exception as e:
-        logger.error(f"put_user_profile: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("put_user_profile: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -169,22 +175,24 @@ async def put_user_profile(data: UserProfileModel, auth_session: Optional[str] =
 
 
 @router.put("/username")
-async def change_username(data: ChangeUsernameModel, auth_session: Optional[str] = Cookie(None)):
+def change_username(data: ChangeUsernameModel, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
     from ..access import load_principal, is_owner
-    if is_owner(await asyncio.to_thread(load_principal,username)):
+    if is_owner(load_principal(username)):
         return JSONResponse(status_code=403,content={'status':'error','message':'主管理员账号名受保护，请保留当前账号名。'})
     new_username = (data.new_username or "").strip()[:64]
     if not new_username or new_username == username:
         return JSONResponse(status_code=400, content={"status": "error", "message": "新用户名无效或未变更"})
+    if len(data.password.encode()) > 72:
+        return JSONResponse(status_code=400, content={'status':'error','message':'密码不能超过 72 字节。'})
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, hashed_password FROM users WHERE username = %s", (username,))
+        cursor.execute("SELECT id, hashed_password FROM users WHERE username = %s FOR UPDATE", (username,))
         user = cursor.fetchone()
         if not user or not bcrypt.checkpw(data.password.encode(), user["hashed_password"].encode()):
             return JSONResponse(status_code=401, content={"status": "error", "message": "当前密码错误"})
@@ -201,14 +209,14 @@ async def change_username(data: ChangeUsernameModel, auth_session: Optional[str]
             cursor.execute('SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s',(table,))
             if cursor.fetchone()['n']:
                 cursor.execute(f'UPDATE `{table}` SET user_id=%s WHERE user_id=%s',(new_username,username))
-        conn.commit()
         for token,name in list(SESSION_STORE.items()):
             if name==username:SESSION_STORE[token]=new_username
+        conn.commit()
         return {"status": "success", "username": new_username, "message": "用户名已修改"}
     except Exception as e:
         if conn:conn.rollback()
-        logger.error(f"change_username: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("change_username: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -217,29 +225,31 @@ async def change_username(data: ChangeUsernameModel, auth_session: Optional[str]
 
 
 @router.put("/password")
-async def change_password(data: ChangePasswordModel, auth_session: Optional[str] = Cookie(None)):
+def change_password(data: ChangePasswordModel, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
-    if not data.new_password or len(data.new_password) < 6:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "新密码至少 6 位"})
+    if len(data.new_password) < 6 or max(len(data.new_password.encode()),len(data.current_password.encode())) > 72:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "密码至少 6 位，且不能超过 72 字节。"})
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT hashed_password FROM users WHERE username = %s", (username,))
+        cursor.execute("SELECT hashed_password FROM users WHERE username = %s FOR UPDATE", (username,))
         row = cursor.fetchone()
         if not row or not bcrypt.checkpw(data.current_password.encode(), row["hashed_password"].encode()):
             return JSONResponse(status_code=401, content={"status": "error", "message": "当前密码错误"})
         hashed = bcrypt.hashpw(data.new_password.encode(), bcrypt.gensalt()).decode()
-        cursor = conn.cursor()
         cursor.execute("UPDATE users SET hashed_password = %s WHERE username = %s", (hashed, username))
+        # Login and password-reset lock the same account row. Revoke while held
+        # so a concurrent login cannot retain a session made with the old hash.
+        SESSION_STORE.remove_value(username)
         conn.commit()
-        return {"status": "success", "message": "密码已修改"}
+        return {"status": "success", "message": "密码已修改，所有设备已退出，请重新登录。", "reauthenticate": True}
     except Exception as e:
-        logger.error(f"change_password: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("change_password: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -248,34 +258,56 @@ async def change_password(data: ChangePasswordModel, auth_session: Optional[str]
 
 
 @router.post("/avatar")
-async def upload_avatar(file: UploadFile = File(...), auth_session: Optional[str] = Cookie(None)):
+def upload_avatar(file: UploadFile = File(...), auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_AVATAR_EXT:
         return JSONResponse(status_code=400, content={"status": "error", "message": "仅支持 PNG/JPG/GIF/WEBP"})
+    conn = cursor = path = None
+    committed = False
+    old_name = None
     try:
-        content = await file.read()
-        if len(content) > 2 * 1024 * 1024:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "图片不超过 2MB"})
+        from ..avatar_image import sanitize_avatar
+        content = sanitize_avatar(file.file.read(2 * 1024 * 1024 + 1))
         safe_name = re.sub(r"[^\w\-]", "_", username)[:32]
-        fname = f"{safe_name}_{uuid.uuid4().hex[:12]}{ext}"
+        fname = f"{safe_name}_{uuid.uuid4().hex}.png"
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # Serialize replacement so concurrent uploads cannot orphan every file.
+        cursor.execute('SELECT id FROM users WHERE username=%s FOR UPDATE', (username,))
+        cursor.fetchone()
+        cursor.execute('SELECT avatar_url FROM user_profiles WHERE user_id=%s', (username,))
+        old_row = cursor.fetchone()
+        old_url = (old_row[0] or '') if isinstance(old_row, (tuple, list)) and old_row else ''
+        candidate = old_url.removeprefix('/static/avatars/') if isinstance(old_url, str) else ''
+        if (isinstance(old_url,str) and old_url.startswith('/static/avatars/') and
+                re.fullmatch(re.escape(safe_name)+r'_[a-f0-9]{32}\.(?:png|jpg|jpeg|gif|webp)', candidate)):
+            old_name = candidate
         path = os.path.join(AVATAR_DIR, fname)
         with open(path, "wb") as f:
             f.write(content)
         url = f"/static/avatars/{fname}"
-        conn = get_db_connection()
-        cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO user_profiles (user_id, avatar_url, updated_at) VALUES (%s, %s, CURRENT_TIMESTAMP)
                ON DUPLICATE KEY UPDATE avatar_url = VALUES(avatar_url), updated_at = CURRENT_TIMESTAMP""",
             (username, url),
         )
         conn.commit()
-        cursor.close()
-        conn.close()
+        committed = True
+        if old_name:
+            try: os.remove(os.path.join(AVATAR_DIR, old_name))
+            except OSError: pass
         return {"status": "success", "avatar_url": url, "message": "头像已更新"}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={'status':'error','message':str(e)})
     except Exception as e:
-        logger.error(f"upload_avatar: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("upload_avatar: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+        if path and not committed:
+            try: os.remove(path)
+            except OSError: pass

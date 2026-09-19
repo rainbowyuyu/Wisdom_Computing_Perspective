@@ -325,6 +325,7 @@ export function applyEdit() {
                     const dt = new DataTransfer();
                     dt.items.add(file);
                     fileInput.files = dt.files;
+                    window.dispatchEvent(new CustomEvent('recognition-source-change'));
                     if (window.handleImageFile) {
                         // 传递 skipAutoOpen=true 防止移动端再次自动打开编辑器
                         window.handleImageFile(file, true);

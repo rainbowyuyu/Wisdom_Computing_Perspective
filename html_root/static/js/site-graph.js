@@ -30,7 +30,7 @@ export const NODES = [
   { id: 'agent-examples', name: '功能示例', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-lightbulb', keywords: ['示例'], val: 8, color: '#c4b5fd' },
   { id: 'agent-clear', name: '清空对话', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-trash', keywords: ['清空'], val: 7, color: '#a5b4fc' },
   { id: 'agent-settings', name: '智能体设置', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-gear', keywords: ['设置'], val: 7, color: '#c4b5fd' },
-  { id: 'agent-tasks', name: '后台解题任务', section: 'agent', focus_target: '.math-task-board', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-list-check', keywords: ['后台任务','并发','多道题','任务进度','继续未完成'], val: 10, color: '#a5b4fc' },
+  { id: 'agent-tasks', name: '后台解题任务', section: 'agent', focus_target: '.math-task-board', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-list-check', keywords: ['后台任务','单题拆解','资源排队','任务进度','继续未完成'], val: 10, color: '#a5b4fc' },
   { id: 'agent-decompose', name: '复杂题拆解', section: 'agent', agent_action: 'decompose', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-diagram-project', keywords: ['复杂题','拆解','拆题','多个小问'], val: 10, color: '#a5b4fc' },
   { id: 'detect', name: '智能识别', section: 'detect', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-camera', keywords: ['识别','公式识别','OCR','手写','上传'], val: 14, color: '#22d3ee' },
   { id: 'detect-handwrite', name: '手写模式', section: 'detect', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-pen', keywords: ['手写'], val: 9, color: '#67e8f9' },

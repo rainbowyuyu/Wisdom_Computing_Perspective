@@ -43,6 +43,22 @@ async def lifespan(app):
         await asyncio.to_thread(journal.close)
 
 app = FastAPI(lifespan=lifespan)
+
+@app.get('/healthz',include_in_schema=False)
+async def healthz():
+    # Independent of databases, model providers and the shared I/O thread pool.
+    return {'status':'ok'}
+
+from app.config import db_pool  # Load deployment environment before worker limits.
+from app.math_runtime import MathCapacityError,MathDeadlineExceeded,MathWorkerError
+from app.host_resources import HostBusy
+
+@app.exception_handler(MathCapacityError)
+@app.exception_handler(MathDeadlineExceeded)
+@app.exception_handler(MathWorkerError)
+@app.exception_handler(HostBusy)
+async def math_resource_error(request,exc):
+    return JSONResponse(status_code=503,content={'status':'error','message':str(exc),'retryable':False},headers={'Cache-Control':'no-store'})
 from app.static_compression import StaticCompression
 app.add_middleware(StaticCompression)
 
@@ -88,6 +104,10 @@ from app.routers import math_tasks
 app.include_router(math_tasks.router, prefix="/api")
 from app.request_guard import RequestGuard
 app.add_middleware(RequestGuard)
+from app.security import SecurityEnvelope, safe_validation_error
+from fastapi.exceptions import RequestValidationError
+app.add_exception_handler(RequestValidationError, safe_validation_error)
+app.add_middleware(SecurityEnvelope)
 from app.routers import accounts
 app.include_router(accounts.router,prefix='/api')
 from app.access import AccessDenied
@@ -129,7 +149,8 @@ def run():
     # Sessions, rendering tasks and WebSocket rooms share this single process.
     # Passing the app avoids importing main a second time and creating another DB pool.
     uvicorn.run(app, host=os.getenv("HOST", "127.0.0.1"),
-                port=int(os.getenv("PORT", "8000")), workers=1, reload=False, proxy_headers=False)
+                port=int(os.getenv("PORT", "8000")), workers=1, reload=False, proxy_headers=False,
+                ws_max_size=4096, ws_max_queue=4)
 
 
 if __name__ == "__main__":

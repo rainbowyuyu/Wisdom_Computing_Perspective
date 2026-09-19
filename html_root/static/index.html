@@ -30,9 +30,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- 第三方库：KaTeX 全站公式渲染（与 ChatGPT / Claude / 豆包等一致，整齐正确好看） -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.js" integrity="sha384-CwjPRVHTvLiMBFjEoij+QZViMV5rhTOIp7CJzl24JEqpRDA1sJFHVXXLURktbYYp" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous"></script>
     <script>
     window.App = window.App || {};
     window.App.config = window.App.config || {};
@@ -52,17 +52,17 @@
     </script>
     <!-- Driver.js (用于新手引导) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
-    <script defer src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js" integrity="sha384-yPK823YWGKpXfBT8wLqUXmrB5ejcI7sgGBIary/01UavNc1bD92AOUBCBzjXQS/s" crossorigin="anonymous"></script>
     <!-- MathLive (用于可视化公式编辑) -->
-    <script async src="https://unpkg.com/mathlive"></script>
+    <script async src="https://unpkg.com/mathlive@0.110.0/mathlive.min.js" integrity="sha384-5IN6K0kiaz8MufrTGBvPCP3oDeMjmwe+DDTvuyQLNv6gc634FpKbQfllonjHJPmy" crossorigin="anonymous"></script>
     <!-- Marked (Markdown 解析) -->
-    <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/marked@18.0.13/lib/marked.umd.js" integrity="sha384-Jy8qDMspJASzATgFngF2ompIKy0StbCcvuTE65mxDm/E0/YSIF6Ndc+5V7bbwRcw" crossorigin="anonymous"></script>
     <!-- Highlight.js (代码高亮) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
     <!-- Cropper.js (图片裁剪编辑) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css">
-    <script defer src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js" integrity="sha384-r+ljwOAhwY4/kdyzMnuBg7MEVoWpTMp5EYUDntB/E9qzNwL9dAEcNrb2XaV+mJc2" crossorigin="anonymous"></script>
 
     <!-- 核心样式 -->
     <link rel="stylesheet" href="css/main.css?v=20260918-hero-1">
@@ -337,7 +337,7 @@
                             <i class="fa-solid fa-magnifying-glass"></i> 立即识别
                         </button>
                         <p style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.75rem; font-weight: 500;">
-                            识别结果将显示在右侧底部
+                            每次只识别一道题，请保留完整题干和图形
                         </p>
                     </div>
                 </div>
@@ -372,7 +372,7 @@
                         <button type="button" class="btn-detect-primary" onclick="processRecognition()" title="对手写或上传的公式进行识别">
                             <i class="fa-solid fa-magnifying-glass"></i> 立即识别
                         </button>
-                        <p class="detect-action-hint">识别结果将显示在下方</p>
+                        <p class="detect-action-hint">一次一道题，先核对题面，再开始计算</p>
                     </div>
 
                     <!-- 下半部分：识别结果 (独立面板) -->
@@ -399,6 +399,12 @@
                             </math-field>
                         </div>
 
+                        <label class="detect-problem-label" for="detect-problem">完整题面 · 计算时以这里为准</label>
+                        <textarea id="detect-problem" class="tech-input detect-problem" maxlength="6000" rows="4" placeholder="核对或补充题干、已知条件与所求；支持 LaTeX。每次只放一道题。"></textarea>
+                        <div id="detect-loading" class="detect-loading" role="progressbar" aria-label="正在识别题目" hidden><span></span></div>
+                        <p id="detect-feedback" class="detect-feedback" role="status" aria-live="polite">每次只上传一道题，保留完整题干、图形和该题的小问。</p>
+                        <label id="detect-review" class="detect-review" hidden><input type="checkbox" id="detect-confirm"> 我已核对并补全题面，以完整题面为准</label>
+                        <button type="button" id="detect-cancel" class="action-btn secondary" hidden>取消识别</button>
                         <div class="result-actions">
                             <div style="font-size: 0.85rem; color: var(--text-secondary);">
                                 <i class="fa-regular fa-keyboard"></i> 点击公式可直接修改
@@ -414,7 +420,7 @@
                                 <!-- 修改 2: 添加 id="btn-copy-calc" 和 disabled -->
                                 <button id="btn-copy-calc" class="action-btn secondary" onclick="copyToCalc()" disabled
                                         style="padding: 0.8rem 1.5rem; border-radius: 99px;" title="仅跳转到计算页，不保存">
-                                    去计算 <i class="fa-solid fa-arrow-right"></i>
+                                    确认题面并去计算 <i class="fa-solid fa-arrow-right"></i>
                                 </button>
                                 <!-- 新增：跳转到 LaTeX 编辑器 -->
                                 <button id="btn-edit-in-latex" class="action-btn tertiary" type="button" onclick="openInDevLatexFromDetect()" disabled
@@ -902,10 +908,12 @@
             <header class="auth-style-header">
                 <div class="auth-style-eyebrow"><i class="fa-solid fa-shield-halved"></i> 账户安全</div>
                 <h3 class="auth-title">更换绑定邮箱</h3>
-                <p class="auth-form-hint">验证码会发送到新邮箱，验证成功后立即替换当前邮箱。</p>
+                <p class="auth-form-hint">输入当前密码，并验证新邮箱后即可完成更换。</p>
             </header>
             <div id="change-email-guest" class="auth-body" style="display:none; color: var(--text-secondary);">请先登录后再更换邮箱。</div>
             <div id="change-email-form" class="auth-body" style="display:none;">
+                <label class="auth-field-label" for="change-email-password">当前密码</label>
+                <input type="password" id="change-email-password" class="tech-input" placeholder="确认是本人操作" maxlength="72" autocomplete="current-password">
                 <label class="auth-field-label" for="change-email-new">新邮箱地址</label>
                 <input type="email" id="change-email-new" class="tech-input" placeholder="name@example.com" maxlength="254" autocomplete="email">
                 <div class="email-code-row profile-email-code-row">
@@ -1819,7 +1827,7 @@
     </div>
 
     <!-- HLS.js：MSE 流媒体播放（.m3u8），与原生 MP4 并存 -->
-    <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js" integrity="sha384-cciJ0zi8d1uMKC2zJd7jvPY4HQt7W4ByUI/FlMkltvBi31aW61rcpVBhpmW8/NwX" crossorigin="anonymous"></script>
     <!-- Three.js + 3d-force-graph（UMD 单实例）process polyfill 解决浏览器中 process 未定义 -->
     <script>window.process = { env: { NODE_ENV: 'production' } };</script>
     <!-- 模块化 JS 入口 -->

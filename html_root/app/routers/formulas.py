@@ -34,7 +34,7 @@ def _ensure_topics_tables(cursor) -> None:
             """
         )
     except Exception as e:
-        logger.warning(f"ensure formula_topics table failed: {e}")
+        logger.warning("ensure formula_topics table failed: %s", type(e).__name__)
 
 
 def _heuristic_tags(latex: str) -> List[str]:
@@ -133,7 +133,7 @@ def _infer_formula_topics(latex: str, note: str = "") -> List[Tuple[str, float]]
                 uniq.append(t)
         return [(t, 1.0) for t in uniq]
     except Exception as e:
-        logger.warning(f"infer formula topics via LLM failed: {e}")
+        logger.warning("infer formula topics via LLM failed: %s", type(e).__name__)
         return [(t, 1.0) for t in base_tags]
 
 
@@ -164,12 +164,12 @@ def save_formula(data: FormulaModel, auth_session: str | None = Cookie(None)):
                 )
                 topics_cursor.close()
         except Exception as e:
-            logger.warning(f"save_formula topics failed: {e}")
+            logger.warning("save_formula topics failed: %s", type(e).__name__)
 
         conn.commit()
         return {"status": "success", "message": "保存成功"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -206,7 +206,7 @@ async def list_formulas(username: str, auth_session: str | None = Cookie(None)):
         result = await loop.run_in_executor(None, _list_formulas_sync, username, SESSION_STORE.get(auth_session or '') == username)
         return result
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
 
 
 @router.get('/list/me')
@@ -215,7 +215,7 @@ def list_my_formulas(auth_session: str | None = Cookie(None)):
 
 
 @router.delete("/delete")
-async def delete_formula(id: int, username: str, auth_session: str | None = Cookie(None)):
+def delete_formula(id: int, username: str, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != username:
         return JSONResponse(status_code=403, content={"status":"error","message":"无权删除其他账户的算式"})
     conn = None
@@ -233,11 +233,11 @@ async def delete_formula(id: int, username: str, auth_session: str | None = Cook
             )
             topics_cursor.close()
         except Exception as e:
-            logger.warning(f"delete_formula topics cleanup failed: {e}")
+            logger.warning("delete_formula topics cleanup failed: %s", type(e).__name__)
         conn.commit()
         return {"status": "success"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -279,14 +279,14 @@ def update_formula(data: FormulaUpdateModel, auth_session: str | None = Cookie(N
                     )
                 topics_cursor.close()
             except Exception as e:
-                logger.warning(f"update_formula topics failed: {e}")
+                logger.warning("update_formula topics failed: %s", type(e).__name__)
 
         conn.commit()
         if cursor.rowcount == 0:
             return JSONResponse(status_code=404, content={"status": "error", "message": "未找到算式或无权修改"})
         return {"status": "success", "message": "更新成功"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -295,7 +295,7 @@ def update_formula(data: FormulaUpdateModel, auth_session: str | None = Cookie(N
 
 
 @router.get("/knowledge")
-async def knowledge_summary(username: str):
+def knowledge_summary(username: str):
     """
     基于用户已保存的算式，统计各知识标签的数量与粗略掌握度估计，
     供前端渲染「知识星云」与进度条。
@@ -370,8 +370,8 @@ async def knowledge_summary(username: str):
         topics.sort(key=lambda x: (-x["mastery"], -x["count"], x["tag"]))
         return {"status": "success", "total": total, "topics": topics}
     except Exception as e:
-        logger.error(f"knowledge_summary failed: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("knowledge_summary failed: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()

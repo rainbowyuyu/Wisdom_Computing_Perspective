@@ -25,6 +25,8 @@ async def list_tasks():
 async def create_task(data:MathJobRequest):
     who=caller()
     if not data.problem.strip():raise HTTPException(status_code=422,detail='请填写完整题目。')
+    from logic.single_problem import multiple_problems, SINGLE_PROBLEM_MESSAGE
+    if multiple_problems(data.problem): raise HTTPException(status_code=422,detail=SINGLE_PROBLEM_MESSAGE)
     try:return await manager.submit(data,who)
     except AccessDenied:raise
     except UsageDenied as error:raise HTTPException(status_code=429,detail=str(error),headers={'Retry-After':str(error.retry_after)}) from error

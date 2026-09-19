@@ -210,6 +210,7 @@ function hideCanvasEditButton() {
 // @param {File} file - 图片文件
 // @param {boolean} skipAutoOpen - 是否跳过移动端自动打开编辑器（用于从编辑器应用时）
 function handleImageFile(file, skipAutoOpen = false) {
+    window.dispatchEvent(new CustomEvent('recognition-source-change'));
     const fileNameDisplay = document.getElementById('file-name-display');
     if(fileNameDisplay) fileNameDisplay.innerText = file.name || "Pasted Image";
 
@@ -655,6 +656,7 @@ function saveState() {
 }
 
 export function undo() {
+    window.dispatchEvent(new CustomEvent('recognition-source-change'));
     if (historyStep > 0) {
         historyStep--;
         restoreState();
@@ -662,6 +664,7 @@ export function undo() {
 }
 
 export function redo() {
+    window.dispatchEvent(new CustomEvent('recognition-source-change'));
     if (historyStep < historyStack.length - 1) {
         historyStep++;
         restoreState();
@@ -684,6 +687,7 @@ function restoreState() {
 }
 
 export function clearCanvas() {
+    window.dispatchEvent(new CustomEvent('recognition-source-change'));
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
 

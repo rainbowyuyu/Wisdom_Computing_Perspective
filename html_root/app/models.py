@@ -17,11 +17,16 @@ class EmailCodeRequest(BaseModel):
     purpose: str = Field(pattern=r'^(register|verify|reset|change_email)$')
     captcha: Optional[str] = Field(default=None, max_length=12)
     captcha_id: Optional[str] = Field(default=None, max_length=64)
+    current_password: Optional[str] = Field(default=None, max_length=72)
 
 
 class EmailVerifyModel(BaseModel):
     email: str = Field(min_length=3, max_length=254)
     code: str = Field(min_length=4, max_length=12)
+
+
+class EmailChangeModel(EmailVerifyModel):
+    current_password: str = Field(min_length=1, max_length=72)
 
 
 class PasswordResetModel(BaseModel):
@@ -74,13 +79,13 @@ class UserProfileModel(BaseModel):
 
 
 class ChangeUsernameModel(BaseModel):
-    new_username: str
-    password: str
+    new_username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=72)
 
 
 class ChangePasswordModel(BaseModel):
-    current_password: str
-    new_password: str
+    current_password: str = Field(min_length=1, max_length=72)
+    new_password: str = Field(min_length=6, max_length=72)
 
 
 class ManimCodeModel(BaseModel):

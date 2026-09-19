@@ -1,8 +1,30 @@
-import { normalizeLatex } from './math-text.js';
+import { createRecognitionFlow } from './recognition-flow.js';
 // static/js/detect.js
 import { getCanvasBlob } from './canvas.js';
 import { showSection } from './ui.js';
 import * as DevTools from '/static/js/devtools.js?v=20260917-creator-2';
+
+let flow;
+function getFlow(){
+    if(flow)return flow;
+    flow=createRecognitionFlow(state=>{
+        const math=document.getElementById('latex-output'),code=document.getElementById('latex-code-detect');
+        if(math && math.value!==state.latex){if(math.setValue)math.setValue(state.latex);else math.value=state.latex;}
+        if(code && code.value!==state.latex)code.value=state.latex;
+        const problem=document.getElementById('detect-problem');
+        if(problem&&problem.value!==state.problem)problem.value=state.problem;
+        const status=document.getElementById('detect-feedback');
+        if(status){status.textContent=state.message;status.dataset.error=String(!!state.error);}
+        document.getElementById('detect-loading')?.toggleAttribute('hidden',!state.busy);
+        document.getElementById('detect-cancel')?.toggleAttribute('hidden',!state.busy);
+        const review=document.getElementById('detect-review');
+        if(review)review.hidden=!state.needsReview;
+        const check=document.getElementById('detect-confirm');if(check)check.checked=state.confirmed;
+        document.querySelectorAll('[onclick="processRecognition()"]').forEach(b=>b.disabled=state.busy);
+        if(flow)setButtonsState(flow.canContinue());
+    });
+    return flow;
+}
 
 // 辅助：设置按钮可用状态
 function setButtonsState(enabled) {
@@ -11,9 +33,10 @@ function setButtonsState(enabled) {
     const btnLatex = document.getElementById('btn-edit-in-latex');
 
     // 当 enabled 为 true 时，disabled 属性应为 false
-    if (btnSave) btnSave.disabled = !enabled;
+    const hasFormula = !!flow?.state.latex.trim();
+    if (btnSave) btnSave.disabled = !enabled || !hasFormula;
     if (btnCalc) btnCalc.disabled = !enabled;
-    if (btnLatex) btnLatex.disabled = !enabled;
+    if (btnLatex) btnLatex.disabled = !enabled || !hasFormula;
 }
 
 // 辅助：检查内容是否为有效公式
@@ -31,20 +54,30 @@ function checkContent(text) {
 export function initDetectListeners() {
     const mathField = document.getElementById('latex-output');
     const codeArea = document.getElementById('latex-code-detect');
+    if (mathField?.dataset.recognitionBound) return;
+    if(mathField)mathField.dataset.recognitionBound='true';
+    getFlow();
+    document.getElementById('detect-problem')?.addEventListener('input', e=>flow.editProblem(e.target.value));
+    document.getElementById('detect-confirm')?.addEventListener('change', e=>flow.confirm(e.target.checked));
+    document.getElementById('detect-cancel')?.addEventListener('click', ()=>flow.cancel());
+    window.addEventListener('recognition-source-change',()=>flow.reset());
+    window.addEventListener('recognition-result',e=>flow.accept(e.detail));
+    document.getElementById('image-upload')?.addEventListener('change',()=>flow.reset());
+    document.getElementById('drawing-board')?.addEventListener('pointerdown',()=>flow.reset());
 
     if (mathField && codeArea) {
         // 双向绑定：MathLive -> Textarea
         mathField.addEventListener('input', (e) => {
             const val = e.target.value;
             codeArea.value = val;
-            setButtonsState(checkContent(val));
+            getFlow().editLatex(val);
         });
 
         // 双向绑定：Textarea -> MathLive
         codeArea.addEventListener('input', (e) => {
             const val = e.target.value;
             mathField.setValue(val);
-            setButtonsState(checkContent(val));
+            getFlow().editLatex(val);
         });
         
         // 调整"查看源码"弹层位置，确保不超出视口
@@ -109,113 +142,19 @@ export function initDetectListeners() {
 }
 
 export async function processRecognition() {
-    const mathField = document.getElementById('latex-output');
-    const codeArea = document.getElementById('latex-code-detect');
-
-    // 1. 开始前：禁用按钮，显示 Loading
-    setButtonsState(false);
-    mathField.setValue(String.raw`\text{正在识别...}`);
-
-    let blob;
-
-    // 检查当前处于哪个 Tab
-    const drawTab = document.querySelector('.tab-btn[onclick*="draw"]');
-    const isDrawMode = drawTab && drawTab.classList.contains('active');
-
-    if (isDrawMode) {
-        blob = await getCanvasBlob();
-    } else {
-        const fileInput = document.getElementById('image-upload');
-        if (fileInput.files.length > 0) {
-            blob = fileInput.files[0];
-        }
-    }
-
-    if (!blob) {
-        if (typeof showAlert === 'function') await showAlert(isDrawMode ? "请先绘制内容" : "请先上传图片", "提示");
-        mathField.setValue(String.raw`\text{等待输入...}`);
-        setButtonsState(false); // 保持禁用
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', blob);
-
-    try {
-        const response = await fetch('/api/detect', { method: 'POST', body: formData });
-        const data = await response.json();
-
-        if (data.status === 'success') {
-            // 2. 成功：填充内容并激活按钮
-            data.latex=normalizeLatex(data.latex);
-            if (mathField.setValue) mathField.setValue(data.latex);
-            if (codeArea) codeArea.value = data.latex;
-            try {
-                sessionStorage.setItem('last_detect_latex', String(data.latex));
-                sessionStorage.setItem('last_detect_problem', String(data.problem_text || data.latex));
-            } catch {}
-
-            setButtonsState(true); // <--- 关键：激活按钮
-
-            // 将识别结果中由后端生成的「视觉描述 Prompt」暂存，供动态计算页复用
-            // 这样从 detect → calculate 不仅传 LaTeX，还能携带对几何/结构关系的自然语言描述
-            try {
-                if (data.vision_prompt && typeof sessionStorage !== 'undefined') {
-                    sessionStorage.setItem('last_detect_vision_prompt', String(data.vision_prompt));
-                } else if (typeof sessionStorage !== 'undefined') {
-                    sessionStorage.removeItem('last_detect_vision_prompt');
-                }
-            } catch (e) {
-                console.warn('persist vision_prompt failed', e);
-            }
-
-            // 成功提示效果
-            const container = document.querySelector('.result-panel');
-            if (container) {
-                container.style.boxShadow = "0 0 0 2px var(--primary-color)";
-                setTimeout(() => container.style.boxShadow = "", 1000);
-            }
-        } else {
-            // 3. 失败：显示错误信息，保持禁用
-            if(mathField.setValue) mathField.setValue(String.raw`\text{Error: }` + data.message);
-            setButtonsState(false);
-        }
-    } catch (e) {
-        console.error(e);
-        if(mathField.setValue) mathField.setValue(String.raw`\text{网络错误}`);
-        setButtonsState(false);
-    }
+    return getFlow().run(async()=>{
+        const isDrawMode=document.querySelector('.tab-btn[onclick*="draw"]')?.classList.contains('active');
+        return isDrawMode?await getCanvasBlob():document.getElementById('image-upload')?.files?.[0];
+    });
 }
 
-// 导出到计算页面
 export async function copyToCalc() {
-    const mathField = document.getElementById('latex-output');
-    const codeArea = document.getElementById('latex-code-detect');
-
-    let detected = "";
-    if (mathField && mathField.getValue) {
-        detected = mathField.getValue();
-    } else if (codeArea) {
-        detected = codeArea.value;
-    }
-
-    // 再次校验（虽然按钮禁用时点不了，但为了健壮性保留）
-    if(checkContent(detected)) {
-        // 跳转到计算页面
+    try{
+        const {problem,context}=getFlow().payload();
+        if(!window.StepTutor)await import('./step-tutor.js');
         (window.showSection || showSection)('calculate');
-        let problem = detected, context = '';
-        try {
-            if (sessionStorage.getItem('last_detect_latex') === detected) {
-                problem = sessionStorage.getItem('last_detect_problem') || detected;
-                context = sessionStorage.getItem('last_detect_vision_prompt') || '';
-            }
-        } catch {}
-        window.StepTutor?.prefill(problem, context);
-
-
-    } else {
-        if (typeof showAlert === 'function') await showAlert("请先进行识别或输入有效公式", "提示");
-    }
+        window.StepTutor.prefill(problem,context);
+    }catch(error){window.showAlert?.(error.message,'核对题目');}
 }
 
 // 从识别结果跳转到开发者工具中的 LaTeX 编辑器进行进一步编辑

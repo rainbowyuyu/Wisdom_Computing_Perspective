@@ -108,6 +108,7 @@ export function switchAuthMode(mode) {
 
 // 切换 手写/上传 模式
 export function switchInputMode(mode) {
+    window.dispatchEvent(new CustomEvent('recognition-source-change'));
     const drawTools = document.getElementById('draw-tools');
     const uploadTools = document.getElementById('upload-tools');
     const canvas = document.getElementById('drawing-board');

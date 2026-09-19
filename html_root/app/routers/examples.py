@@ -1,5 +1,6 @@
 # 教学案例：示例视频列表、点赞/评论/弹幕、播放器配置与鉴权（B 站风核心）
 import json
+import asyncio
 import os
 import logging
 import time
@@ -42,14 +43,14 @@ async def _broadcast_video(video_id: str, message: dict):
     if not room:
         return
     text = json.dumps(message, ensure_ascii=False)
-    dead = []
-    for ws in list(room):
+    async def deliver(ws):
         try:
-            await ws.send_text(text)
+            await asyncio.wait_for(ws.send_text(text), 2)
         except Exception:
-            dead.append(ws)
-    for ws in dead:
-        room.discard(ws)
+            room.discard(ws)
+            try: await asyncio.wait_for(ws.close(code=1013), 1)
+            except Exception: pass
+    await asyncio.gather(*(deliver(ws) for ws in list(room)))
 
 
 def _username_from_session(auth_session: Optional[str] = None):
@@ -121,7 +122,7 @@ def _ensure_tables(cursor):
             else:
                 cursor.execute(sql)
         except Exception as e:
-            logger.warning(f"_ensure_tables step failed: {e}")
+            logger.warning("_ensure_tables step failed: %s", type(e).__name__)
     run("""
         CREATE TABLE IF NOT EXISTS example_video_likes (
             video_id VARCHAR(128) NOT NULL,
@@ -217,7 +218,7 @@ def _ensure_tables(cursor):
 
 
 @router.get("/examples/health")
-async def examples_health():
+def examples_health():
     """
     诊断接口：不依赖 Cookie，返回列表或详细错误（便于排查 500）。
     正常后请勿依赖此接口，使用 GET /api/examples。
@@ -255,30 +256,26 @@ async def examples_health():
             conn.close()
         except Exception as db_err:
             db_ok = False
-            db_error = str(db_err)
+            db_error = '数据库暂不可用'
         return {
             "status": "ok",
             "videos_count": len(videos),
             "db_ok": db_ok,
             "db_error": db_error,
-            "storage_dir": storage_dir,
             "storage_exists": os.path.exists(storage_dir),
         }
     except Exception as e:
-        import traceback
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": str(e),
-                "type": type(e).__name__,
-                "traceback": traceback.format_exc(),
+                "message": "服务暂不可用，请稍后重试。",
             },
         )
 
 
 @router.get("/examples")
-async def get_examples(
+def get_examples(
     request: Request,
     tag: Optional[str] = Query(None, max_length=64),
     filter_mode: Optional[str] = Query(None, description="all|favorites|watch_later"),
@@ -302,7 +299,7 @@ async def get_examples(
                     if fn:
                         meta_dict[fn] = item
             except Exception as e:
-                logger.error(f"Metadata load error: {e}")
+                logger.error("Metadata load error: %s", type(e).__name__)
 
         if os.path.exists(storage_dir):
             try:
@@ -346,7 +343,7 @@ async def get_examples(
                             "tags": tags_list,
                         })
             except OSError as e:
-                logger.warning(f"Storage listdir error: {e}")
+                logger.warning("Storage listdir error: %s", type(e).__name__)
 
         if tag:
             tag_lower = tag.strip().lower()
@@ -394,7 +391,7 @@ async def get_examples(
                 v["user_favorited"] = vid in fav_ids
                 v["user_watch_later"] = vid in watch_later_ids
         except Exception as e:
-            logger.warning(f"Examples likes query: {e}")
+            logger.warning("Examples likes query: %s", type(e).__name__)
             for v in videos:
                 v["like_count"] = v.get("like_count", 0)
                 v["user_has_liked"] = v.get("user_has_liked", False)
@@ -416,7 +413,7 @@ async def get_examples(
 # ========== v1 播放器核心 API（鉴权 URL、续播、弹幕分段、心跳） ==========
 
 @router.get("/v1/player/config/{video_id}")
-async def get_player_config(
+def get_player_config(
     video_id: str,
     request: Request,
     auth_session: Optional[str] = Cookie(None),
@@ -439,7 +436,7 @@ async def get_player_config(
                     fn = item.get("filename", "")
                     meta_dict[fn.rsplit(".", 1)[0] if "." in fn else fn] = item
         except Exception as e:
-            logger.error(f"Metadata load error: {e}")
+            logger.error("Metadata load error: %s", type(e).__name__)
     filename = video_id + ".mp4"
     file_path = os.path.join(storage_dir, filename)
     if not os.path.isfile(file_path):
@@ -474,7 +471,7 @@ async def get_player_config(
             if row and row.get("progress") is not None:
                 last_play_time = float(row["progress"])
         except Exception as e:
-            logger.warning(f"play_history query: {e}")
+            logger.warning("play_history query: %s", type(e).__name__)
         finally:
             if cursor:
                 cursor.close()
@@ -575,7 +572,7 @@ async def stream_video(
 
 
 @router.get("/v1/danmaku/list")
-async def get_danmaku_list(
+def get_danmaku_list(
     video_id: str = Query(..., max_length=128),
     segment_index: Optional[int] = Query(None, ge=0),
 ):
@@ -621,8 +618,8 @@ async def get_danmaku_list(
             ])
         return {"code": 0, "data": out}
     except Exception as e:
-        logger.error(f"get_danmaku_list: {e}")
-        return JSONResponse(status_code=500, content={"code": -1, "message": str(e)})
+        logger.error("get_danmaku_list: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"code": -1, "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -672,8 +669,8 @@ async def post_danmaku_v1(body: DanmakuCreateV1, auth_session: Optional[str] = C
         await _broadcast_video(video_id, {"type": "new_danmaku", "data": payload["data"]})
         return payload
     except Exception as e:
-        logger.error(f"post_danmaku_v1: {e}")
-        return JSONResponse(status_code=500, content={"code": -1, "message": str(e)})
+        logger.error("post_danmaku_v1: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"code": -1, "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -703,7 +700,7 @@ async def delete_danmaku(ident: int, auth_session: Optional[str] = Cookie(None))
 
 
 @router.post("/v1/player/heartbeat")
-async def post_heartbeat(
+def post_heartbeat(
     body: HeartbeatBody,
     auth_session: Optional[str] = Cookie(None),
 ):
@@ -729,8 +726,8 @@ async def post_heartbeat(
         # 此处简化：仅更新进度，不在此处自增 views；若需 views 可另表或异步任务
         return {"code": 0}
     except Exception as e:
-        logger.error(f"heartbeat: {e}")
-        return JSONResponse(status_code=500, content={"code": -1, "message": str(e)})
+        logger.error("heartbeat: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"code": -1, "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -745,7 +742,7 @@ class LikeBody(BaseModel):
 
 
 @router.get("/examples/likes")
-async def get_likes(video_id: str = Query(..., max_length=128), auth_session: Optional[str] = Cookie(None)):
+def get_likes(video_id: str = Query(..., max_length=128), auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     conn = None
     cursor = None
@@ -761,8 +758,8 @@ async def get_likes(video_id: str = Query(..., max_length=128), auth_session: Op
             user_has_liked = cursor.fetchone() is not None
         return {"status": "success", "like_count": count, "user_has_liked": user_has_liked}
     except Exception as e:
-        logger.error(f"get_likes: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_likes: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -771,7 +768,7 @@ async def get_likes(video_id: str = Query(..., max_length=128), auth_session: Op
 
 
 @router.post("/examples/like")
-async def post_like(body: LikeBody, auth_session: Optional[str] = Cookie(None)):
+def post_like(body: LikeBody, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -804,8 +801,8 @@ async def post_like(body: LikeBody, auth_session: Optional[str] = Cookie(None)):
         user_has_liked = cursor.fetchone() is not None
         return {"status": "success", "like_count": count, "user_has_liked": user_has_liked}
     except Exception as e:
-        logger.error(f"post_like: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("post_like: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -825,7 +822,7 @@ class NoteCreate(BaseModel):
 
 
 @router.get("/examples/favorites")
-async def get_favorites(auth_session: Optional[str] = Cookie(None)):
+def get_favorites(auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return {"status": "success", "data": []}
@@ -840,8 +837,8 @@ async def get_favorites(auth_session: Optional[str] = Cookie(None)):
         out = [{"video_id": r["video_id"], "created_at": time.mktime(r["created_at"].timetuple()) if r.get("created_at") and hasattr(r["created_at"], "timetuple") else None} for r in rows]
         return {"status": "success", "data": out}
     except Exception as e:
-        logger.error(f"get_favorites: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_favorites: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -850,7 +847,7 @@ async def get_favorites(auth_session: Optional[str] = Cookie(None)):
 
 
 @router.post("/examples/favorites")
-async def post_favorite(body: VideoIdBody, auth_session: Optional[str] = Cookie(None)):
+def post_favorite(body: VideoIdBody, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -867,8 +864,8 @@ async def post_favorite(body: VideoIdBody, auth_session: Optional[str] = Cookie(
         conn.commit()
         return {"status": "success", "user_favorited": True}
     except Exception as e:
-        logger.error(f"post_favorite: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("post_favorite: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -877,7 +874,7 @@ async def post_favorite(body: VideoIdBody, auth_session: Optional[str] = Cookie(
 
 
 @router.delete("/examples/favorites")
-async def delete_favorite(video_id: str = Query(..., max_length=128), auth_session: Optional[str] = Cookie(None)):
+def delete_favorite(video_id: str = Query(..., max_length=128), auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -894,8 +891,8 @@ async def delete_favorite(video_id: str = Query(..., max_length=128), auth_sessi
         conn.commit()
         return {"status": "success", "user_favorited": False}
     except Exception as e:
-        logger.error(f"delete_favorite: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("delete_favorite: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -904,7 +901,7 @@ async def delete_favorite(video_id: str = Query(..., max_length=128), auth_sessi
 
 
 @router.get("/examples/watch-later")
-async def get_watch_later(auth_session: Optional[str] = Cookie(None)):
+def get_watch_later(auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return {"status": "success", "data": []}
@@ -919,8 +916,8 @@ async def get_watch_later(auth_session: Optional[str] = Cookie(None)):
         out = [{"video_id": r["video_id"], "created_at": time.mktime(r["created_at"].timetuple()) if r.get("created_at") and hasattr(r["created_at"], "timetuple") else None} for r in rows]
         return {"status": "success", "data": out}
     except Exception as e:
-        logger.error(f"get_watch_later: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_watch_later: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -929,7 +926,7 @@ async def get_watch_later(auth_session: Optional[str] = Cookie(None)):
 
 
 @router.post("/examples/watch-later")
-async def post_watch_later(body: VideoIdBody, auth_session: Optional[str] = Cookie(None)):
+def post_watch_later(body: VideoIdBody, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -946,8 +943,8 @@ async def post_watch_later(body: VideoIdBody, auth_session: Optional[str] = Cook
         conn.commit()
         return {"status": "success", "user_watch_later": True}
     except Exception as e:
-        logger.error(f"post_watch_later: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("post_watch_later: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -956,7 +953,7 @@ async def post_watch_later(body: VideoIdBody, auth_session: Optional[str] = Cook
 
 
 @router.delete("/examples/watch-later")
-async def delete_watch_later(video_id: str = Query(..., max_length=128), auth_session: Optional[str] = Cookie(None)):
+def delete_watch_later(video_id: str = Query(..., max_length=128), auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -973,8 +970,8 @@ async def delete_watch_later(video_id: str = Query(..., max_length=128), auth_se
         conn.commit()
         return {"status": "success", "user_watch_later": False}
     except Exception as e:
-        logger.error(f"delete_watch_later: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("delete_watch_later: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -984,7 +981,7 @@ async def delete_watch_later(video_id: str = Query(..., max_length=128), auth_se
 
 # --- 课件包（教师：我的课件） ---
 @router.post("/examples/course-pack/add")
-async def add_to_course_pack(body: VideoIdBody, auth_session: Optional[str] = Cookie(None)):
+def add_to_course_pack(body: VideoIdBody, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -1022,8 +1019,8 @@ async def add_to_course_pack(body: VideoIdBody, auth_session: Optional[str] = Co
         conn.commit()
         return {"status": "success", "in_course_pack": True}
     except Exception as e:
-        logger.error(f"add_to_course_pack: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("add_to_course_pack: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -1032,7 +1029,7 @@ async def add_to_course_pack(body: VideoIdBody, auth_session: Optional[str] = Co
 
 
 @router.get("/examples/notes")
-async def get_notes(video_id: str = Query(..., max_length=128), auth_session: Optional[str] = Cookie(None)):
+def get_notes(video_id: str = Query(..., max_length=128), auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return {"status": "success", "data": []}
@@ -1062,8 +1059,8 @@ async def get_notes(video_id: str = Query(..., max_length=128), auth_session: Op
             })
         return {"status": "success", "data": out}
     except Exception as e:
-        logger.error(f"get_notes: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_notes: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -1072,7 +1069,7 @@ async def get_notes(video_id: str = Query(..., max_length=128), auth_session: Op
 
 
 @router.post("/examples/notes")
-async def post_note(body: NoteCreate, auth_session: Optional[str] = Cookie(None)):
+def post_note(body: NoteCreate, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -1097,8 +1094,8 @@ async def post_note(body: NoteCreate, auth_session: Optional[str] = Cookie(None)
         nid = cursor.lastrowid
         return {"status": "success", "data": {"id": nid, "video_id": video_id, "time_sec": time_sec, "content": content}}
     except Exception as e:
-        logger.error(f"post_note: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("post_note: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -1107,7 +1104,7 @@ async def post_note(body: NoteCreate, auth_session: Optional[str] = Cookie(None)
 
 
 @router.delete("/examples/notes/{note_id}")
-async def delete_note(note_id: int, auth_session: Optional[str] = Cookie(None)):
+def delete_note(note_id: int, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -1121,8 +1118,8 @@ async def delete_note(note_id: int, auth_session: Optional[str] = Cookie(None)):
         conn.commit()
         return {"status": "success"}
     except Exception as e:
-        logger.error(f"delete_note: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("delete_note: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -1137,7 +1134,7 @@ class CommentCreate(BaseModel):
 
 
 @router.get("/examples/comments")
-async def get_comments(video_id: str = Query(..., max_length=128)):
+def get_comments(video_id: str = Query(..., max_length=128)):
     conn = None
     cursor = None
     try:
@@ -1154,8 +1151,8 @@ async def get_comments(video_id: str = Query(..., max_length=128)):
                 r["created_at"] = time.mktime(r["created_at"].timetuple()) if hasattr(r["created_at"], "timetuple") else r["created_at"]
         return {"status": "success", "data": rows}
     except Exception as e:
-        logger.error(f"get_comments: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_comments: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -1164,7 +1161,7 @@ async def get_comments(video_id: str = Query(..., max_length=128)):
 
 
 @router.post("/examples/comments")
-async def post_comment(body: CommentCreate, auth_session: Optional[str] = Cookie(None)):
+def post_comment(body: CommentCreate, auth_session: Optional[str] = Cookie(None)):
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "请先登录"})
@@ -1195,8 +1192,8 @@ async def post_comment(body: CommentCreate, auth_session: Optional[str] = Cookie
             row["created_at"] = time.mktime(row["created_at"].timetuple())
         return {"status": "success", "data": row}
     except Exception as e:
-        logger.error(f"post_comment: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("post_comment: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -1213,24 +1210,33 @@ class DanmakuCreate(BaseModel):
 
 @router.websocket("/examples/ws/{video_id}")
 async def websocket_video_room(websocket: WebSocket, video_id: str):
-    video_id = (video_id or "").strip()[:128]
-    if not video_id:
+    if not re.fullmatch(r'[\w-]{1,128}', video_id):
         await websocket.close(code=4000)
         return
     await websocket.accept()
     room = _ws_rooms.setdefault(video_id, set())
     room.add(websocket)
     count = len(room)
-    await _broadcast_video(video_id, {"type": "viewer_count", "count": count})
     try:
+        await _broadcast_video(video_id, {"type": "viewer_count", "count": count})
+        window=time.monotonic(); messages=0
         while True:
-            raw = await websocket.receive_text()
+            raw = await asyncio.wait_for(websocket.receive_text(), 90)
+            now=time.monotonic()
+            if now-window>=60: window=now; messages=0
+            messages+=1
+            if len(raw)>4096 or messages>60:
+                await websocket.close(code=1008)
+                break
             try:
                 msg = json.loads(raw)
+                if not isinstance(msg,dict): continue
                 if msg.get("type") == "ping":
                     await websocket.send_text(json.dumps({"type": "pong"}, ensure_ascii=False))
             except (json.JSONDecodeError, TypeError):
                 pass
+    except asyncio.TimeoutError:
+        await websocket.close(code=1000)
     except WebSocketDisconnect:
         pass
     finally:
@@ -1242,7 +1248,7 @@ async def websocket_video_room(websocket: WebSocket, video_id: str):
 
 
 @router.get("/examples/danmaku")
-async def get_danmaku(video_id: str = Query(..., max_length=128)):
+def get_danmaku(video_id: str = Query(..., max_length=128)):
     conn = None
     cursor = None
     try:
@@ -1265,8 +1271,8 @@ async def get_danmaku(video_id: str = Query(..., max_length=128)):
             })
         return {"status": "success", "data": out}
     except Exception as e:
-        logger.error(f"get_danmaku: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("get_danmaku: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -1301,8 +1307,8 @@ async def post_danmaku(body: DanmakuCreate, auth_session: Optional[str] = Cookie
         await _broadcast_video(video_id, {"type": "new_danmaku", "data": payload["data"]})
         return payload
     except Exception as e:
-        logger.error(f"post_danmaku: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error("post_danmaku: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()

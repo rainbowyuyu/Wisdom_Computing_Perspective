@@ -1,24 +1,11 @@
-/**
- * 共享 HTML 清洗工具：防止 Markdown 解析后的 XSS 注入
- * 移除 <script>、iframe、object、embed 及内联事件、javascript: URL
- */
+import DOMPurify from './vendor/dompurify.es.mjs';
 
 export function sanitizeMarkdownHtml(html) {
     if (!html || typeof html !== 'string') return '';
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    const removeTags = ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'];
-    removeTags.forEach((tag) => {
-        tmp.querySelectorAll(tag).forEach((el) => el.remove());
+    return DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        FORBID_TAGS: ['style', 'form', 'input', 'button', 'select', 'textarea', 'video', 'audio', 'source'],
+        FORBID_ATTR: ['style', 'srcset', 'id', 'name'],
+        ALLOW_DATA_ATTR: false,
     });
-    tmp.querySelectorAll('*').forEach((el) => {
-        [...el.attributes].forEach((attr) => {
-            const name = attr.name.toLowerCase();
-            const value = String(attr.value || '');
-            if (name.startsWith('on')) el.removeAttribute(attr.name);
-            if ((name === 'href' || name === 'src') && /^javascript:/i.test(value.trim())) el.removeAttribute(attr.name);
-            if (name === 'formaction' && /^javascript:/i.test(value.trim())) el.removeAttribute(attr.name);
-        });
-    });
-    return tmp.innerHTML;
 }

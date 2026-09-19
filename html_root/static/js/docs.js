@@ -23,7 +23,13 @@ function ensureModal(){
 async function ensureMarked(){
     if(window.marked?.parse)return;
     let script=document.querySelector('script[src*="marked"]');
-    if(!script){script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/marked/marked.min.js';document.head.append(script);}
+    if(!script){
+        script=document.createElement('script');
+        script.src='https://cdn.jsdelivr.net/npm/marked@18.0.13/lib/marked.umd.js';
+        script.integrity='sha384-Jy8qDMspJASzATgFngF2ompIKy0StbCcvuTE65mxDm/E0/YSIF6Ndc+5V7bbwRcw';
+        script.crossOrigin='anonymous';
+        document.head.append(script);
+    }
     for(let i=0;i<75;i++){if(window.marked?.parse)return;await new Promise(resolve=>setTimeout(resolve,80));}
     throw new Error('文档排版组件加载超时');
 }

@@ -279,25 +279,23 @@ def agent_execute(data: AgentRequest):
     latex_from_image = None
     if data.image_base64:
         try:
-            base64_image = re.sub(r"^data:image/[^;]+;base64,", "", data.image_base64.strip())
+            import base64
+            from ..recognition import recognize_sync, RecognitionIssue
             if not api_key:
-                return {"status": "error", "message": "图片识别需要配置 ALIYUN_KEY，请先输入文字题目。", "retryable":False}
-            else:
-                completion = client.with_options(timeout=70, max_retries=0).chat.completions.create(
-                    model="qwen-vl-max",
-                    messages=[{
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "完整转写图片中的数学题目：保留题干、所有已知条件、选项和问题，公式使用LaTeX；如有几何图，描述标注与关系。只转写，不求解，不猜测看不清的内容。"},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
-                        ],
-                    }],
-                )
-                latex_from_image = completion.choices[0].message.content.strip()
-                latex_from_image = latex_from_image.replace("```latex", "").replace("```", "").replace("\\[", "").replace("\\]", "").strip()
-        except Exception as e:
-            logger.error(f"Agent image recognition: {e}")
-            return JSONResponse(status_code=200, content={"status": "error", "message": llm_error_message(e), "retryable":recoverable_error(e)})
+                return {'status':'error','message':'图片识别暂不可用，请先输入完整题面。','retryable':False}
+            encoded = re.sub(r'^data:image/[^;]+;base64,', '', data.image_base64.strip())
+            try: content = base64.b64decode(encoded, validate=True)
+            except ValueError as error: raise RecognitionIssue('图片无法读取，请重新上传一道题的清晰图片。') from error
+            recognized = recognize_sync(content, client)
+            # Image interpretation never silently starts calculation. Preserve the
+            # full statement for user review, without paying for a second planner.
+            return {'status':'success','steps':[{'section':'detect','trigger':'none',
+                'formula':recognized['problem_text'], 'recognition':recognized,
+                'reply':'请先核对识别题面，再送入计算。'}]}
+        except Exception as error:
+            from ..recognition import RecognitionIssue
+            logger.warning('Agent image recognition failed (%s)', type(error).__name__)
+            return {'status':'error','message':str(error) if isinstance(error,RecognitionIssue) else llm_error_message(error),'retryable':False}
 
     context_prefix = ""
     if data.last_user_message or data.last_assistant_message:
@@ -311,9 +309,9 @@ def agent_execute(data: AgentRequest):
     # Supported local math tasks can immediately dispatch real tools without a model round trip.
     if not data.image_base64:
         try:
-            from logic.solution_engine import local_solution
-            local = local_solution(data.prompt or "")
-        except (ValueError, SyntaxError, TypeError, OverflowError):
+            from ..math_runtime import run_math_sync
+            local = run_math_sync('local',{'problem':data.prompt or ''})
+        except (ValueError, SyntaxError, TypeError, OverflowError,TimeoutError):
             local = None
         if local is not None:
             return {"status": "success", "prompt": data.prompt, "steps": [{"section": "calculate", "operation": "solution", "trigger": "generate", "formula": data.prompt, "reply": "将调用符号计算、交互图形和 Manim，逐步展示这道题的解答。"}]}

@@ -1,3 +1,4 @@
+import { multipleProblems, singleProblemMessage } from './recognition-flow.js';
 import { textWithMath, renderFormula, normalizeSolution } from './math-text.js';
 import { requestEvents } from './event-stream.js?v=20260919-tasks-1';
 import { recoverRequest, requestFailure } from './automatic-recovery.js';
@@ -42,6 +43,7 @@ export function cancelTutor() {
 export async function solveProblem(problem, {autoRender=true, context='', retry=false}={}) {
     problem=String(problem||'').trim();
     if(!problem) { state.status='请先输入完整题目。'; publish(); return false; }
+    if(multipleProblems(problem)){state.status=singleProblemMessage;publish();return false;}
     if(problem.length>6000) {state.status='题目请控制在 6000 字以内。';publish();return false;}
     controller?.abort(); renderController?.abort(); stopPlayback();
     const run=++generation; const aborter=new AbortController(); controller=aborter;
@@ -163,7 +165,7 @@ export function restoreSavedSolution(record) {
 export function mountTutor(host) {
     if(!host||host.dataset.tutorMounted)return()=>{};
     host.dataset.tutorMounted='true';host.classList.add('step-tutor');
-    host.innerHTML=`<form class="tutor-composer"><div class="tutor-composer-heading"><label for="tutor-problem">开始一道新题</label><div><button type="button" data-action="detect"><i class="fa-regular fa-image"></i> 图片识题</button><button type="button" data-action="library"><i class="fa-regular fa-bookmark"></i> 我的算式</button></div></div><div class="tutor-input-tabs" role="group" aria-label="输入方式"><button type="button" data-input-mode="text" aria-pressed="true">题目 / LaTeX</button><button type="button" data-input-mode="math" aria-pressed="false">可视化公式</button><span class="tutor-input-help">支持完整题面与 LaTeX</span></div><math-field class="tutor-math-input" aria-label="可视化题目公式" virtual-keyboard-mode="manual" hidden></math-field><textarea id="tutor-problem" name="problem" rows="3" maxlength="6000" placeholder="输入题目或 LaTeX，探索每一步推导与图形变化…"></textarea><div class="tutor-input-preview" aria-label="题目预览" hidden></div>
+    host.innerHTML=`<form class="tutor-composer"><div class="tutor-composer-heading"><label for="tutor-problem">开始一道新题</label><div><button type="button" data-action="detect"><i class="fa-regular fa-image"></i> 图片识题</button><button type="button" data-action="library"><i class="fa-regular fa-bookmark"></i> 我的算式</button></div></div><div class="tutor-input-tabs" role="group" aria-label="输入方式"><button type="button" data-input-mode="text" aria-pressed="true">题目 / LaTeX</button><button type="button" data-input-mode="math" aria-pressed="false">可视化公式</button><span class="tutor-input-help">每次一道完整题目 · 支持 LaTeX</span></div><math-field class="tutor-math-input" aria-label="可视化题目公式" virtual-keyboard-mode="manual" hidden></math-field><textarea id="tutor-problem" name="problem" rows="3" maxlength="6000" placeholder="每次只输入一道题，保留完整条件和本题的小问…"></textarea><div class="tutor-input-preview" aria-label="题目预览" hidden></div>
       <div class="tutor-compose-actions"><label class="tutor-check"><input name="autoRender" type="checkbox" checked> 同步生成动画</label><span class="tutor-key-hint">Ctrl / ⌘ + Enter</span><button type="submit" class="tutor-primary">开始解题 <i class="fa-solid fa-arrow-right"></i></button><button type="button" data-action="cancel" hidden>停止</button></div></form>
       <aside class="tutor-advice" hidden aria-label="题目拆解建议"><strong></strong><p>题目会保留；补全条件，或选择一个目标填回输入框后再解题。</p><div></div></aside>
       <div class="tutor-status-row"><p class="tutor-status" role="status" aria-live="polite"></p><button type="button" data-action="login" hidden>登录后继续</button><button type="button" data-action="retry" hidden>重试解题</button></div>
@@ -188,7 +190,7 @@ export function mountTutor(host) {
         }
         inputMode=mode;input.hidden=mode==='math';mathInput.hidden=mode!=='math';
         $$('[data-input-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.inputMode===mode)));
-        $('.tutor-input-help').textContent=mode==='math'?'点击公式编辑 · 支持粘贴 LaTeX':'支持完整题面与 LaTeX';
+        $('.tutor-input-help').textContent=mode==='math'?'点击公式编辑 · 支持粘贴 LaTeX':'每次一道完整题目 · 支持 LaTeX';
         syncInput(input.value);if(focus)(mode==='math'?mathInput:input).focus();
     }
     function changed(value) {

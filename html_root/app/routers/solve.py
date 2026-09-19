@@ -24,15 +24,18 @@ from ..config import api_key, client, VIDEOS_DIR
 from ..solution_models import RenderRequest, Solution, SolveRequest
 from ..llm_errors import llm_error_message, recoverable_error
 from ..usage_guard import GuardedClient, UsageDenied, identity
-from logic.solution_engine import local_solution, resolve_visual_functions, validate_summary_consistency
-from logic.solution_adaptation import strategy_guidance, parse_solution, verify_parameter_analysis
-from logic.curriculum import EXAMPLES, catalog, exact_example, worked_solution, teaching_context, study_advice
+from ..math_runtime import run_math, setting, MathDeadlineExceeded
+from ..process_output import log_tail, resource_failure
+from ..host_resources import HostBusy
+from logic.solution_adaptation import strategy_guidance
+from logic.curriculum import EXAMPLES, catalog, teaching_context, study_advice
 from logic.task_planning import needs_agent
 
 router = APIRouter(prefix="/solve", tags=["step tutor"])
 logger = logging.getLogger(__name__)
-RENDER_SLOTS = asyncio.Semaphore(2)
+RENDER_SLOTS = asyncio.Semaphore(setting('MANIM_MAX_CONCURRENT',1,2))
 SCENE = Path(__file__).resolve().parents[2] / "logic" / "solution_scene.py"
+RENDER_WORKER = Path(__file__).resolve().parents[1] / 'render_worker.py'
 HEADERS = {"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"}
 ai_client = GuardedClient(AsyncOpenAI(api_key=client.api_key, base_url=client.base_url, timeout=70, max_retries=0), asynchronous=True)
 SOLVE_TIMEOUT = 150
@@ -73,7 +76,7 @@ def remember_solution(data, solution):
 
 def stop_process(proc):
     """Also terminate TeX/FFmpeg children when a renderer is cancelled."""
-    if proc.poll() is not None: return
+    if proc.poll() is not None and sys.platform=='win32': return
     if sys.platform == "win32" and getattr(proc, "pid", None):
         try:
             subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], stdout=subprocess.DEVNULL,
@@ -123,8 +126,8 @@ async def read_example(ident: str):
     item = next((e for e in EXAMPLES if e['id'] == ident), None)
     if item is None:
         raise HTTPException(status_code=404, detail='例题不存在')
-    solution = await asyncio.to_thread(worked_solution, item)
-    return {'problem': item['problem'], 'solution': solution.model_dump()}
+    solution = await run_math('example',{'example':item},LOCAL_TIMEOUT)
+    return {'problem': item['problem'], 'solution': solution}
 
 
 async def ai_solution(data):
@@ -172,17 +175,12 @@ async def ai_solution(data):
             continue
         content = result.choices[0].message.content
         try:
-            solution = parse_solution(content)
-            validate_summary_consistency(solution)
-            solution.source = "ai"
-            solution.verification = "AI 推导与图形数据，未经符号计算验证；请核对题目条件和结论。"
-            if solution.completion == 'solved':
-                solution = await asyncio.to_thread(verify_parameter_analysis, solution, data.problem)
+            solution = Solution.model_validate(await run_math('prepare_ai',{'content':content,'problem':data.problem},LOCAL_TIMEOUT))
             break
         except (ValueError, SyntaxError, TypeError, NotImplementedError) as error:
             if attempt: raise
             messages += [{"role": "assistant", "content": content}, {"role": "user", "content": str(error) + "。重新输出完整 JSON，保留原题全部条件。"}]
-    return await asyncio.to_thread(resolve_visual_functions, solution)
+    return solution
 
 
 @router.post("/stream")
@@ -202,8 +200,8 @@ async def solve_stream(data: SolveRequest, request: Request):
                 yield event('handoff', message='题目包含多个阶段，正在转交智能体拆解与安排任务。')
                 return
             try:
-                solution = await asyncio.wait_for(asyncio.to_thread(
-                    lambda: exact_example(data.problem) or local_solution(data.problem)), LOCAL_TIMEOUT) if not data.context else None
+                local = await run_math('local',{'problem':data.problem},LOCAL_TIMEOUT) if not data.context else None
+                solution = Solution.model_validate(local) if local else None
             except (ValueError, SyntaxError, TypeError, OverflowError, asyncio.TimeoutError):
                 solution = None
             if solution is None:
@@ -239,6 +237,8 @@ async def solve_stream(data: SolveRequest, request: Request):
             yield event("complete", solution=solution.model_dump())
         except asyncio.CancelledError:
             raise
+        except MathDeadlineExceeded as error:
+            yield event('error', message=str(error), retryable=False)
         except asyncio.TimeoutError:
             yield event('advice', advice=study_advice(data.problem, data.context, failure=True))
             yield event("error", message="本次推导等待超时，任务已停止，请重试。题目和已收到的步骤已保留。")
@@ -272,6 +272,11 @@ async def _render_solution_once(data: RenderRequest, request: Request):
                 if remaining <= 0:
                     yield event("error", message="动画渲染资源暂时繁忙，排队已超时。题解已保留，请稍后重试动画。")
                     return
+                from ..host_resources import pressure_message
+                if pressure_message():
+                    yield event('heartbeat', message='正在等待可用资源，解答已保留，可以继续查看步骤。')
+                    await asyncio.sleep(min(3, remaining))
+                    continue
                 try:
                     await asyncio.wait_for(RENDER_SLOTS.acquire(), timeout=min(5, remaining))
                     acquired = True
@@ -285,7 +290,7 @@ async def _render_solution_once(data: RenderRequest, request: Request):
             env["WISDOM_SOLUTION_JSON"] = str(payload)
             env["WISDOM_TEX_ERROR"] = str(folder / 'tex-error.json')
             env["PYTHONIOENCODING"] = "utf-8"
-            cmd = [sys.executable, "-m", "manim", "-ql", "--disable_caching", "--media_dir", temp,
+            cmd = [sys.executable, str(RENDER_WORKER), "-ql", "--disable_caching", "--media_dir", temp,
                    "-o", "solution.mp4", str(SCENE), "SolutionScene"]
             started = time.monotonic()
             with (folder / "render.log").open("wb") as log:
@@ -296,11 +301,13 @@ async def _render_solution_once(data: RenderRequest, request: Request):
                 last_chapter = -1
                 last_heartbeat = started
                 while proc.poll() is None:
+                    from ..host_resources import require_emergency_capacity
+                    require_emergency_capacity()
                     if await request.is_disconnected(): return
                     if time.monotonic() - started > 240:
-                        yield event("error", message="动画渲染超时，已停止任务。可以保留交互解答并重试动画。")
+                        yield event("error", message="动画渲染超时，已停止任务。请简化动画后重试，交互解答已保留。",retryable=False)
                         return
-                    content = (folder / "render.log").read_text(encoding="utf-8", errors="replace")[-12000:]
+                    content = log_tail(folder / 'render.log')
                     matches = re.findall(r"WISDOM_CHAPTER:(\d+)", content)
                     chapter = int(matches[-1]) if matches else -1
                     if chapter > last_chapter:
@@ -311,14 +318,16 @@ async def _render_solution_once(data: RenderRequest, request: Request):
                         yield event("heartbeat", message="Manim 渲染中…")
                     await asyncio.sleep(0.4)
             if proc.returncode:
-                failure = (folder/"render.log").read_text(encoding="utf-8", errors="replace")[-12000:]
+                failure = log_tail(folder/'render.log')
                 logger.warning("Solution render failed: %s", failure[-2400:])
                 message = tex_failure_message(folder, failure)
                 try:
                     diagnostic=json.loads((folder/'tex-error.json').read_text(encoding='utf-8'))
                     if not isinstance(diagnostic,dict):diagnostic={}
                 except (OSError,ValueError):diagnostic={}
-                yield event("error", message=message + "交互解答已保留。", _diagnostic=diagnostic, _failure=failure[-4000:])
+                limited=resource_failure(proc.returncode,failure)
+                if limited:message='本题动画达到资源上限，已停止渲染，请简化动画后再试。'
+                yield event("error", message=message + "交互解答已保留。",retryable=not limited, _diagnostic=diagnostic, _failure=failure[-4000:])
                 return
             outputs = [p for p in folder.rglob("solution.mp4") if "partial_movie_files" not in str(p)]
             if not outputs:
@@ -330,6 +339,8 @@ async def _render_solution_once(data: RenderRequest, request: Request):
             yield event("complete", video_url="/videos/"+name, chapters=chapters)
         except asyncio.CancelledError:
             raise
+        except HostBusy as error:
+            yield event('error',message=str(error),retryable=False)
         except Exception:
             logger.exception("Solution render failed")
             yield event("error", message="动画服务暂时不可用，交互解答已保留。")
@@ -373,7 +384,7 @@ async def render_solution(data: RenderRequest, request: Request):
                 diagnostic=failed.pop('_diagnostic',{})
                 failure=failed.pop('_failure',failed['message'])
                 step=diagnostic.get('step')
-                can_repair=(not budget['used'] and attempt==0 and type(step) is int
+                can_repair=(failed.get('retryable',True) and not budget['used'] and attempt==0 and type(step) is int
                     and 1<=step<=len(working.solution.steps) and eligible(failure,diagnostic))
                 if not can_repair:
                     if repaired:failed['message']='自动修复后仍未完成动画。'+failed['message']

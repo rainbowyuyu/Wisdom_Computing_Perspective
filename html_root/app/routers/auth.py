@@ -11,7 +11,7 @@ from mysql.connector.errors import IntegrityError
 from ..database import transaction
 from ..store import CAPTCHA_STORE, SESSION_STORE
 from ..request_origin import public_scheme
-from ..models import AuthModel, EmailCodeRequest, EmailVerifyModel, PasswordResetModel
+from ..models import AuthModel, EmailCodeRequest, EmailVerifyModel, EmailChangeModel, PasswordResetModel
 from ..email_service import (
     EmailServiceError, EmailDeliveryError, EmailConfigurationError, EmailAuthenticationError, EmailRateLimitError, normalize_email, mask_email,
     issue_code, verify_code,
@@ -72,6 +72,12 @@ def validate_new_password(password):
         raise ValueError('密码至少需要 6 位，且不能超过 72 字节。')
 
 
+def require_current_password(password, user):
+    if (not password or len(password.encode()) > 72 or not user
+            or not bcrypt.checkpw(password.encode(), user['hashed_password'].encode())):
+        raise AccessDenied('当前密码不正确，请重新输入。', 403, 'reauthentication_required')
+
+
 @router.get('/captcha')
 async def get_captcha():
     code, image = generate_captcha_image_bytes()
@@ -92,6 +98,9 @@ def send_email_code(data: EmailCodeRequest, request: Request, auth_session: Opti
             if principal.get('email') and principal['email'].lower() != email:
                 return error('请输入当前账户绑定的邮箱。')
         elif principal and data.purpose == 'change_email':
+            with transaction() as (_, cur):
+                cur.execute('SELECT hashed_password FROM users WHERE id=%s', (principal['id'],))
+                require_current_password(data.current_password, cur.fetchone())
             if principal.get('email') and principal['email'].lower() == email:
                 return error('新邮箱不能与当前绑定邮箱相同。')
         elif not _captcha_ok(data.captcha, data.captcha_id):
@@ -235,7 +244,7 @@ def verify_email(data: EmailVerifyModel, auth_session: Optional[str] = Cookie(No
 
 
 @router.post('/email/change')
-def change_email(data: EmailVerifyModel, auth_session: Optional[str] = Cookie(None)):
+def change_email(data: EmailChangeModel, auth_session: Optional[str] = Cookie(None)):
     """Replace the signed-in account email after proving control of the new address."""
     try:
         principal = current_principal(auth_session)
@@ -244,10 +253,11 @@ def change_email(data: EmailVerifyModel, auth_session: Optional[str] = Cookie(No
             raise ValueError('新邮箱不能与当前绑定邮箱相同。')
 
         def bind(conn, cur, challenge):
-            cur.execute('SELECT email FROM users WHERE id=%s FOR UPDATE', (principal['id'],))
+            cur.execute('SELECT email,hashed_password FROM users WHERE id=%s FOR UPDATE', (principal['id'],))
             user = cur.fetchone()
             if not user:
                 raise AccessDenied('账户不存在或已失效。', 401, 'login_required')
+            require_current_password(data.current_password, user)
             cur.execute('SELECT id FROM users WHERE email=%s AND id<>%s', (email, principal['id']))
             if cur.fetchone():
                 raise ValueError('该邮箱已被其他账户使用，请更换邮箱。')

@@ -12,6 +12,8 @@ def recoverable_error(error):
     return not isinstance(detail,dict) or detail.get('code')!='Arrearage'
 
 def llm_error_message(error):
+    from .math_runtime import MathCapacityError,MathDeadlineExceeded,MathWorkerError
+    if isinstance(error,(MathCapacityError,MathDeadlineExceeded,MathWorkerError)):return str(error)
     if isinstance(error, UsageDenied):
         return str(error)
     if isinstance(error, (TimeoutError, APITimeoutError)):

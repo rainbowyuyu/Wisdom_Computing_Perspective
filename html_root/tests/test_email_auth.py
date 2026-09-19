@@ -181,11 +181,11 @@ def test_signed_in_user_can_change_email_with_new_address_proof(env):
     uid = seed(email='old@example.test', verified=True)
     assert sign_in(client).status_code == 200
     request = client.post('/api/email/send-code', json={
-        'email': 'new-address@example.test', 'purpose': 'change_email'
+        'email': 'new-address@example.test', 'purpose': 'change_email', 'current_password': 'old-password'
     })
     assert request.status_code == 200 and sent[-1][0] == 'new-address@example.test'
     result = client.post('/api/email/change', json={
-        'email': 'new-address@example.test', 'code': sent[-1][1]
+        'email': 'new-address@example.test', 'code': sent[-1][1], 'current_password': 'old-password'
     })
     assert result.status_code == 200
     with database.transaction() as (_, cur):
@@ -201,9 +201,26 @@ def test_email_change_rejects_another_accounts_address(env):
     seed(username='second', email='second@example.test', verified=True)
     assert sign_in(client, 'first').status_code == 200
     result = client.post('/api/email/send-code', json={
-        'email': 'second@example.test', 'purpose': 'change_email'
+        'email': 'second@example.test', 'purpose': 'change_email', 'current_password': 'old-password'
     })
     assert result.status_code == 400
+
+
+def test_email_change_requires_password_even_with_valid_session_and_code(env):
+    client, sent = env
+    seed(email='old@example.test', verified=True)
+    sign_in(client)
+    request={'email':'new@example.test','purpose':'change_email'}
+    for password in (None, 'wrong-password', '数'*30):
+        assert client.post('/api/email/send-code',json={**request,'current_password':password}).status_code==403
+    assert sent==[]
+    assert client.post('/api/email/send-code',json={**request,'current_password':'old-password'}).status_code==200
+    payload={'email':'new@example.test','code':sent[-1][1]}
+    assert client.post('/api/email/change',json=payload).status_code==422
+    assert client.post('/api/email/change',json={**payload,'current_password':'wrong-password'}).status_code==403
+    assert client.get('/api/user/me').json()['email_address']=='old@example.test'
+    # A mistyped current password must not consume a valid email challenge.
+    assert client.post('/api/email/change',json={**payload,'current_password':'old-password'}).status_code==200
 
 
 def test_reset_changes_password_revokes_all_sessions_and_is_one_time(env):

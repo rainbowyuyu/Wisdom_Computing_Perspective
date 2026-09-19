@@ -161,7 +161,7 @@
               font-weight: 500;
             "
           >
-            识别结果将显示在右侧底部
+            每次只识别一道题，请保留完整题干和图形
           </p>
         </div>
       </div>
@@ -224,7 +224,7 @@
             <i class="fa-solid fa-magnifying-glass"></i>
             立即识别
           </button>
-          <p class="detect-action-hint">识别结果将显示在下方</p>
+          <p class="detect-action-hint">一次一道题，先核对题面，再开始计算</p>
         </div>
 
         <div class="result-panel">
@@ -268,6 +268,12 @@
             </math-field>
           </div>
 
+          <label class="detect-problem-label" for="detect-problem">完整题面 · 计算时以这里为准</label>
+          <textarea id="detect-problem" class="tech-input detect-problem" rows="4" maxlength="6000" :value="problemText" @input="onProblemInput" placeholder="核对或补充题干、已知条件与所求；支持 LaTeX。每次只放一道题。"></textarea>
+          <div v-if="isRecognizing" class="detect-loading" role="progressbar" aria-label="正在识别题目"><span></span></div>
+          <p id="detect-feedback" class="detect-feedback" :data-error="!!recognitionError" role="status" aria-live="polite">{{ recognitionMessage }}</p>
+          <label v-if="needsReview" class="detect-review"><input id="detect-confirm" type="checkbox" :checked="confirmed" @change="onConfirm"> 我已核对并补全题面，以完整题面为准</label>
+          <button v-if="isRecognizing" id="detect-cancel" type="button" class="action-btn secondary" @click="cancelRecognition">取消识别</button>
           <div class="result-actions">
             <div style="font-size: 0.85rem; color: var(--text-secondary)">
               <i class="fa-regular fa-keyboard"></i>
@@ -276,9 +282,9 @@
 
             <div style="display: flex; gap: 10px; flex-wrap: wrap">
               <button
-                id="btn-save-check"
-                class="btn-calc-go"
-                :disabled="!canOperate"
+                  id="btn-save-check"
+                  class="btn-calc-go"
+                  :disabled="!canOperate || !currentLatex.trim()"
                 @click="saveAndShowFormula"
                 style="
                   background: linear-gradient(135deg, #10b981, #059669);
@@ -297,15 +303,15 @@
                 style="padding: 0.8rem 1.5rem; border-radius: 99px"
                 title="仅跳转到计算页，不保存"
               >
-                去计算
+                确认题面并去计算
                 <i class="fa-solid fa-arrow-right"></i>
               </button>
 
               <button
-                id="btn-edit-in-latex"
+                  id="btn-edit-in-latex"
                 class="action-btn tertiary"
                 type="button"
-                :disabled="!canOperate"
+                  :disabled="!canOperate || !currentLatex.trim()"
                 @click="openInDevLatexFromDetectHandler"
                 style="padding: 0.8rem 1.5rem; border-radius: 99px"
               >
@@ -336,19 +342,31 @@ const runner = useAgentRunnerStore();
 const inputMode = ref<InputMode>("draw");
 
 const isRecognizing = ref(false);
-const currentLatex = ref<string>(String.raw`\text{等待识别...}`);
-
-const canOperate = computed(() => {
-  const t = (currentLatex.value || "").trim();
-  return (
-    t.length > 0 &&
-    !t.includes("等待识别") &&
-    !t.includes("正在识别") &&
-    !t.includes("等待输入") &&
-    !t.startsWith("\\text{Error") &&
-    !isRecognizing.value
-  );
-});
+const currentLatex = ref('');
+const problemText=ref(''), recognitionError=ref(''), recognitionMessage=ref('每次只上传一道题，保留完整题干、图形和该题的小问。');
+  const needsReview=ref(false), confirmed=ref(false);
+const singleProblem=ref(true);
+const canOperate=computed(()=>singleProblem.value&&!!(problemText.value.trim()||currentLatex.value.trim())&&!isRecognizing.value&&!recognitionError.value&&(!needsReview.value||confirmed.value)&&!currentLatex.value.includes('?'));
+let recognitionFlow:any=null, flowLoading:Promise<any>|null=null;
+async function ensureRecognitionFlow(){
+  if(!flowLoading)flowLoading=(async()=>{
+    const path='/static/js/recognition-flow.js';
+      const {createRecognitionFlow,multipleProblems}=await import(/* @vite-ignore */ path);
+    recognitionFlow=createRecognitionFlow((state:any)=>{
+      setLatex(state.latex);problemText.value=state.problem;recognitionError.value=state.error;
+      recognitionMessage.value=state.message;needsReview.value=state.needsReview;confirmed.value=state.confirmed;
+        isRecognizing.value=state.busy;
+        singleProblem.value=!multipleProblems(state.problem);
+    });
+    return recognitionFlow;
+  })();
+  return flowLoading;
+}
+async function onProblemInput(e:Event){(await ensureRecognitionFlow()).editProblem((e.target as HTMLTextAreaElement).value);}
+async function onConfirm(e:Event){(await ensureRecognitionFlow()).confirm((e.target as HTMLInputElement).checked);}
+function cancelRecognition(){recognitionFlow?.cancel();}
+function onSourceChanged(){onFileChange();}
+async function onRecognitionResult(e:Event){(await ensureRecognitionFlow()).accept((e as CustomEvent).detail);}
 
 const mathFieldRef = ref<any | null>(null);
 const codeAreaRef = ref<HTMLTextAreaElement | null>(null);
@@ -370,6 +388,7 @@ let ctx: CanvasRenderingContext2D | null = null;
 let drawing = false;
 
 function switchInputMode(mode: InputMode) {
+  if(inputMode.value!==mode)recognitionFlow?.reset();
   inputMode.value = mode;
 }
 
@@ -421,7 +440,7 @@ function drawStroke(s: Stroke) {
     ctx.strokeStyle = "rgba(0,0,0,1)";
   } else {
     ctx.globalCompositeOperation = "source-over";
-    ctx.strokeStyle = "rgba(255,255,255,1)";
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#1e293b';
   }
   ctx.beginPath();
   ctx.moveTo(s.points[0].x, s.points[0].y);
@@ -438,26 +457,30 @@ function redrawAll() {
 }
 
 function undo() {
+  recognitionFlow?.reset();
   const last = strokes.value.pop();
   if (last) redoStack.value.push(last);
   redrawAll();
 }
 
 function redo() {
+  recognitionFlow?.reset();
   const last = redoStack.value.pop();
   if (last) strokes.value.push(last);
   redrawAll();
 }
 
 function clearCanvas() {
+  recognitionFlow?.reset();
   strokes.value = [];
   redoStack.value = [];
   redrawAll();
 }
 
 function onPointerDown(e: PointerEvent) {
-  if (inputMode.value !== "draw") return;
-  if (!canvasRef.value) return;
+    if (inputMode.value !== "draw") return;
+    if (!canvasRef.value) return;
+    recognitionFlow?.reset();
   (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   drawing = true;
   redoStack.value = [];
@@ -483,24 +506,27 @@ function onPointerUp() {
 function setLatex(val: string) {
   currentLatex.value = val;
   const mf = mathFieldRef.value;
-  if (mf && typeof mf.setValue === "function") mf.setValue(val);
+    if (mf && mf.value !== val && typeof mf.setValue === "function") mf.setValue(val);
   if (codeAreaRef.value) codeAreaRef.value.value = val;
 }
 
 function onMathFieldInput(e: any) {
   const v = String(e?.target?.value ?? "");
   currentLatex.value = v;
+  ensureRecognitionFlow().then(f=>f.editLatex(v));
   if (codeAreaRef.value) codeAreaRef.value.value = v;
 }
 
 function onCodeAreaInput(e: Event) {
   const v = (e.target as HTMLTextAreaElement).value;
   currentLatex.value = v;
+  ensureRecognitionFlow().then(f=>f.editLatex(v));
   const mf = mathFieldRef.value;
   if (mf && typeof mf.setValue === "function") mf.setValue(v);
 }
 
 function onFileChange() {
+  recognitionFlow?.reset();
   const f = fileInputRef.value?.files?.[0] || null;
   uploadedFile.value = f;
   if (uploadedPreviewUrl.value) {
@@ -513,57 +539,22 @@ function onFileChange() {
 async function canvasToBlob(): Promise<Blob | null> {
   const canvas = canvasRef.value;
   if (!canvas) return null;
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+  // Export opaque black ink on white paper, independent of the current theme.
+  const output=document.createElement('canvas');output.width=canvas.width;output.height=canvas.height;
+  const ink=output.getContext('2d');if(!ink)return null;
+  ink.drawImage(canvas,0,0);ink.globalCompositeOperation='source-in';
+  ink.fillStyle='#111827';ink.fillRect(0,0,output.width,output.height);
+  ink.globalCompositeOperation='destination-over';ink.fillStyle='#ffffff';ink.fillRect(0,0,output.width,output.height);
+  return new Promise((resolve) => output.toBlob((b) => resolve(b), "image/png"));
 }
 
 async function processRecognitionHandler() {
-  isRecognizing.value = true;
-  setLatex(String.raw`\text{正在识别...}`);
-
-  let blob: Blob | null = null;
-  if (inputMode.value === "draw") blob = await canvasToBlob();
-  else blob = uploadedFile.value;
-
-  if (!blob) {
-    const msg = inputMode.value === "draw" ? "请先绘制内容" : "请先上传图片";
-    if (typeof (window as any).showAlert === "function") {
-      await (window as any).showAlert(msg, "提示");
-    }
-    setLatex(String.raw`\text{等待输入...}`);
-    isRecognizing.value = false;
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", blob);
-
-  try {
-    const response = await fetch("/api/detect", { method: "POST", body: formData });
-    const data = await response.json();
-    if (data.status === "success") {
-      const mathPath="/static/js/math-text.js";
-      const {normalizeLatex}=await import(/* @vite-ignore */ mathPath);
-      const latex = normalizeLatex(data.latex ?? "");
-      try {
-        sessionStorage.setItem("last_detect_latex", latex);
-        sessionStorage.setItem("last_detect_problem", String(data.problem_text || latex));
-      } catch {}
-      setLatex(latex);
-      try {
-        if (data.vision_prompt && typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem("last_detect_vision_prompt", String(data.vision_prompt));
-        } else if (typeof sessionStorage !== "undefined") {
-          sessionStorage.removeItem("last_detect_vision_prompt");
-        }
-      } catch (_) {}
-    } else {
-      setLatex(String.raw`\text{Error: }` + String(data.message ?? "识别失败"));
-    }
-  } catch (_) {
-    setLatex(String.raw`\text{网络错误}`);
-  } finally {
-    isRecognizing.value = false;
-  }
+  if(isRecognizing.value)return;
+  isRecognizing.value=true;
+  try{
+    const flow=await ensureRecognitionFlow();
+    await flow.run(async()=>inputMode.value==='draw'?(strokes.value.length?await canvasToBlob():null):(fileInputRef.value?.files?.[0]||uploadedFile.value));
+  }finally{isRecognizing.value=false;}
 }
 
 async function saveAndShowFormula() {
@@ -571,18 +562,12 @@ async function saveAndShowFormula() {
 }
 
 async function copyToCalcHandler() {
-  if (!canOperate.value) {
-    if (typeof (window as any).showAlert === "function") {
-      await (window as any).showAlert("请先进行识别或输入有效公式", "提示");
-    }
-    return;
-  }
-  try {
-    const isRecognized = sessionStorage.getItem("last_detect_latex") === currentLatex.value;
-    sessionStorage.setItem("pending_calc_latex", isRecognized ? (sessionStorage.getItem("last_detect_problem") || currentLatex.value) : currentLatex.value);
-    sessionStorage.setItem("pending_calc_context", isRecognized ? (sessionStorage.getItem("last_detect_vision_prompt") || "") : "");
-  } catch (_) {}
-  router.push("/calculate");
+  try{
+    const {problem,context}=(await ensureRecognitionFlow()).payload();
+    sessionStorage.setItem('pending_calc_latex',problem);
+    sessionStorage.setItem('pending_calc_context',context);
+    await router.push('/calculate');
+  }catch(error:any){recognitionMessage.value=error.message;}
 }
 
 async function openInDevLatexFromDetectHandler() {
@@ -599,6 +584,9 @@ async function openInDevLatexFromDetectHandler() {
 }
 
 onMounted(() => {
+  ensureRecognitionFlow();
+  window.addEventListener('recognition-source-change',onSourceChanged);
+  window.addEventListener('recognition-result',onRecognitionResult);
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
 
@@ -610,6 +598,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  recognitionFlow?.cancel();
+  window.removeEventListener('recognition-source-change',onSourceChanged);
+  window.removeEventListener('recognition-result',onRecognitionResult);
   window.removeEventListener("resize", resizeCanvas);
   if (uploadedPreviewUrl.value) URL.revokeObjectURL(uploadedPreviewUrl.value);
 });

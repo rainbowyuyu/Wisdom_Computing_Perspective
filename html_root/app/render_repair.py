@@ -28,7 +28,8 @@ def eligible(failure, diagnostic=None):
     text = str(failure).lower()
     environmental = ('no module named', 'modulenotfounderror', 'filenotfounderror',
         'permissionerror', 'permission denied', 'no space left', 'out of memory',
-        'cannot allocate memory', 'not found', 'not installed', 'font-not-found',
+        'cannot allocate memory', 'memoryerror', 'std::bad_alloc', 'resource temporarily unavailable',
+        'file size limit exceeded', 'not found', 'not installed', 'font-not-found',
         '缺少', '未安装', '排队', '超时', '已停止', 'quota', 'rate limit',
         '不支持的导入', '动态执行', '文件操作', '内部属性', '断点')
     if any(term in text for term in environmental):

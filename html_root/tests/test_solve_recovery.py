@@ -52,6 +52,8 @@ def test_whole_task_deadline_cancels_a_provider_that_never_returns(monkeypatch):
             async def is_disconnected(self): return False
         monkeypatch.setattr(solve, 'api_key', 'test')
         monkeypatch.setattr(solve, 'ai_solution', pending)
+        async def no_local_result(*args, **kwargs): return None
+        monkeypatch.setattr(solve, 'run_math', no_local_result)
         monkeypatch.setattr(solve, 'SOLVE_TIMEOUT', .03)
         monkeypatch.setattr(solve, 'HEARTBEAT_INTERVAL', .005)
         response = await solve.solve_stream(SolveRequest(problem='证明一个几何结论'), Request())

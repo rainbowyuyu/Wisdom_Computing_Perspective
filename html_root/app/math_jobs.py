@@ -123,8 +123,8 @@ class MathJobManager:
                     return self.public(job)
             if sum(j['status'] in ACTIVE for j in self.jobs.values()) >= 24:
                 raise UsageDenied('任务队列已满，请稍后提交；当前没有调用模型。')
-            if sum(j['status'] in ACTIVE and j['owner']==owner for j in self.jobs.values()) >= 3:
-                raise UsageDenied('你已有 3 道题在处理，请先完成或取消其中一道。')
+            if any(j['status'] in ACTIVE and j['owner']==owner for j in self.jobs.values()):
+                raise UsageDenied('当前题目仍在处理，请先完成或停止本题，再开始下一道。')
             from .access import consume
             await asyncio.to_thread(consume,'calculate',who)
             from .request_records import request_record_id
@@ -178,7 +178,7 @@ class MathJobManager:
             if job['status'] in ACTIVE:return self.public(job)
             if job['status'] in {'done','needs_information','partial'}:
                 raise UsageDenied('请补充条件后作为新题提交；当前已完成的结果仍可阅读。')
-            if sum(j['status'] in ACTIVE for j in self.jobs.values())>=24 or sum(j['status'] in ACTIVE and j['owner']==who[1] for j in self.jobs.values())>=3:
+            if sum(j['status'] in ACTIVE for j in self.jobs.values())>=24 or any(j['status'] in ACTIVE and j['owner']==who[1] for j in self.jobs.values()):
                 raise UsageDenied('当前任务已达上限，请稍后继续。')
             # The immutable, owned job has already been charged at submission.
             # Resume only missing work; never silently debit a failed retry.
@@ -209,7 +209,15 @@ class MathJobManager:
 
     async def dispatch(self):
         while True:
-            await self.wake.wait();self.wake.clear()
+            try: await asyncio.wait_for(self.wake.wait(), 5)
+            except asyncio.TimeoutError: pass
+            self.wake.clear()
+            from .host_resources import pressure_message
+            pressure = pressure_message()
+            if pressure:
+                for job in self.jobs.values():
+                    if job['status'] in ACTIVE: job['message']='正在等待可用资源，题目已保留；资源恢复后会自动继续。'
+                continue
             for kind, maximum in [('solve',max(1,min(4,limit('AI_MAX_CONCURRENT',4)))),('render',2)]:
                 while sum(k[2]==kind for k in self.work)<maximum:
                     choice=None

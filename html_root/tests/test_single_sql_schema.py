@@ -28,7 +28,7 @@ def test_installer_contains_every_declared_table():
     application='\n'.join(p.read_text(encoding='utf-8') for directory in ('app','database/migrations') for p in (ROOT/directory).rglob('*') if p.suffix in ('.py','.sql'))
     required=set(re.findall(r'CREATE TABLE IF NOT EXISTS\s+`?(\w+)',application,re.I))
     # Provider leases and background jobs are private SQLite operational stores.
-    required-={'usage','leases','math_jobs','provider_circuit'}
+    required-={'usage','leases','math_jobs','provider_circuit','failed_requests'}
     assert required<=declared,required-declared
     assert len(declared)==32
     assert not re.search(r'^\s*(SOURCE|DROP|TRUNCATE)\b',script,re.M|re.I)

@@ -150,9 +150,7 @@ def test_duplicate_admission_and_per_user_bound(tmp_path,monkeypatch):
             first=await manager.submit(request(),('ip','a'))
             duplicate=await manager.submit(request(key='different1'),('ip','a'))
             assert first['id']==duplicate['id']
-            await manager.submit(request('second','request02'),('ip','a'))
-            await manager.submit(request('third','request03'),('ip','a'))
-            with pytest.raises(usage_guard.UsageDenied):await manager.submit(request('fourth','request04'),('ip','a'))
+            with pytest.raises(usage_guard.UsageDenied):await manager.submit(request('second','request02'),('ip','a'))
             other=await manager.submit(request(),('ip','b'))
             assert other['id']!=first['id']
             with pytest.raises(KeyError):manager.owned(first['id'],'b')
@@ -246,6 +244,28 @@ def test_persistence_failure_pauses_before_more_paid_work(tmp_path,monkeypatch):
             failing[0]=False;await manager.retry(job['id'],('ip','a'))
             await until(lambda:manager.jobs[job['id']]['status']=='done')
             assert len(calls)==3
+        finally:await manager.close()
+    asyncio.run(scenario())
+
+
+def test_resource_wait_preserves_job_and_resumes_without_recharging(tmp_path,monkeypatch):
+    from app import host_resources
+    pressure=['busy'];called=[];charged=[]
+    monkeypatch.setattr(host_resources,'pressure_message',lambda:pressure[0])
+    monkeypatch.setattr('app.access.consume',lambda *args,**kwargs:charged.append(args))
+    async def planner(*_):
+        called.append(True)
+        return MathTaskPlan(title='补充条件',status='needs_information',message='请补充题面',tasks=[])
+    monkeypatch.setattr(math_jobs,'plan_problem',planner)
+    async def scenario():
+        manager=MathJobManager(JobStore(tmp_path/'jobs.db'))
+        try:
+            job=await manager.submit(request(),('ip','a'))
+            await until(lambda:'等待可用资源' in manager.jobs[job['id']]['message'])
+            assert not called and manager.jobs[job['id']]['status']=='queued'
+            pressure[0]='';manager.wake.set()
+            await until(lambda:manager.jobs[job['id']]['status']=='needs_information')
+            assert len(called)==len(charged)==1
         finally:await manager.close()
     asyncio.run(scenario())
 

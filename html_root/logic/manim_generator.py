@@ -7,6 +7,7 @@ import numpy as np
 import shutil
 import math
 import time
+from app.host_resources import HostBusy, require_capacity
 
 # 获取项目根目录 (假设此文件在 logic/ 目录下，根目录是上一级)
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -211,9 +212,9 @@ class {scene_name}(Scene):
     # Manim 默认会输出到 media/videos/temp_xxx/480p15/GenScene.mp4
     # 我们可以通过 --media_dir 指定输出根目录
 
-    # 使用当前解释器 -m manim，保证与主项目环境一致；-ql 为最快渲染预设（480p15）
+    # 使用当前解释器与受限渲染入口；-ql 为快速渲染预设（480p15）
     cmd = [
-        sys.executable, "-m", "manim",
+        sys.executable, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),'app','render_worker.py'),
         "-ql",
         py_path,
         scene_name,
@@ -223,10 +224,13 @@ class {scene_name}(Scene):
     proc=None
     try:
         if cancel_event is not None and cancel_event.is_set():return None
+        require_capacity()
         proc=subprocess.Popen(cmd,cwd=BASE_DIR,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform=='win32' else 0,start_new_session=sys.platform!='win32')
         started=time.monotonic()
         while proc.poll() is None:
+            from app.host_resources import require_emergency_capacity
+            require_emergency_capacity()
             if time.monotonic()-started>=180 or (cancel_event is not None and cancel_event.is_set()):return None
             time.sleep(.2)
         if proc.returncode:return None
@@ -248,6 +252,8 @@ class {scene_name}(Scene):
             print(f"Video file not found at {src_file}")
             return None
 
+    except HostBusy:
+        raise
     except subprocess.CalledProcessError as e:
         print(f"Manim Failed: {e}")
         return None
@@ -255,7 +261,7 @@ class {scene_name}(Scene):
         print(f"General Error: {e}")
         return None
     finally:
-        if proc and proc.poll() is None:
+        if proc:
             from app.routers.solve import stop_process
             stop_process(proc)
         if os.path.exists(py_path):os.remove(py_path)

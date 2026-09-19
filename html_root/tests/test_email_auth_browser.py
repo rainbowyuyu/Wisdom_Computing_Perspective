@@ -59,18 +59,19 @@ def test_settings_email_change_updates_profile(base):
         expect(page.locator('#profile-email-display')).to_have_text('old@example.test')
         page.locator('.profile-email-change-btn').click()
         expect(page.locator('#change-email-modal')).to_be_visible()
+        page.locator('#change-email-password').fill('old-password')
         page.locator('#change-email-new').fill('new@example.test')
         page.locator('#btn-change-email-code').click()
         expect(page.locator('#change-email-hint')).to_contain_text('已发送')
         expect(page.locator('#btn-change-email-code')).to_be_disabled()
-        assert ('/api/email/send-code',{'email':'new@example.test','purpose':'change_email'}) in requests
+        assert ('/api/email/send-code',{'email':'new@example.test','purpose':'change_email','current_password':'old-password'}) in requests
         page.locator('#change-email-code').fill('123456')
         page.locator('#btn-change-email-submit').click()
         expect(page.locator('#change-email-modal')).not_to_be_visible()
         expect(page.locator('#profile-email-display')).to_have_text('new@example.test')
         expect(page.locator('#profile-email-status')).to_have_text('已验证')
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+2')
-        assert ('/api/email/change',{'email':'new@example.test','code':'123456'}) in requests
+        assert ('/api/email/change',{'email':'new@example.test','code':'123456','current_password':'old-password'}) in requests
         browser.close()
 
 
