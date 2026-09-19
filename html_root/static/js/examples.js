@@ -1,5 +1,7 @@
 import { renderWrongbook, editWrongbook, openWrongbook } from './wrongbook.js';
 import { textWithMath } from './math-text.js';
+import { mountCurriculum } from './curriculum-ui.js?v=20260919-teaching-2';
+import { openSolutionRecord } from './solution-library.js?v=20260919-teaching-2';
 import { createTeachingDanmaku } from './teaching-danmaku.js';
 // static/js/examples.js — 教学案例：B 站风预览、点赞、评论与弹幕（登录后可发）
 import { toggleModal, toggleAuthModal as staticAuthModal, showToast } from './ui.js';
@@ -17,6 +19,7 @@ const EXAMPLES_PAGE_SIZE_MOBILE = 4;
 let examplesLastVideos = [];
 let teachingCatalog = [];
 let loadGeneration=0;
+let disposeCurriculum=null;
 export async function ensurePlayer(){
     if(document.getElementById('video-modal'))return;
     const response=await fetch('/static/templates/teaching-player.html');if(!response.ok)throw new Error('播放器加载失败');
@@ -30,7 +33,7 @@ export async function mountExamples(host){
     window.playExample=playExample;window.closeVideoModal=closeVideoModal;
     await loadExamples();
     const params=new URLSearchParams(location.search);if(host.isConnected&&params.get('video'))playExampleByVideoId(params.get('video'),Number(params.get('t')||0));
-    return()=>{loadGeneration++;closeVideoModal();disposeCourseDialogs();};
+    return()=>{loadGeneration++;disposeCurriculum?.();disposeCurriculum=null;closeVideoModal();disposeCourseDialogs();};
 }
 window.addEventListener('course-packs-updated',()=>{if(document.querySelector('.examples-filter-tab.active')?.dataset.filter==='courseware')loadExamples();});
 window.addEventListener('auth-state-change',()=>{closeVideoModal();document.querySelectorAll('.course-dialog').forEach(d=>{if(!d.querySelector('.course-editor'))d.close();});if(document.getElementById('examples-grid'))loadExamples();});
@@ -45,6 +48,7 @@ export async function loadExamples() {
     const generation=++loadGeneration;
     const grid = document.getElementById('examples-grid');
     if (!grid) return;
+    disposeCurriculum?.();disposeCurriculum=null;
     initExamplesFilterTabs();
 
     const filterTab = document.querySelector('.examples-filter-tab.active');
@@ -53,8 +57,24 @@ export async function loadExamples() {
     const tag = (tagSelect && tagSelect.value) || '';
     grid.classList.toggle('course-pack-grid',filterMode==='courseware');
     grid.classList.toggle('wrongbook-host',filterMode==='wrongbook');
+    grid.classList.toggle('curriculum-host',filterMode==='curriculum');
     for(const control of document.querySelectorAll('#examples-create-course-btn,.course-import'))control.hidden=filterMode==='wrongbook';
-    if(tagSelect)tagSelect.closest('.examples-tag-filter').hidden=['courseware','wrongbook'].includes(filterMode);
+    if(tagSelect)tagSelect.closest('.examples-tag-filter').hidden=['courseware','wrongbook','curriculum'].includes(filterMode);
+    if(filterMode==='curriculum'){
+        document.querySelector('.examples-pagination')?.remove();
+        grid.innerHTML='<details class="tutor-curriculum teaching-curriculum" open></details>';
+        const busy=()=>{const s=window.StepTutor?.getState();return !!(s?.busy||s?.rendering||s?.saving);};
+        disposeCurriculum=mountCurriculum(grid.firstElementChild,{
+            busy,read:openSolutionRecord,
+            prefill:async problem=>{
+                if(!window.StepTutor)await(window.loadStepTutor?window.loadStepTutor():import('./step-tutor.js?v=20260919-tasks-1'));
+                if(busy())throw new Error('请先完成或停止当前任务，再切换例题。');
+                if(!grid.isConnected||generation!==loadGeneration)return;
+                window.StepTutor.prefill(problem);window.showSection?.('calculate');
+            }
+        });
+        return;
+    }
     if(filterMode==='wrongbook'){const options=window.pendingWrongbookOptions||{};window.pendingWrongbookOptions=null;return renderWrongbook(grid,()=>generation===loadGeneration,options);}
     if(filterMode==='courseware'){document.querySelector('.examples-pagination')?.remove();return renderCoursePacks(grid,()=>generation===loadGeneration);}
 
@@ -108,7 +128,7 @@ export async function loadExamples() {
  * @returns {Promise<boolean>} 是否成功切换（登录校验失败时返回 false）
  */
 export async function switchExamplesFilter(mode) {
-    const valid = ['all', 'favorites', 'watch_later', 'courseware', 'wrongbook'].includes(mode);
+    const valid = ['all', 'curriculum', 'favorites', 'watch_later', 'courseware', 'wrongbook'].includes(mode);
     const filterMode = valid ? mode : 'all';
     if (filterMode === 'favorites' || filterMode === 'watch_later' || filterMode === 'courseware') {
         try {
@@ -138,6 +158,7 @@ function initExamplesFilterTabs() {
     const toolbar=document.getElementById('examples-filter');
     if(!toolbar||toolbar.dataset.bound)return;
     toolbar.dataset.bound='true';
+    if(!toolbar.querySelector('[data-filter=curriculum]'))toolbar.querySelector('[data-filter=all]').insertAdjacentHTML('afterend','<button class="examples-filter-tab" data-filter="curriculum">典型例题</button>');
     if(!toolbar.querySelector('[data-filter=wrongbook]'))toolbar.querySelector('.examples-filter-tabs').insertAdjacentHTML('beforeend','<button class="examples-filter-tab" data-filter="wrongbook">错题本</button>');
     document.querySelectorAll('.examples-filter-tab').forEach(btn => {
         btn.addEventListener('click', async (e) => {
@@ -154,8 +175,10 @@ function initExamplesFilterTabs() {
         createCourseBtn.disabled=false;createCourseBtn.title='创建教案、选择视频并保存课包';
         createCourseBtn.addEventListener('click', () => openCoursePackModal());
     }
-    const importButton=document.createElement('label');importButton.className='action-btn tertiary course-import';importButton.innerHTML='导入课包<input type="file" accept="application/json,.json" hidden>';
-    toolbar.append(importButton);importButton.querySelector('input').onchange=async e=>{try{await importCoursePack(e.target.files[0]);}catch(error){showToast(error.message,'error');}finally{e.target.value='';}};
+    const importButton=document.createElement('button');importButton.type='button';importButton.className='action-btn tertiary course-import';importButton.textContent='导入课包';
+    const importFile=document.createElement('input');importFile.type='file';importFile.accept='application/json,.json';importFile.hidden=true;
+    toolbar.append(importButton,importFile);importButton.onclick=()=>importFile.click();
+    importFile.onchange=async e=>{try{if(e.target.files[0])await importCoursePack(e.target.files[0]);}catch(error){showToast(error.message,'error');}finally{e.target.value='';}};
 
 }
 

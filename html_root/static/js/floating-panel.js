@@ -1,10 +1,12 @@
 import { textWithMath } from './math-text.js';
+import { mountTaskProgress } from '/static/js/task-progress.js';
 
 /** Pointer capture, viewport constraints and task controls shared by both frontends. */
 export function initFloatingPanel() {
     const panel=document.getElementById('knowledge-panel');
     if(!panel||panel.dataset.floatingReady)return;
     panel.dataset.floatingReady='true';
+    mountTaskProgress();
     const header=panel.querySelector('#knowledge-panel-header'),bubble=panel.querySelector('#knowledge-panel-bubble'),content=panel.querySelector('#knowledge-panel-content'),close=panel.querySelector('#knowledge-panel-close-btn');
     if(!header||!bubble||!content||!close)return;
     const key='wisdom.nebula.layout.v2';
@@ -35,6 +37,7 @@ export function initFloatingPanel() {
         panel.title=value?'打开智算星云；拖动可移动位置':'';
         place(r.left,r.top);persist();
         if(focus){if(value){bubble.focus();}else{lastFocus=document.activeElement;close.focus();}}
+        window.dispatchEvent(new CustomEvent('nebula-panel-toggle', { detail: { collapsed: value } }));
     }
     function down(e) {
         if(e.button!==0||e.target.closest('button,a,input,select,textarea'))return;

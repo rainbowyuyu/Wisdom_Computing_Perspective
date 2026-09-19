@@ -1,5 +1,9 @@
 """Regenerate the idempotent upgrade tail of the single phpMyAdmin installer."""
 import ast
+import argparse
+import hashlib
+import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,7 +14,125 @@ def literal(value):
     return "'" + value.replace("'", "''") + "'"
 
 
-def build():
+def manifest(base):
+    """Read the canonical CREATE definitions without importing app configuration."""
+    tables = []
+    for match in re.finditer(r'CREATE TABLE IF NOT EXISTS `?(\w+)`?\s*\((.*?)\) ENGINE=', base, re.S):
+        table, body = match.groups()
+        columns = []
+        indexes = []
+        foreign_keys = []
+        for line in body.splitlines():
+            line = line.strip().rstrip(',')
+            if not line:
+                continue
+            column = re.match(r'`?(\w+)`?\s+', line).group(1)
+            if column.upper() not in {'PRIMARY', 'UNIQUE', 'KEY', 'INDEX', 'CONSTRAINT'}:
+                columns.append(column)
+                if 'PRIMARY KEY' in line.upper():
+                    indexes.append({'name': 'PRIMARY', 'columns': column, 'unique': 1})
+            key = re.match(r'(PRIMARY KEY|UNIQUE KEY|KEY|INDEX)\s*(?:`?(\w+)`?)?\s*\(([^)]+)\)', line, re.I)
+            if key:
+                kind, name, fields = key.groups()
+                indexes.append({'name': name or 'PRIMARY', 'columns': re.sub(r'[\s`]', '', fields),
+                                'unique': int(kind.upper() in {'PRIMARY KEY', 'UNIQUE KEY'})})
+            fk = re.search(r'FOREIGN KEY\s*\(`?(\w+)`?\) REFERENCES `?(\w+)`?\s*\(`?(\w+)`?\) ON DELETE (CASCADE|SET NULL)', line, re.I)
+            if fk:
+                field, parent, parent_field, delete_rule = fk.groups()
+                foreign_keys.append({'column': field, 'parent': parent, 'parent_column': parent_field,
+                                     'delete_rule': delete_rule, 'update_cascade': int('ON UPDATE CASCADE' in line)})
+        tables.append({'table': table, 'columns': columns, 'indexes': indexes, 'foreign_keys': foreign_keys})
+    return tables
+
+
+def completion_sql(base):
+    tables = manifest(base)
+    versions = [{'version': p.name, 'checksum': hashlib.sha256(p.read_text(encoding='utf-8').encode()).hexdigest()}
+                for p in sorted((ROOT / 'database/migrations').glob('*.sql'))]
+    # One object per line keeps the generated SQL reviewable in phpMyAdmin.
+    schema_json = '[\n' + ',\n'.join(json.dumps(t, ensure_ascii=False) for t in tables) + '\n]'
+    versions_json = json.dumps(versions, indent=2)
+    return f"""-- 9. 结构自检与升级版本登记（由 scripts/build_database_installer.py 同步生成）
+-- 缺少字段、索引、关联或历史校验和冲突时，不登记新版本，不覆盖已有记录。
+SET @wisdom_schema = {literal(schema_json)};
+SET @wisdom_versions = {literal(versions_json)};
+
+SELECT COUNT(*) INTO @wisdom_missing_columns
+FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
+    table_name VARCHAR(64) PATH '$.table',
+    NESTED PATH '$.columns[*]' COLUMNS (column_name VARCHAR(64) PATH '$')
+)) required_column
+WHERE NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS c
+    WHERE c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME=required_column.table_name AND c.COLUMN_NAME=required_column.column_name);
+
+SELECT COUNT(*) INTO @wisdom_missing_indexes
+FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
+    table_name VARCHAR(64) PATH '$.table',
+    NESTED PATH '$.indexes[*]' COLUMNS (
+        index_name VARCHAR(64) PATH '$.name', column_names VARCHAR(512) PATH '$.columns', is_unique INT PATH '$.unique'
+    )
+)) required_index
+WHERE required_index.index_name IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.STATISTICS s
+    WHERE s.TABLE_SCHEMA=DATABASE() AND s.TABLE_NAME=required_index.table_name AND s.INDEX_NAME=required_index.index_name
+    GROUP BY s.INDEX_NAME
+    HAVING GROUP_CONCAT(s.COLUMN_NAME ORDER BY s.SEQ_IN_INDEX)=required_index.column_names
+        AND MAX(s.NON_UNIQUE)=1-required_index.is_unique
+);
+
+SELECT COUNT(*) INTO @wisdom_missing_relations
+FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
+    table_name VARCHAR(64) PATH '$.table',
+    NESTED PATH '$.foreign_keys[*]' COLUMNS (
+        column_name VARCHAR(64) PATH '$.column', parent_table VARCHAR(64) PATH '$.parent',
+        parent_column VARCHAR(64) PATH '$.parent_column', delete_rule VARCHAR(16) PATH '$.delete_rule',
+        update_cascade INT PATH '$.update_cascade'
+    )
+)) required_fk
+WHERE required_fk.column_name IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k
+    JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+      ON r.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND r.TABLE_NAME=k.TABLE_NAME AND r.CONSTRAINT_NAME=k.CONSTRAINT_NAME
+    WHERE k.CONSTRAINT_SCHEMA=DATABASE() AND k.TABLE_NAME=required_fk.table_name AND k.COLUMN_NAME=required_fk.column_name
+      AND k.REFERENCED_TABLE_NAME=required_fk.parent_table AND k.REFERENCED_COLUMN_NAME=required_fk.parent_column
+      AND r.DELETE_RULE=required_fk.delete_rule AND (required_fk.update_cascade=0 OR r.UPDATE_RULE='CASCADE')
+);
+
+SELECT COUNT(*) INTO @wisdom_migration_conflicts
+FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version', checksum CHAR(64) PATH '$.checksum')) expected
+JOIN schema_migrations existing ON existing.version=expected.version COLLATE utf8mb4_general_ci
+WHERE BINARY existing.checksum<>BINARY expected.checksum;
+
+SELECT COUNT(*) INTO @wisdom_pending_legacy
+FROM user_wrongbook w JOIN users u ON BINARY u.username=BINARY w.user_id
+WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id);
+
+SET @wisdom_upgrade_ok = (@wisdom_missing_columns=0 AND @wisdom_missing_indexes=0
+    AND @wisdom_missing_relations=0 AND @wisdom_migration_conflicts=0 AND @wisdom_pending_legacy=0);
+
+INSERT INTO schema_migrations(version,checksum)
+SELECT expected.version,expected.checksum
+FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version', checksum CHAR(64) PATH '$.checksum')) expected
+WHERE @wisdom_upgrade_ok AND NOT EXISTS (SELECT 1 FROM schema_migrations existing WHERE existing.version=expected.version COLLATE utf8mb4_general_ci);
+COMMIT;
+
+-- OK 且执行过程无报错才表示完成。非零缺项或校验和冲突需要核对，不要清空业务表重建。
+SELECT IF(@wisdom_upgrade_ok, 'OK', 'NEEDS_ATTENTION') AS upgrade_status,
+    DATABASE() AS current_database,
+    (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()) AS total_tables,
+    @wisdom_missing_columns AS missing_columns,
+    @wisdom_missing_indexes AS missing_indexes,
+    @wisdom_missing_relations AS missing_relations,
+    @wisdom_migration_conflicts AS migration_conflicts,
+    (SELECT COUNT(*) FROM schema_migrations WHERE version COLLATE utf8mb4_general_ci IN (
+        SELECT version COLLATE utf8mb4_general_ci FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version')) expected
+    )) AS applied_migrations,
+    @wisdom_pending_legacy AS pending_legacy_wrongbook,
+    (SELECT COUNT(*) FROM user_wrongbook w WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id)) AS unmatched_legacy_wrongbook;
+"""
+
+
+def build(check=False):
     path = ROOT / 'visdom_db.sql'
     base = path.read_text(encoding='utf-8').split(MARKER)[0].rstrip()
     sections = [base, MARKER,
@@ -22,6 +144,12 @@ def build():
                          'PREPARE wisdom_statement FROM @wisdom_ddl;',
                          'EXECUTE wisdom_statement;',
                          'DEALLOCATE PREPARE wisdom_statement;'])
+
+    # Real historical player schemas predate color/mode. Preserve existing choices.
+    for column, definition in [('color', 'INT DEFAULT 16777215 AFTER `time`'),
+                               ('mode', 'SMALLINT DEFAULT 1 AFTER `color`')]:
+        ddl = f'ALTER TABLE `example_video_danmaku` ADD COLUMN `{column}` {definition}'
+        execute(f"IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_danmaku' AND COLUMN_NAME='{column}'), 'DO 0', {literal(ddl)})")
 
     module = ast.parse((ROOT / 'app/database.py').read_text(encoding='utf-8'))
     indexes = next(ast.literal_eval(node.value) for node in module.body
@@ -61,15 +189,17 @@ SELECT u.id,w.id,'video',w.video_id,GREATEST(w.time_sec,0),
 FROM user_wrongbook w JOIN users u
     ON BINARY u.username = BINARY w.user_id
 WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id);
-COMMIT;
-
--- phpMyAdmin 最后显示当前库、已建表数量和保留待处理的旧错题数量。
-SELECT DATABASE() AS current_database,
-    (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()) AS total_tables,
-    (SELECT COUNT(*) FROM user_wrongbook w WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id)) AS unmatched_legacy_wrongbook;
 """)
-    path.write_text('\n\n'.join(sections), encoding='utf-8')
+    sections.append(completion_sql(base))
+    result = '\n\n'.join(sections)
+    if check:
+        if path.read_text(encoding='utf-8') != result:
+            raise SystemExit('visdom_db.sql 已过期，请运行 python scripts/build_database_installer.py')
+    else:
+        path.write_text(result, encoding='utf-8')
 
 
 if __name__ == '__main__':
-    build()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--check', action='store_true', help='Check generated SQL without writing files')
+    build(check=parser.parse_args().check)

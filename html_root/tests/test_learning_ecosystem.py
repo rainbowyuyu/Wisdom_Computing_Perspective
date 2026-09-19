@@ -55,8 +55,9 @@ def test_resources_ownership_snapshots_revision_and_search(accounts):
         assert search['course_packs']==[] and search['wrongbook']==[]
 
 
-def test_review_agent_route():
+def test_review_agent_route(accounts):
     with TestClient(app) as c:
+        c.cookies.set('auth_session',accounts[1][0])
         result=c.post('/api/agent/execute',json={'prompt':'复习错题'})
         assert result.status_code==200
         assert result.json()['steps'][0]['examples_action']=='review'

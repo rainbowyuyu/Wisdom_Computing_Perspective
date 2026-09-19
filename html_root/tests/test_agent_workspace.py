@@ -51,7 +51,8 @@ def test_agent_solves_renders_saves_and_reads_real_record(workspace):
     page.screenshot(path=f'tests/artifacts/agent-mobile-{kind}.png',full_page=True)
 
 
-def test_code_assistant_preview_conflict_apply_undo_and_render(workspace):
+def test_code_assistant_preview_conflict_apply_undo_and_render(workspace, accounts, monkeypatch):
+    monkeypatch.setenv('WISDOM_CODE_RUNNERS', accounts[0][0])
     page,origin,kind=workspace
     page.evaluate("window.showSection('devtools')")
     page.wait_for_function("document.querySelector('#devtools')?.dataset.devInitialized")
@@ -99,7 +100,8 @@ def test_agent_failure_stops_dependent_actions(workspace):
     assert page.locator('[data-agent=retry]').is_visible()
 
 
-def test_agent_creates_runs_and_saves_script_across_navigation(workspace):
+def test_agent_creates_runs_and_saves_script_across_navigation(workspace, accounts, monkeypatch):
+    monkeypatch.setenv('WISDOM_CODE_RUNNERS', accounts[0][0])
     page,origin,kind=workspace
     # Different scene names occur in actual model replies. The browser must run them.
     code=CODE.replace('GenScene','SquareToCircle')

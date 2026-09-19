@@ -52,11 +52,12 @@ def get_db_connection():
 
 
 # 大模型
+from .usage_guard import GuardedClient
 api_key = os.getenv("ALIYUN_KEY")
-client = OpenAI(
+client = GuardedClient(OpenAI(
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     api_key=api_key or "sk-mock-key",
-)
+))
 
 # 头像与视频目录（相对项目根）
 AVATAR_DIR = os.path.join(ROOT_DIR, "static", "avatars")

@@ -5,6 +5,8 @@ import re
 import sys
 import numpy as np
 import shutil
+import math
+import time
 
 # 获取项目根目录 (假设此文件在 logic/ 目录下，根目录是上一级)
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -40,21 +42,27 @@ def parse_latex_to_list(latex_str):
                 try:
                     row_nums.append(float(clean_c))
                 except ValueError:
-                    row_nums.append(0.0)  # 容错
+                    raise ValueError('矩阵元素必须是有限实数，请先化简分数或根式。')
             if row_nums:
                 matrix_data.append(row_nums)
 
-        if not matrix_data: return [[1, 0], [0, 1]]
+        if not matrix_data or len(matrix_data)>4 or not 1 <= len(matrix_data[0]) <= 4:
+            raise ValueError('矩阵请使用最多 4 行 4 列的非空矩阵。')
+        if any(len(row)!=len(matrix_data[0]) or any(not math.isfinite(n) or abs(n)>10000 for n in row) for row in matrix_data):
+            raise ValueError('矩阵各行列数必须一致，元素绝对值不超过 10000。')
         return matrix_data
     except Exception as e:
-        print(f"Matrix Parse Error: {e}")
-        return [[1, 0], [0, 1]]
+        raise ValueError('矩阵格式无效，请检查各元素和行列数。') from e
 
 
-def render_matrix_animation(matA_latex, matB_latex, operation, task_id):
+def render_matrix_animation(matA_latex, matB_latex, operation, task_id, cancel_event=None):
     """
     生成 Manim 脚本并执行，使用纯 Manim Community 实现
     """
+    if operation not in {'add', 'mul', 'det'}:
+        raise ValueError('仅支持矩阵加法、乘法和行列式。')
+    if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', task_id):
+        raise ValueError('任务编号无效。')
     matA = parse_latex_to_list(matA_latex)
     matB = parse_latex_to_list(matB_latex)
 
@@ -172,7 +180,7 @@ class {scene_name}(Scene):
                 return
 
             val = np.linalg.det(arr)
-            res = MathTex(f"{{:.2f}}".format(val)).set_color(YELLOW).next_to(det_bars, RIGHT)
+            res = MathTex("{{:.2f}}".format(val)).set_color(YELLOW).next_to(det_bars, RIGHT)
 
             self.play(Write(res))
 
@@ -212,8 +220,16 @@ class {scene_name}(Scene):
         "--media_dir", os.path.join(BASE_DIR, "manim_media")  # 临时输出目录，避免污染 static
     ]
 
+    proc=None
     try:
-        subprocess.run(cmd, check=True, cwd=BASE_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if cancel_event is not None and cancel_event.is_set():return None
+        proc=subprocess.Popen(cmd,cwd=BASE_DIR,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform=='win32' else 0,start_new_session=sys.platform!='win32')
+        started=time.monotonic()
+        while proc.poll() is None:
+            if time.monotonic()-started>=180 or (cancel_event is not None and cancel_event.is_set()):return None
+            time.sleep(.2)
+        if proc.returncode:return None
 
         # 寻找生成的文件并移动
         # 路径通常是: BASE_DIR/manim_media/videos/temp_{task_id}/480p15/GenScene.mp4
@@ -238,3 +254,8 @@ class {scene_name}(Scene):
     except Exception as e:
         print(f"General Error: {e}")
         return None
+    finally:
+        if proc and proc.poll() is None:
+            from app.routers.solve import stop_process
+            stop_process(proc)
+        if os.path.exists(py_path):os.remove(py_path)

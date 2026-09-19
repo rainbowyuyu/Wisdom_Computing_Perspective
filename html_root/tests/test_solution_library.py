@@ -50,6 +50,26 @@ def payload():
     return {'problem':'解方程 x^2-5*x+6=0','context':'','solution':local_solution('x^2-5*x+6=0').model_dump(mode='json'),'video':None}
 
 
+def test_curriculum_solution_in_formula_wrongbook_and_course_pack(accounts):
+    from logic.curriculum import EXAMPLES, worked_solution
+    item = next(e for e in EXAMPLES if e['id']=='uni-bayes')
+    snapshot = {'problem':item['problem'], 'solution':worked_solution(item).model_dump(mode='json')}
+    with TestClient(app) as client:
+        client.cookies.set('auth_session', accounts[1][0])
+        saved = client.post('/api/formulas/solutions', json=snapshot)
+        assert saved.status_code==200, saved.text
+        fid=saved.json()['id']
+        restored=client.get(f'/api/formulas/solutions/{fid}').json()['data']
+        assert restored['solution']==snapshot['solution']
+        wrong=client.post('/api/wrongbook/add',json={'title':'贝叶斯例题复习','problem':item['problem'],
+            'answer':snapshot['solution']['summary'],'formula_id':fid,'source_type':'solution','snapshot':snapshot})
+        assert wrong.status_code==200,wrong.text
+        pack=client.post('/api/examples/course-packs',json={'name':'典型例题课包','resources':[{'kind':'solution','source_id':fid}]})
+        assert pack.status_code==200,pack.text
+        data=client.get('/api/examples/course-packs/'+str(pack.json()['id'])).json()['data']
+        assert data['resources'][0]['snapshot']['solution']['solution']['source']=='curriculum'
+
+
 def test_solution_library_requires_session():
     with TestClient(app) as client:
         assert client.post('/api/formulas/solutions',json=payload()).status_code==401
@@ -63,6 +83,7 @@ def test_saved_solution_roundtrip_update_isolation_and_delete(accounts):
     with TestClient(app) as client:
         client.cookies.set('auth_session',sessions[0])
         original=payload()
+        original['solution']['task_goal']='仅求原题方程的根，其他子目标另存题解。'
         response=client.post('/api/formulas/solutions',json=original)
         assert response.status_code==200,response.text
         ident=response.json()['id']
@@ -100,20 +121,29 @@ def test_invalid_video_cannot_be_saved(accounts):
 
 
 @pytest.fixture
-def live_library_server(accounts):
+def live_library_server(accounts, tmp_path, monkeypatch):
     import socket
     import threading
     import time
     import uvicorn
+    from app import math_jobs
+    from app.routers import math_tasks
+    # Each in-process server owns its scheduler and event loop, as a real
+    # main.py process does. Never carry a driver into the next test's loop.
+    scheduler=math_jobs.MathJobManager(math_jobs.JobStore(tmp_path/'tasks.sqlite3'))
+    monkeypatch.setattr(math_jobs,'manager',scheduler)
+    monkeypatch.setattr(math_tasks,'manager',scheduler)
     sock=socket.socket();sock.bind(('127.0.0.1',0))
     origin=f'http://127.0.0.1:{sock.getsockname()[1]}'
-    server=uvicorn.Server(uvicorn.Config(app,log_level='error',access_log=False))
+    server=uvicorn.Server(uvicorn.Config(app,log_level='error',access_log=False,timeout_graceful_shutdown=2))
     thread=threading.Thread(target=server.run,kwargs={'sockets':[sock]},daemon=True);thread.start()
     deadline=time.monotonic()+10
     while not server.started and thread.is_alive() and time.monotonic()<deadline: time.sleep(.05)
     assert server.started
     try: yield origin,accounts
-    finally: server.should_exit=True;thread.join(timeout=10);sock.close()
+    finally:
+        server.should_exit=True;thread.join(timeout=10);sock.close()
+        assert not thread.is_alive(), 'Test server must release its event loop before the next test'
 
 
 def test_browser_saves_renders_and_reads_across_frontends(live_library_server):

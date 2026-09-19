@@ -100,3 +100,28 @@
 #devtools .tools-panel { flex:0 0 auto!important; }
 #devtools .workspace-main { border:0;box-shadow:none;background:transparent; }
 .manim-studio .code-assistant-header,.manim-studio .code-assistant-intro,.manim-studio .code-assistant-shortcuts,.manim-studio .code-assistant-form,.manim-studio .code-assistant-status,.manim-studio .code-assistant-proposal { flex-shrink:0; }
+
+.math-task-board { margin:0 0 24px; min-width:0; }
+.math-task-board>header,.math-task-heading,.math-subtask-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.math-task-board h3 { margin:5px 0 8px;font-size:18px;color:var(--text-main); }
+.math-task-board p { font-size:13px; line-height:1.8; color:var(--text-secondary); margin:8px 0;overflow-wrap:anywhere; }
+.math-task-board button { font:inherit;font-size:12px;padding:8px 12px;border:1px solid var(--border-color);border-radius:9px;background:var(--bg-surface);color:var(--primary-color);cursor:pointer;flex-shrink:0; }
+.math-task-board button:disabled { opacity:.5;cursor:wait; }.math-task-board :focus-visible{outline:2px solid var(--primary-color);outline-offset:3px}
+.math-task-card { border:1px solid var(--border-color);border-radius:14px;background:var(--bg-surface);padding:18px;margin:14px 0;min-width:0; }
+.math-task-card h4 { font-size:15px;line-height:1.6;margin:0;min-width:0;overflow-wrap:anywhere; }
+.math-task-badge { padding:4px 8px;border-radius:7px;background:var(--bg-input);color:var(--text-secondary);font-size:11px;white-space:nowrap; }
+.math-task-badge.running,.math-task-badge.planning {color:var(--primary-color)}.math-task-badge.error,.math-task-badge.partial{color:#b45309}
+.math-task-card details,.math-task-card details[open] { padding:0;border:0;box-shadow:none;background:transparent;margin:10px 0; }
+.math-task-card details summary {font-size:12px;display:flex;width:100%;padding:0;white-space:normal}.math-task-card details p {border:0;padding:0;max-height:180px;overflow:auto;white-space:pre-wrap}
+.math-task-progress {height:5px;border-radius:6px;overflow:hidden;background:var(--bg-input);margin:12px 0 7px}.math-task-progress>span{height:100%;display:block;background:linear-gradient(90deg,var(--primary-color),var(--secondary-color));transition:width .2s}
+.math-task-card small {font-size:11px;color:var(--text-secondary);line-height:1.7}.math-task-card ol{padding:0;list-style:none;margin:12px 0}.math-task-card li{padding:12px 0;border-top:1px solid var(--border-color)}.math-subtask-heading strong{font-size:13px;min-width:0}.math-subtask-heading>span{font-size:11px;white-space:nowrap;color:var(--text-secondary)}.math-task-card li button{margin-top:8px}.math-task-card footer{display:flex;gap:8px;flex-wrap:wrap}.math-task-card .katex-display{max-width:100%;overflow:auto}
+.math-task-feedback:empty{display:none}.math-task-pending{border:1px solid var(--border-color);border-radius:10px;padding:12px}.math-task-pending p{max-height:160px;overflow:auto;white-space:pre-wrap}
+.agent-task-mode{display:flex;gap:7px;align-items:center;color:var(--text-secondary);font-size:12px;margin:4px 0 12px}.agent-task-mode input{accent-color:var(--primary-color)}
+.assistant-main>header,.assistant-composer{flex-shrink:0}
+.assistant-main{height:var(--assistant-viewport-height,min(800px,calc(100dvh - 190px)));min-height:450px}
+.assistant-thread{min-height:0}
+.math-subtask-heading strong{overflow-wrap:anywhere}
+.math-task-card details summary{color:var(--text-secondary)}
+[data-theme=dark] .math-task-badge.error,[data-theme=dark] .math-task-badge.partial{color:#fbbf24}
+@media(max-width:760px){.math-task-card{padding:12px}.math-task-board>header{flex-wrap:wrap}.math-task-card h4{font-size:14px}.math-task-board p{font-size:12px}.math-task-heading{gap:7px}.agent-task-mode{font-size:11px;line-height:1.6}}
+@media(prefers-reduced-motion:reduce){.math-task-progress>span{transition:none}}

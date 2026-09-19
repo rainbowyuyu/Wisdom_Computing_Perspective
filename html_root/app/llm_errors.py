@@ -1,5 +1,14 @@
 """User-facing provider failures, without leaking raw service responses."""
+from openai import APIConnectionError, APITimeoutError
+from .usage_guard import UsageDenied
+
 def llm_error_message(error):
+    if isinstance(error, UsageDenied):
+        return str(error)
+    if isinstance(error, (TimeoutError, APITimeoutError)):
+        return "AI 服务响应超时，请重试。题目和已完成的步骤会保留。"
+    if isinstance(error, APIConnectionError):
+        return "暂时无法连接 AI 服务，请稍后重试。题目和已完成的步骤会保留。"
     body = getattr(error, "body", {}) or {}
     detail = body.get("error", body) if isinstance(body, dict) else {}
     code = detail.get("code", detail.get("type", "")) if isinstance(detail, dict) else ""
@@ -10,4 +19,6 @@ def llm_error_message(error):
         return "AI 服务鉴权失败，请检查服务端 ALIYUN_KEY 与模型访问权限。"
     if status == 429:
         return "AI 服务请求过于频繁，请稍后重试。已完成的步骤会保留。"
+    if status is not None and status >= 500:
+        return "AI 服务暂时繁忙，请稍后重试。题目和已完成的步骤会保留。"
     return "本次 AI 推导未完成，请重试或补充题目条件。已显示的步骤会保留。"

@@ -42,6 +42,7 @@ export function mountCodeAssistant(panel, getEditor, run, ensureEditor) {
         if(!proposal||controller)return;const aborter=new AbortController(),id=++version;controller=aborter;busy(true);status.textContent='正在实际渲染建议代码的最终画面…';
         try{const result=await request('render_keyframe',{code:proposal.code},aborter.signal);if(id!==version)return;
             if(!/^\/videos\/[a-f0-9-]+_preview\.png$/.test(result.preview_url))throw new Error('预览地址无效');
+            if(result.repaired&&result.code){proposal.code=result.code;$('.code-assistant-source pre').textContent=result.code;diff?.getModel()?.modified.setValue(result.code);$('.code-assistant-summary').textContent='预览错误已自动修复，应用时将使用修复后的脚本。';}
             $('.code-assistant-preview img').src=result.preview_url;$('.code-assistant-preview').hidden=false;status.textContent='预览渲染成功。代码尚未应用，可检查效果。';
         }catch(error){if(id===version){status.textContent=error.name==='AbortError'?'已停止等待预览。':'预览失败：'+error.message+'。可补充修复要求重新生成。';
             if(error.name!=='AbortError'){const log=document.getElementById('dev-manim-log');if(log)log.textContent=('建议代码预览失败：\n'+error.message).slice(-12000);}}}

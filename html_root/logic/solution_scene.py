@@ -4,44 +4,20 @@ import os
 from pathlib import Path
 import re
 import textwrap
+import sys
 
 import numpy as np
 from manim import *
+
+# Manim runs from an isolated temporary directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from logic.manim_tex import formula, set_tex_step
 
 
 def label(text, size=24, width=12, color=WHITE):
     item = Text(str(text), font="Microsoft YaHei", font_size=size, color=color)
     if item.width > width: item.scale_to_fit_width(width)
     return item
-
-
-def formula(text):
-    if not text.strip():
-        return VGroup()
-    # MathTex repairs unmatched braces automatically. Reject these before that
-    # repair can silently change the mathematical expression shown to students.
-    braces = re.sub(r"\\[{}]", "", text)
-    depth = 0
-    for char in braces:
-        if char == "{": depth += 1
-        elif char == "}": depth -= 1
-        if depth < 0: break
-    if depth != 0:
-        raise ValueError("WISDOM_LATEX_ERROR: 公式括号不完整")
-    # Only a small math-command vocabulary reaches TeX (no file/IO primitives).
-    allowed = set("frac dfrac tfrac sqrt sin cos tan cot sec csc arcsin arccos arctan log ln exp lim to infty pi theta alpha beta gamma Gamma Delta delta epsilon varepsilon zeta eta Theta lambda Lambda mu nu xi Xi rho sigma Sigma tau phi varphi Phi chi psi Psi omega Omega det left right begin end matrix pmatrix bmatrix array cdot times div pm mp quad qquad text mathrm mathbf mathbb mathcal operatorname vec hat bar overline underline overrightarrow overleftarrow sum prod int iint partial le ge leq geq ne neq approx equiv sim cong propto in notin subset subseteq supset supseteq cup cap forall exists neg land lor angle triangle perp parallel circ degree rightarrow leftarrow Rightarrow Leftarrow Leftrightarrow implies iff because therefore mapsto cdots ldots dots underbrace overbrace overset underset substack displaystyle textstyle limits nolimits lvert rvert vert langle rangle big Big bigl bigr Bigl Bigr".split())
-    commands = re.findall(r"\\([A-Za-z]+)", text)
-    environments = re.findall(r"\\(?:begin|end)\{([^}]+)\}", text)
-    safe_environments = {"matrix", "pmatrix", "bmatrix", "vmatrix", "Vmatrix", "array", "aligned", "cases"}
-    if text and len(text) < 450 and all(c in allowed for c in commands) and all(e in safe_environments for e in environments) and not re.search(r"[#%~]|\^\^", text):
-        try:
-            item = MathTex(text, font_size=42)
-            if item.width > 12: item.scale_to_fit_width(12)
-            if item.height > 1.15: item.scale_to_fit_height(1.15)
-            return item
-        except Exception as error:
-            raise ValueError("WISDOM_LATEX_ERROR: 公式排版失败，请修正公式或检查 TeX 环境") from error
-    raise ValueError("WISDOM_LATEX_ERROR: 公式包含不支持的命令或格式")
 
 
 def prose(text, size=18, width=12):
@@ -71,7 +47,38 @@ def sequences(visual):
         return [curve["points"] for curve in visual.get("curves", [])]
     points = visual.get("points", [])
     edges = visual.get("segments")
-    return [[points[a], points[b]] for a, b in edges] if edges is not None else [points]
+    edges = [[points[a], points[b]] for a, b in edges] if edges is not None else [points]
+    return [curve["points"] for curve in visual.get("curves", [])] + edges
+
+
+def number_line_graph(visual):
+    rows = visual.get("rows", [])
+    values = [i[k] for row in rows for i in row["intervals"] for k in ("lower", "upper") if i.get(k) is not None]
+    low, high = min([0]+values), max([1]+values)
+    pad = max((high-low)*.1, 1)
+    low -= pad; high += pad
+    def point(value, y): return np.array([-2.9+(value-low)/(high-low)*7.8, y, 0])
+    result = VGroup()
+    gap = min(.66, 3.1/max(len(rows)-1, 1))
+    for index, row in enumerate(rows):
+        y = 1-index*gap
+        color = GOLD_A if index == len(rows)-1 else PALETTE[index % len(PALETTE)]
+        result.add(label(row["label"], 16, width=2.7).move_to(np.array([-4.5,y,0])))
+        result.add(Line(point(low,y), point(high,y), color=GREY_B, stroke_width=1))
+        if not row["intervals"]:
+            result.add(label("∅", 20).move_to(point((low+high)/2,y)))
+        for interval in row["intervals"]:
+            a, b = interval.get("lower"), interval.get("upper")
+            start, end = point(low if a is None else a,y), point(high if b is None else b,y)
+            if np.linalg.norm(end-start) > 1e-8:
+                result.add(Line(start, end, color=color, stroke_width=5))
+            for value, location, key, direction in [(a,start,"lower",LEFT), (b,end,"upper",RIGHT)]:
+                if value is None:
+                    result.add(Arrow(location-direction*.3,location,buff=0,color=color,stroke_width=2,max_tip_length_to_length_ratio=.5))
+                else:
+                    result.add(Dot(location,radius=.055,color=color) if interval.get(key+"_closed") else Circle(radius=.055,color=color,fill_color="#10182b",fill_opacity=1,stroke_width=2).move_to(location))
+                    result.add(label(interval.get(key+"_label") or str(value), 12, width=1.5).next_to(location,DOWN,buff=.12))
+    return result
 
 
 def sequence_key(points):
@@ -119,6 +126,7 @@ class SolutionScene(Scene):
         matrix_value = None
         tracker = None
         for index, step in enumerate(steps):
+            set_tex_step(index)
             print(f"WISDOM_CHAPTER:{index}", flush=True)
             v = step["visual"]
             title = VGroup(label(f'{index+1:02d} / {len(steps):02d}', 24),
@@ -218,6 +226,10 @@ class SolutionScene(Scene):
                     # computed root or a geometrical relation.
                     animations.append(Indicate(next(reversed(dots.values())) if dots else next(iter(paths.values())), color=GOLD_A, scale_factor=1.015))
 
+            elif v["kind"] == "number_line":
+                new_graph = number_line_graph(v)
+                animations.append(ReplacementTransform(graph,new_graph) if len(graph) else FadeIn(new_graph))
+                graph = new_graph
             elif v["kind"] == "matrix":
                 m = np.array(v["matrix"], dtype=float)
                 if matrix_shape is None:

@@ -1,3 +1,4 @@
+import '/static/js/account-access.js?v=20260919-access-1';
 import { initNavSearch } from './site-search.js';
 // static/js/main.js
 import * as UI from './ui.js';
@@ -8,7 +9,7 @@ import * as Auth from './auth.js';
 import * as Settings from './settings.js';
 import * as Tutorial from './tutorial.js';
 import * as Formulas from './formulas.js?v=20260917-creator-2';
-import * as Examples from './examples.js';
+import * as Examples from './examples.js?v=20260919-teaching-2';
 import * as Docs from './docs.js?v=20260918-doc-math-1';
 import * as Theme from './theme.js';
 import * as DevTools from '/static/js/devtools.js?v=20260917-creator-2';
@@ -23,7 +24,7 @@ import * as SectionHistory from './section-history.js';
 import * as MathLiveKeyboard from './mathlive/mathlive-keyboard.js';
 import * as MathLiveMenu from './mathlive/mathlive-menu.js';
 import * as MathLiveLocale from './mathlive/mathlive-locale.js';
-import { initStepTutor } from './step-tutor.js?v=20260918-progress-1';
+import { initStepTutor } from './step-tutor.js?v=20260919-tasks-1';
 import { initFloatingPanel } from './floating-panel.js?v=20260917-nebula-math-7';
 
 // 将常用 UI 能力挂到 window，便于各处统一使用（如 Toast）
@@ -75,31 +76,10 @@ function getUrlParams() {
 
 // 帮助页面内搜索：在当前页面内过滤/展开问答
 function initHelpSearch() {
-  const input = document.getElementById('help-search-input');
-  const helpSection = document.getElementById('help');
-  if (!input || !helpSection) return;
-  const entries = Array.from(helpSection.querySelectorAll('details'));
-  if (!entries.length) return;
-
-  input.addEventListener('input', () => {
-    const q = (input.value || '').trim().toLowerCase();
-    if (!q) {
-      entries.forEach(d => {
-        d.style.display = '';
-        // 恢复默认展开状态：只保留页面原有的 open 属性
-        // 不强制关闭，避免干扰用户手动展开的结果
-      });
-      return;
-    }
-    entries.forEach(d => {
-      const text = (d.textContent || '').toLowerCase();
-      if (text.includes(q)) {
-        d.style.display = '';
-        d.open = true;
-      } else {
-        d.style.display = 'none';
-      }
-    });
+  const host=document.querySelector('#help .help-container');
+  if(!host)return;
+  import('./help-center.js').then(({mountHelpCenter})=>mountHelpCenter(host)).catch(()=>{
+    host.textContent='帮助内容暂时无法加载，请刷新重试。';
   });
 }
 
@@ -166,8 +146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Examples and their video metadata load on first entry.
     Theme.initTheme();
 
-    // 全设备初始化开发者工具工作台（含手机端）
-    DevTools.initDevTools();
+    // 开发者工具已初始化，切换页面复用现有工作台。
 
     Agent.initAgent();
     Profile.initProfile();
@@ -231,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // 新增功能条：若用户曾关闭则不再显示
-    if (localStorage.getItem('wisdom.release.dismissed')==='0.4.5') {
+    if (localStorage.getItem('wisdom.release.dismissed')==='0.4.6') {
       const el = document.getElementById('agent-update-banner');
       if (el) el.style.display = 'none';
     }
@@ -254,7 +233,7 @@ window.closeAgentBanner = function () {
   const el = document.getElementById('agent-update-banner');
   if (el) {
     el.style.display = 'none';
-    localStorage.setItem('wisdom.release.dismissed', '0.4.5');
+    localStorage.setItem('wisdom.release.dismissed', '0.4.6');
   }
 };
 
@@ -567,7 +546,20 @@ window.useFormula = Formulas.useFormula;
 window.deleteFormula = Formulas.deleteFormula;
 
 // --- 其他挂载 ---
+let adminPageDispose=null,adminPageNavigation=0;
 window.showSection = (sectionId, opts = {}) => {
+    const adminRun=++adminPageNavigation;
+    adminPageDispose?.();adminPageDispose=null;
+    if(sectionId==='admin'){
+        import('./account-admin.js').then(({mountAdmin})=>{
+            if(adminRun===adminPageNavigation)adminPageDispose=mountAdmin(document.querySelector('#admin [data-admin-host]'));
+        }).catch(()=>{
+            if(adminRun===adminPageNavigation){
+                const host=document.querySelector('#admin [data-admin-host]');
+                host.textContent='用户管理页面加载失败，请刷新重试。';
+            }
+        });
+    }
     if (!opts.fromHistory) {
         SectionHistory.pushSection(sectionId);
         if (!window._initPhase) pushStateForSection(sectionId);
@@ -597,7 +589,7 @@ window.showSection = (sectionId, opts = {}) => {
     // A section switch reuses the document: do not carry the previous page's
     // scroll offset into the assistant and hide its header behind the navbar.
     // The conversation keeps its own independent scroll position.
-    if (sectionId === 'agent' && !opts.fromHistory) {
+    if (['agent','admin'].includes(sectionId) && !opts.fromHistory) {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }
 
@@ -636,7 +628,7 @@ window.openSettings = Settings.openSettings;
 window.closeSettings = () => UI.toggleModal('settings-modal', false);
 window.startRecording = Settings.startRecording;
 window.resetDefaults = Settings.resetDefaults;
-    window.startTutorial = Tutorial.startTutorial;
+    window.startTutorial = () => import('./site-tour.js').then(module => module.startSiteTour());
     window.startRoleGuide = Tutorial.startRoleGuide;
 
 // 新增挂载

@@ -11,6 +11,7 @@ app.use(router);
 (window as any).App = (window as any).App || {};
 
 const sectionToPath: Record<string, string> = {
+  admin: "/admin",
   home: "/",
   agent: "/agent",
   detect: "/detect",
@@ -31,7 +32,7 @@ const sectionToPath: Record<string, string> = {
 };
 
 (window as any).openSettings = (...args: unknown[]) => {
-  (window as any).App.__openSettings && (window as any).App.__openSettings(...args);
+  return (window as any).App.__openSettings?.(...args);
 };
 
 (window as any).toggleMobileMenu = () => {
@@ -47,3 +48,6 @@ import(/* @vite-ignore */ graphBootstrapUrl).catch(error => console.warn("图谱
 
 const docsUrl="/static/js/docs.js?v=20260918-doc-math-1";
 import(/* @vite-ignore */ docsUrl).catch(error=>console.warn("文档组件加载失败",error));
+
+const accountAccessUrl='/static/js/account-access.js?v=20260919-access-1';
+import(/* @vite-ignore */ accountAccessUrl).catch(error=>console.warn('账户权益加载失败',error));

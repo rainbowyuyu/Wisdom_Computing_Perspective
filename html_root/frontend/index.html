@@ -94,33 +94,33 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"
     />
-    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
 
     <!-- MathLive (用于可视化公式编辑) -->
-    <script defer src="https://unpkg.com/mathlive"></script>
+    <script async src="https://unpkg.com/mathlive"></script>
 
     <!-- Marked (Markdown 解析) -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <!-- Highlight.js (代码高亮) -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
     />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
     <!-- Cropper.js (图片裁剪编辑) -->
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css"
     />
-    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
 
     <!-- 核心样式：沿用原有 main.css 与静态资源路径 -->
     <link rel="stylesheet" href="/static/css/main.css?v=20260918-hero-1" />
     <link rel="stylesheet" href="/static/css/components/release-banner.css?v=20260918-1">
     <link rel="stylesheet" href="/static/css/pages/achievement-cards.css?v=20260917-artwork-3" />
-    <link rel="stylesheet" href="/static/css/pages/step-tutor.css?v=20260918-progress-1" />
+    <link rel="stylesheet" href="/static/css/pages/step-tutor.css?v=20260919-teaching-2" />
     <link rel="stylesheet" href="/static/css/refinements.css?v=20260918-hero-1" />
     <link rel="stylesheet" href="/static/css/pages/home-background.css?v=20260918-horizontal-fade-4">
 
@@ -128,8 +128,6 @@
     <script>
       window.process = { env: { NODE_ENV: "production" } };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.79.1/dist/3d-force-graph.min.js"></script>
     <!-- 仅引入知识图谱模块，不再加载旧站点 main.js -->
 
 
@@ -147,9 +145,10 @@
         }
       }
     </script>
-  <link rel="stylesheet" href="/static/css/pages/assistant-workspace.css">
-<link rel="stylesheet" href="/static/css/pages/teaching-workspace.css">
+  <link rel="stylesheet" href="/static/css/pages/assistant-workspace.css?v=20260919-tasks-1">
+<link rel="stylesheet" href="/static/css/pages/teaching-workspace.css?v=20260919-teaching-2">
 <link rel="stylesheet" href="/static/css/pages/wrongbook.css">
+<link rel="stylesheet" href="/static/css/pages/account-access.css?v=20260919-access-1">
 </head>
   <body>
     <div class="home-page-background" aria-hidden="true"></div>

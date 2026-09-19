@@ -1,0 +1,36 @@
+CREATE TABLE IF NOT EXISTS account_access (
+    user_id INT PRIMARY KEY,
+    role ENUM('member','vip','admin') NOT NULL DEFAULT 'member',
+    disabled BOOLEAN NOT NULL DEFAULT FALSE,
+    daily_limit INT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_access_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS access_settings (
+    id TINYINT PRIMARY KEY,
+    daily_limit INT NOT NULL DEFAULT 40,
+    contact_email VARCHAR(254) NOT NULL DEFAULT 'rainbowyu619@gmail.com',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT IGNORE INTO access_settings(id) VALUES(1);
+
+CREATE TABLE IF NOT EXISTS access_usage (
+    principal VARCHAR(80) NOT NULL,
+    period VARCHAR(10) NOT NULL,
+    feature VARCHAR(20) NOT NULL,
+    used INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY(principal,period,feature)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS access_audit (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    actor_id INT NOT NULL,
+    target_id INT NULL,
+    action VARCHAR(40) NOT NULL,
+    details JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX ix_access_audit_created(created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -2,9 +2,12 @@
   <aside id="knowledge-panel" class="glass-panel knowledge-panel-global knowledge-panel-wrapper" style="position:fixed;right:24px;bottom:24px;width:320px;padding:1.1rem;border-radius:1rem;z-index:1300">
     <button id="knowledge-panel-close-btn" type="button" class="knowledge-panel-close-btn" aria-label="收起智算星云">×</button>
     <div id="knowledge-panel-bubble" style="display:none;width:100%;height:100%;align-items:center;justify-content:center">
-      <img src="/static/assets/智算视界_avatar.svg" alt="" class="knowledge-bubble-logo" style="width:44px;height:44px" draggable="false">
+      <div id="knowledge-panel-bubble-inner" class="knowledge-panel-bubble-inner">
+        <img src="/static/assets/智算视界_avatar.svg" alt="" class="knowledge-bubble-logo" draggable="false">
+      </div>
     </div>
     <div id="knowledge-panel-content" class="knowledge-panel-content-scroll">
+      <div class="knowledge-panel-header-logo"><img src="/static/assets/智算视界_avatar.svg" alt="" width="48" height="48"></div>
       <div id="knowledge-panel-header"><h3 id="knowledge-panel-title">智算星云</h3><p id="knowledge-panel-subtitle">快捷入口与解题任务</p></div>
       <div id="knowledge-panel-metro" class="knowledge-metro-wrap" />
       <div id="knowledge-panel-body" class="knowledge-panel-body knowledge-panel-body-scroll">

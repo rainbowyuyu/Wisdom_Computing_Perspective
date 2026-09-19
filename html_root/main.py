@@ -29,9 +29,17 @@ async def lifespan(app):
         await asyncio.to_thread(apply_migrations)
     else:
         logger.warning('数据库不可用，账户存储功能暂不可用')
-    yield
+    from app.math_jobs import manager
+    try:
+        yield
+    finally:
+        await manager.close()
+        from app.request_records import journal
+        await asyncio.to_thread(journal.close)
 
 app = FastAPI(lifespan=lifespan)
+from app.static_compression import StaticCompression
+app.add_middleware(StaticCompression)
 
 @app.middleware("http")
 async def revalidate_site_code(request, call_next):
@@ -66,6 +74,17 @@ app.include_router(solve.router, prefix="/api")
 app.include_router(solution_library.router, prefix="/api")
 from app.routers import course_packs
 app.include_router(course_packs.router, prefix="/api")
+from app.routers import math_tasks
+app.include_router(math_tasks.router, prefix="/api")
+from app.request_guard import RequestGuard
+app.add_middleware(RequestGuard)
+from app.routers import accounts
+app.include_router(accounts.router,prefix='/api')
+from app.access import AccessDenied
+
+@app.exception_handler(AccessDenied)
+async def access_error(request,exc):
+    return JSONResponse(status_code=exc.status,content={'status':'error','message':str(exc),'code':exc.code},headers={'Cache-Control':'private, no-store','X-Wisdom-Access':exc.code})
 
 # 静态资源
 for name in ("css", "js", "assets", "docs", "videos"):
@@ -100,7 +119,7 @@ def run():
     # Sessions, rendering tasks and WebSocket rooms share this single process.
     # Passing the app avoids importing main a second time and creating another DB pool.
     uvicorn.run(app, host=os.getenv("HOST", "127.0.0.1"),
-                port=int(os.getenv("PORT", "8000")), workers=1, reload=False)
+                port=int(os.getenv("PORT", "8000")), workers=1, reload=False, proxy_headers=False)
 
 
 if __name__ == "__main__":

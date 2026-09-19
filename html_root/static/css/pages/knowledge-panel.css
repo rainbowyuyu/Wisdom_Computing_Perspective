@@ -1292,6 +1292,11 @@
 }
 
 /* 地铁式横向导航：偏上位置，无滚动条，两端渐变隐去 */
+.driver-popover.site-guide { background:var(--bg-surface);color:var(--text-main);border:1px solid var(--border-color);border-radius:14px;box-shadow:0 12px 40px #0003; }
+.driver-popover.site-guide .driver-popover-title { color:var(--primary-color);font-size:17px; }
+.driver-popover.site-guide .driver-popover-description { color:var(--text-secondary);line-height:1.8; }
+.driver-popover.site-guide .driver-popover-footer button { background:var(--bg-input);color:var(--text-main);border:1px solid var(--border-color);border-radius:7px;text-shadow:none; }
+.driver-popover.site-guide .driver-popover-progress-text { color:var(--text-secondary); }
 .knowledge-metro-wrap {
     margin-bottom: 1rem;
     padding-bottom: 1rem;
@@ -1363,7 +1368,14 @@
     align-items: center;
     gap: 0;
     min-width: min-content;
+    padding: 0.35rem max(16px, calc(50% - 58px));
 }
+
+.knowledge-metro-branch { flex: 0 0 auto; }
+.knowledge-metro-caption { display: block; font-size: 0.65rem; color: var(--text-secondary); padding: 0 0.6rem 0.2rem; }
+.knowledge-metro-options { display: flex; align-items: center; gap: 0.25rem; }
+.knowledge-metro-empty { padding: 0.4rem 0.6rem; font-size: 0.75rem; color: var(--text-secondary); }
+.knowledge-metro-station:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
 
 .knowledge-metro-station {
     display: flex;
@@ -1379,6 +1391,7 @@
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .knowledge-metro-station:hover {
@@ -1413,21 +1426,23 @@
 }
 
 .knowledge-metro-label {
-    max-width: 72px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .knowledge-metro-connector {
-    width: 16px;
-    height: 2px;
-    background: linear-gradient(90deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.25));
+    width: 24px;
+    text-align: center;
+    color: var(--text-secondary);
     flex-shrink: 0;
     margin: 0 2px;
 }
 
 [data-theme="dark"] .knowledge-metro-connector {
-    background: linear-gradient(90deg, rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.2));
+    color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .knowledge-metro-station, .knowledge-metro-dot { transition: none; }
 }
 
 [data-theme="dark"] .knowledge-shortcut-btn {

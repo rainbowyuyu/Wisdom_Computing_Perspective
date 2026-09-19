@@ -3,16 +3,39 @@ const palette = ['#3b82f6', '#8b5cf6', '#0891b2', '#d97706', '#f43f5e', '#10b981
 const n = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 const pt = p => [n(p[0]), n(p[1])];
 
+function numberLineMarkup(v) {
+    const rows=v.rows||[], values=rows.flatMap(row=>row.intervals.flatMap(i=>[i.lower,i.upper])).filter(x=>x!==null&&Number.isFinite(x));
+    const min=Math.min(0,...values), max=Math.max(1,...values), pad=Math.max((max-min)*.1,1);
+    const lo=min-pad, hi=max+pad, sx=x=>160+(x-lo)/(hi-lo)*430;
+    const height=Math.max(150,rows.length*65+35);
+    let svg=`<svg class="tutor-number-line" viewBox="0 0 640 ${height}" role="img" aria-label="${escapeText(v.caption||'不等式区间与交集')}"><title>各条件的解集与交集</title>`;
+    rows.forEach((row,index)=>{
+        const y=35+index*65,color=palette[index===rows.length-1?1:index%6];
+        svg+=`<text x="8" y="${y+5}">${escapeText(row.label.slice(0,12))}</text><path d="M160 ${y}H595" stroke="#94a3b8" stroke-width="1"/>`;
+        if(!row.intervals.length)svg+=`<text x="360" y="${y-10}">∅</text>`;
+        row.intervals.forEach(i=>{
+            const a=i.lower===null?160:sx(i.lower), b=i.upper===null?590:sx(i.upper);
+            svg+=`<path d="M${a} ${y}H${b}" stroke="${color}" stroke-width="5"/>`;
+            [[i.lower,a,i.lower_closed,i.lower_label,-1],[i.upper,b,i.upper_closed,i.upper_label,1]].forEach(([value,x,closed,label,direction])=>{
+                if(value===null)svg+=`<path d="M${x-direction*7} ${y-5}L${x} ${y}L${x-direction*7} ${y+5}" fill="none" stroke="${color}" stroke-width="2"/>`;
+                else svg+=`<circle data-endpoint="${closed?'closed':'open'}" cx="${x}" cy="${y}" r="5" fill="${closed?color:'var(--bg-body, #f8fafc)'}" stroke="${color}" stroke-width="2"/><text x="${x}" y="${y+24}" text-anchor="middle">${escapeText(label||String(value))}</text>`;
+            });
+        });
+    });
+    return svg+'</svg>';
+}
+
 export function visualMarkup(visual, progress = 1) {
     progress = Math.max(0, Math.min(1, n(progress)));
     const v = visual || {kind:'reasoning'};
+    if (v.kind === 'number_line') return numberLineMarkup(v);
     if (v.kind === 'reasoning') return `<div class="tutor-reasoning"><span>∴</span><p>${escapeText(v.caption || '跟随左侧步骤，理解条件、推理与结论之间的关系。')}</p></div>`;
     let curves = (v.curves || []).map(c => ({label:c.label, points:c.points.map(pt)}));
     let marked = (v.points || []).map(pt);
     const labels = v.labels || [];
-    if (v.kind === 'geometry') curves = Array.isArray(v.segments)
+    if (v.kind === 'geometry') curves = curves.concat(Array.isArray(v.segments)
         ? v.segments.map(([a,b])=>({label:`${labels[a] || a+1}–${labels[b] || b+1}`,points:[marked[a],marked[b]]}))
-        : [{label:'几何关系', points:marked}];
+        : (marked.length>1?[{label:'几何关系', points:marked}]:[]));
     if (v.kind === 'matrix') {
         const m = v.matrix;
         const corners = [[0,0],[1,0],[1,1],[0,1],[0,0]];

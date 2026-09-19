@@ -17,15 +17,21 @@ export const NODE_TYPE = {
 export const NODES = [
   { id: 'center', name: '智算视界', section: null, type: NODE_TYPE.HUB, val: 24, color: '#818cf8', fx: 0, fy: 0, fz: 0 },
   { id: 'home', name: '首页', section: 'home', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-house', keywords: ['首页','主页'], val: 12, color: '#94a3b8' },
-  { id: 'hero-cta', name: '主 CTA 入口', section: 'home', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-rocket', keywords: ['开始'], val: 8, color: '#a5b4fc' },
+  { id: 'hero-cta', name: '开始学习', section: 'calculate', tutor_target: '.tutor-composer', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-rocket', keywords: ['开始学习'], val: 8, color: '#a5b4fc' },
   { id: 'tutorial', name: '30 秒教程', section: 'home', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-graduation-cap', keywords: ['教程','新手','引导'], val: 9, color: '#94a3b8' },
   { id: 'search', name: '全站搜索', section: 'home', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-search', keywords: ['搜索','查找'], val: 8, color: '#94a3b8' },
+  { id: 'home-account', name: '账户与使用额度', section: 'home', account_action: 'overview', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-user', keywords: ['额度','试用','每日次数','用户类型'], val: 9, color: '#a5b4fc' },
+  { id: 'home-vip', name: '联系作者开通 VIP', section: 'home', account_action: 'vip', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-crown', keywords: ['VIP','联系作者','会员'], val: 8, color: '#a5b4fc' },
+  { id: 'home-admin', name: '用户管理（主账号）', section: 'admin', account_action: 'admin', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-user-shield', keywords: ['用户管理','设置额度','设置VIP','取消VIP'], val: 8, color: '#a5b4fc' },
+  { id: 'home-nebula', name: '星云与任务进度', section: 'home', panel_action: 'open', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-circle-nodes', keywords: ['星云','悬浮球','进度','成就'], val: 9, color: '#a5b4fc' },
   { id: 'agent', name: '智能体', section: 'agent', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-robot', keywords: ['智能体','助手','AI','对话'], val: 14, color: '#6366f1' },
   { id: 'agent-course', name: '备课工作台', section: 'examples', teaching_action:'create', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-folder-plus', keywords: ['备课','课件包'], val: 10, color: '#818cf8' },
   { id: 'agent-template', name: '从模板运行', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-wand-magic-sparkles', keywords: ['模板'], val: 9, color: '#a5b4fc' },
   { id: 'agent-examples', name: '功能示例', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-lightbulb', keywords: ['示例'], val: 8, color: '#c4b5fd' },
   { id: 'agent-clear', name: '清空对话', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-trash', keywords: ['清空'], val: 7, color: '#a5b4fc' },
   { id: 'agent-settings', name: '智能体设置', section: 'agent', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-gear', keywords: ['设置'], val: 7, color: '#c4b5fd' },
+  { id: 'agent-tasks', name: '后台解题任务', section: 'agent', focus_target: '.math-task-board', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-list-check', keywords: ['后台任务','并发','多道题','任务进度','继续未完成'], val: 10, color: '#a5b4fc' },
+  { id: 'agent-decompose', name: '复杂题拆解', section: 'agent', agent_action: 'decompose', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-diagram-project', keywords: ['复杂题','拆解','拆题','多个小问'], val: 10, color: '#a5b4fc' },
   { id: 'detect', name: '智能识别', section: 'detect', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-camera', keywords: ['识别','公式识别','OCR','手写','上传'], val: 14, color: '#22d3ee' },
   { id: 'detect-handwrite', name: '手写模式', section: 'detect', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-pen', keywords: ['手写'], val: 9, color: '#67e8f9' },
   { id: 'detect-upload', name: '上传图片', section: 'detect', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-upload', keywords: ['上传','图片'], val: 9, color: '#67e8f9' },
@@ -44,12 +50,20 @@ export const NODES = [
   { id: 'calc-visual', name: '交互图形', section: 'calculate', tutor_target: '.tutor-visual', type: NODE_TYPE.SUBTOOL, keywords: ['可视化'], val: 8, color: '#6ee7b7' },
   { id: 'calc-solution', name: '完整题解', section: 'calculate', tutor_target: '.tutor-result', type: NODE_TYPE.SUBTOOL, keywords: ['解题'], val: 8, color: '#6ee7b7' },
   { id: 'calc-import', name: '阅读已存题解', section: 'my-formulas', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-book-bookmark', keywords: ['导入'], val: 8, color: '#5eead4' },
-  { id: 'calc-clear', name: '最近练习', section: 'calculate', tutor_target: '.tutor-history', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-trash', keywords: ['清空'], val: 7, color: '#6ee7b7' },
-  { id: 'calc-generate', name: '动画讲解', section: 'calculate', tutor_target: '.tutor-video', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-clapperboard', keywords: ['生成'], val: 10, color: '#34d399' },
+  { id: 'calc-clear', name: '最近练习', section: 'calculate', tutor_target: '.tutor-history', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-clock-rotate-left', keywords: ['最近练习','历史题解'], val: 7, color: '#6ee7b7' },
+  { id: 'calc-generate', name: '动画讲解', section: 'calculate', tutor_target: '[data-action=render]', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-clapperboard', keywords: ['生成动画','重试动画','动画修复'], val: 10, color: '#34d399' },
   { id: 'calc-steps', name: '步骤导航', section: 'calculate', tutor_target: '.tutor-step-list', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-list-ol', keywords: ['步骤'], val: 8, color: '#6ee7b7' },
   { id: 'calc-save-script', name: '保存题解', section: 'calculate', tutor_target: '.tutor-result', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-bookmark', keywords: ['保存题解','保存笔记'], val: 8, color: '#5eead4' },
+  { id: 'calc-math-input', name: '可视化公式输入', section: 'calculate', tutor_target: '[data-input-mode=math]', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-square-root-variable', keywords: ['公式输入','LaTeX输入','数学键盘'], val: 8, color: '#6ee7b7' },
+  { id: 'calc-export', name: '导出解题笔记', section: 'calculate', tutor_target: '[data-action=export]', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-file-export', keywords: ['导出笔记','下载题解'], val: 8, color: '#6ee7b7' },
+  { id: 'calc-copy', name: '复制解答', section: 'calculate', tutor_target: '[data-action=copy]', type: NODE_TYPE.SUBTOOL, icon: 'fa-regular fa-copy', keywords: ['复制解答','复制题解'], val: 7, color: '#6ee7b7' },
+  { id: 'calc-wrongbook', name: '题解加入错题本', section: 'calculate', tutor_target: '[data-action=wrongbook]', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-book', keywords: ['收录错题','题解加入错题本'], val: 8, color: '#5eead4' },
+  { id: 'calc-course', name: '题解加入课包', section: 'calculate', tutor_target: '[data-action=pack]', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-folder-plus', keywords: ['题解加入课包','解题素材'], val: 8, color: '#5eead4' },
   { id: 'examples', name: '教学案例', section: 'examples', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-play', keywords: ['教学案例','案例','视频'], val: 14, color: '#f59e0b' },
   { id: 'examples-filter-all', name: '全部案例', section: 'examples', filter_mode: 'all', type: NODE_TYPE.SUBTOOL, keywords: ['全部','全部案例'], val: 8, color: '#fbbf24' },
+  { id: 'examples-curriculum', name: '典型例题', section: 'examples', filter_mode: 'curriculum', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-book-open', keywords: ['典型例题','例题库','分步样例'], val: 10, color: '#fbbf24' },
+  { id: 'curriculum-highschool', name: '高中例题', section: 'examples', filter_mode: 'curriculum', curriculum_level: '高中', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-graduation-cap', keywords: ['高中','数列','解析几何','三角函数'], val: 8, color: '#fcd34d' },
+  { id: 'curriculum-university', name: '大学例题', section: 'examples', filter_mode: 'curriculum', curriculum_level: '大学', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-graduation-cap', keywords: ['大学','高等数学','极限','微积分','线性代数','贝叶斯'], val: 8, color: '#fcd34d' },
   { id: 'examples-favorites', name: '收藏', section: 'examples', filter_mode: 'favorites', type: NODE_TYPE.SUBTOOL, icon: 'fa-regular fa-star', keywords: ['收藏','我的收藏'], val: 8, color: '#fcd34d' },
   { id: 'examples-watch-later', name: '稍后看', section: 'examples', filter_mode: 'watch_later', type: NODE_TYPE.SUBTOOL, icon: 'fa-regular fa-clock', keywords: ['稍后看'], val: 8, color: '#fde047' },
   { id: 'examples-courseware', name: '我的课件', section: 'examples', filter_mode: 'courseware', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-chalkboard-user', keywords: ['课件','我的课件','课件包'], val: 9, color: '#fbbf24' },
@@ -86,10 +100,11 @@ export const NODES = [
   { id: 'devtools-keyframe', name: '关键帧预览', section: 'devtools', devtool: 'manim', devtool_action: 'keyframe', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-film', keywords: ['关键帧','预览关键帧','断点'], val: 9, color: '#a78bfa' },
   { id: 'devtools-run', name: '运行 Manim', section: 'devtools', devtool: 'manim', devtool_action: 'run', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-play', keywords: ['运行','渲染','执行'], val: 10, color: '#a78bfa' },
   { id: 'devtools-rainbow', name: 'Rainbow 拓展', section: 'devtools', devtool: 'rainbow', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-puzzle-piece', keywords: ['Rainbow','拓展'], val: 10, color: '#ddd6fe' },
-  { id: 'devtools-shortcuts', name: '快捷键', section: 'devtools', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-keyboard', keywords: ['快捷键'], val: 7, color: '#c4b5fd' },
+  { id: 'devtools-shortcuts', name: '画板快捷键', settings_section: 'shortcuts', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-keyboard', keywords: ['画板快捷键'], val: 7, color: '#c4b5fd' },
   { id: 'help', name: '使用文档', section: 'help', type: NODE_TYPE.SECTION, icon: 'fa-solid fa-circle-question', keywords: ['帮助','文档','FAQ','教程'], val: 11, color: '#94a3b8' },
-  { id: 'help-update', name: '更新日志', section: 'help', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-file-lines', keywords: ['更新日志'], val: 8, color: '#cbd5e1' },
-  { id: 'help-open-doc', name: '打开文档', section: 'help', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-file', keywords: ['文档'], val: 8, color: '#94a3b8' },
+  { id: 'help-update', name: '更新日志', section: 'help', doc_file: 'update.md', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-file-lines', keywords: ['更新日志'], val: 8, color: '#cbd5e1' },
+  { id: 'help-open-doc', name: 'API 文档', section: 'help', doc_file: 'api_doc.md', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-file', keywords: ['API文档','接口文档'], val: 8, color: '#94a3b8' },
+  { id: 'help-solving', name: '分步解题指南', section: 'help', doc_file: 'step-tutor.md', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-book-open', keywords: ['分步解题指南','动画生成说明','拆题指南'], val: 8, color: '#94a3b8' },
   { id: 'settings', name: '系统设置', section: null, type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-gear', keywords: ['设置','偏好','系统设置'], val: 9, color: '#64748b' },
   { id: 'settings-appearance', name: '外观与关于', settings_section: 'appearance', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-palette', keywords: ['外观','主题','深色','浅色'], val: 8, color: '#94a3b8' },
   { id: 'settings-profile', name: '账户与资料', settings_section: 'profile', type: NODE_TYPE.SUBTOOL, icon: 'fa-solid fa-user', keywords: ['账户','资料','头像','昵称'], val: 8, color: '#94a3b8' },
@@ -235,6 +250,44 @@ export const EDGES = [
   { source: 'detect', target: 'settings-detect' },
   { source: 'calculate', target: 'settings-calc' },
   { source: 'examples', target: 'settings-examples' },
+  { source: 'home', target: 'home-account' },
+  { source: 'home', target: 'home-nebula' },
+  { source: 'hero-cta', target: 'calc-normal' },
+  { source: 'home-account', target: 'home-vip' },
+  { source: 'home-account', target: 'home-admin' },
+  { source: 'home-account', target: 'settings-profile' },
+  { source: 'home-nebula', target: 'agent-tasks' },
+  { source: 'agent', target: 'agent-decompose' },
+  { source: 'agent', target: 'agent-tasks' },
+  { source: 'calculate', target: 'agent-decompose' },
+  { source: 'agent-decompose', target: 'agent-tasks' },
+  { source: 'agent-tasks', target: 'calc-import' },
+  { source: 'agent-tasks', target: 'home-nebula' },
+  { source: 'calc-normal', target: 'calc-math-input' },
+  { source: 'calc-solution', target: 'calc-export' },
+  { source: 'calc-solution', target: 'calc-copy' },
+  { source: 'calc-solution', target: 'calc-wrongbook' },
+  { source: 'calc-solution', target: 'calc-course' },
+  { source: 'calc-solution', target: 'calc-save-script' },
+  { source: 'calc-solution', target: 'calc-generate' },
+  { source: 'calc-formula', target: 'calc-solution' },
+  { source: 'calc-generate', target: 'home-nebula' },
+  { source: 'calc-wrongbook', target: 'errorbook' },
+  { source: 'calc-course', target: 'examples-courseware' },
+  { source: 'calc-save-script', target: 'calc-import' },
+  { source: 'my-formulas', target: 'calc-import' },
+  { source: 'examples', target: 'examples-curriculum' },
+  { source: 'examples-curriculum', target: 'curriculum-highschool' },
+  { source: 'examples-curriculum', target: 'curriculum-university' },
+  { source: 'curriculum-highschool', target: 'calc-normal' },
+  { source: 'curriculum-university', target: 'calc-normal' },
+  { source: 'help', target: 'help-solving' },
+  { source: 'help-solving', target: 'examples-curriculum' },
+  { source: 'student', target: 'examples-curriculum' },
+  { source: 'student', target: 'errorbook' },
+  { source: 'teacher', target: 'calc-course' },
+  { source: 'creator', target: 'devtools-ai-edit' },
+  { source: 'developer', target: 'devtools-manim' },
 ];
 
 /** 角色推荐路径（与 ROLE_FLOWS 结构一致） */
@@ -269,15 +322,6 @@ export function getSectionDisplayName(sectionId) {
   return node ? node.name : sectionId;
 }
 
-/** 节点 id -> section 映射（用于根据 section 找节点） */
-const SECTION_TO_NODE_IDS = {};
-NODES.forEach((n) => {
-  if (n.section) {
-    if (!SECTION_TO_NODE_IDS[n.section]) SECTION_TO_NODE_IDS[n.section] = [];
-    SECTION_TO_NODE_IDS[n.section].push(n.id);
-  }
-});
-
 /** 获取节点 */
 export function getNodeById(id) {
   return NODES.find((n) => n.id === id) || null;
@@ -285,12 +329,21 @@ export function getNodeById(id) {
 
 /** 获取所有节点 */
 export function getNodes() {
-  return [...NODES];
+  return NODES.map(n => ({ ...n, ...(n.keywords ? { keywords: [...n.keywords] } : {}) }));
 }
 
 /** 获取所有边 */
 export function getEdges() {
-  return [...EDGES];
+  // ForceGraph replaces endpoint IDs with objects; never hand it canonical edges.
+  const ids = new Set(NODES.map(n => n.id));
+  const seen = new Set();
+  return EDGES.flatMap(e => {
+    const source = endpointId(e?.source), target = endpointId(e?.target);
+    const key = JSON.stringify([source, target]);
+    if (!ids.has(source) || !ids.has(target) || source === target || seen.has(key)) return [];
+    seen.add(key);
+    return [{ ...e, source, target }];
+  });
 }
 
 /** 获取完整图（3d-force-graph 格式） */
@@ -304,30 +357,47 @@ export function getGraphDataFor3D() {
 }
 
 /**
- * 地铁式导航：返回有序路径 [prev... , current, next...]
- * 用于智算星云横向展示：◀ prev1 — prev2 — [当前] — next1 — next2 ▶
+ * 地铁导航：读取当前节点的全部直接入边和出边。
+ * 同组节点是并列分支，不是相邻站点之间的连边。
  */
-export function getMetroPathForSection(sectionId, devtool) {
-  const { prev, next } = getPrevNextForSection(sectionId, devtool);
-  const nodeIds = SECTION_TO_NODE_IDS[sectionId] || [];
-  const currentNodeId = devtool ? `devtools-${devtool}` : nodeIds[0] || sectionId;
-  const node = getNodeById(currentNodeId) || NODES.find((n) => n.section === sectionId);
-  const current = node ? [{ id: node.id, name: node.name, section: node.section, devtool: node.devtool, current: true }] : [];
-  return [...prev.slice(0, 3).reverse(), ...current, ...next.slice(0, 3)];
+export function getMetroPathForSection(sectionId, devtool, selectedNodeId) {
+  const node = resolveMetroNode(sectionId, devtool, selectedNodeId);
+  if (!node) return [];
+  const { prev, next } = getPrevNextForSection(sectionId, devtool, node.id);
+  return [
+    ...prev.map(n => ({ ...n, relation: 'incoming', current: false })),
+    { ...node, relation: 'current', current: true },
+    ...next.map(n => ({ ...n, relation: 'outgoing', current: false })),
+  ];
+}
+
+function endpointId(endpoint) {
+  return typeof endpoint === 'string' ? endpoint : endpoint?.id;
+}
+
+function resolveMetroNode(sectionId, devtool, selectedNodeId) {
+  const selected = getNodeById(selectedNodeId);
+  if (selected?.section === sectionId && (!devtool || selected.devtool === devtool)) return selected;
+  const tool = sectionId === 'devtools' && devtool ? getNodeById(`devtools-${devtool}`) : null;
+  return tool || NODES.find(n => n.id === sectionId && n.section === sectionId)
+    || NODES.find(n => n.section === sectionId && n.type === NODE_TYPE.SECTION) || null;
+}
+
+function neighbors(nodeId, direction) {
+  if (!getNodeById(nodeId)) return [];
+  const other = direction === 'source' ? 'target' : 'source';
+  const ids = new Set(getEdges().filter(e => e[direction] === nodeId).map(e => e[other]));
+  return [...ids].map(getNodeById).filter(Boolean);
 }
 
 /** 获取节点的后继（从该节点出发的边） */
 export function getOutNeighbors(nodeId) {
-  return EDGES.filter((e) => e.source === nodeId)
-    .map((e) => getNodeById(e.target))
-    .filter(Boolean);
+  return neighbors(nodeId, 'source');
 }
 
 /** 获取节点的前驱（指向该节点的边） */
 export function getInNeighbors(nodeId) {
-  return EDGES.filter((e) => e.target === nodeId)
-    .map((e) => getNodeById(e.source))
-    .filter(Boolean);
+  return neighbors(nodeId, 'target');
 }
 
 /**
@@ -336,23 +406,14 @@ export function getInNeighbors(nodeId) {
  * @param {string} [devtool] - 若在 devtools 页，可传入 latex/manim/rainbow
  * @returns {{ prev: Array<{id, name, section, devtool}>, next: Array<{id, name, section, devtool}> }}
  */
-export function getPrevNextForSection(sectionId, devtool) {
-  const prev = [];
-  const next = [];
-  const nodeIds = SECTION_TO_NODE_IDS[sectionId] || [];
-  const currentNodeId = devtool ? `devtools-${devtool}` : nodeIds[0] || sectionId;
-  const node = getNodeById(currentNodeId) || NODES.find((n) => n.section === sectionId);
-
-  if (node) {
-    getInNeighbors(node.id).forEach((n) => {
-      if (n.section) prev.push({ id: n.id, name: n.name, section: n.section, devtool: n.devtool });
-    });
-    getOutNeighbors(node.id).forEach((n) => {
-      if (n.section) next.push({ id: n.id, name: n.name, section: n.section, devtool: n.devtool });
-    });
-  }
-
-  return { prev, next };
+export function getPrevNextForSection(sectionId, devtool, selectedNodeId) {
+  const node = resolveMetroNode(sectionId, devtool, selectedNodeId);
+  const actionable = n => (n.section || n.settings_section || n.id === 'settings')
+    && n.type !== NODE_TYPE.HUB && n.type !== NODE_TYPE.ROLE;
+  return {
+    prev: node ? getInNeighbors(node.id).filter(actionable).map(n => ({ ...n })) : [],
+    next: node ? getOutNeighbors(node.id).filter(actionable).map(n => ({ ...n })) : [],
+  };
 }
 
 /**
@@ -365,7 +426,17 @@ let navigationVersion=0;
 async function waitForElement(check,id){
   const start=Date.now();while(id===navigationVersion){const value=check();if(value)return value;if(Date.now()-start>15000)throw new Error('页面加载超时，请重试');await new Promise(r=>setTimeout(r,50));}throw new Error('已切换到其他节点');
 }
-function focusControl(element){if(!element)return false;element.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});element.focus?.({preventScroll:true});return true;}
+function focusControl(element){
+  if(!element)return false;
+  if(!element.matches('a[href],button,input,textarea,select,[tabindex]'))element.tabIndex=-1;
+  element.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});
+  element.focus?.({preventScroll:true});return true;
+}
+function revealDetails(element) {
+  for (let parent = element; parent; parent = parent.parentElement) {
+    if (parent.tagName === 'DETAILS') parent.open = true;
+  }
+}
 function focusTutorTarget(element){
   const navbar=document.querySelector('.navbar');
   const inset=(navbar?.getBoundingClientRect().height||0)+20;
@@ -381,10 +452,16 @@ function focusTutorTarget(element){
 }
 export async function executeNodeAction(node,opts={}) {
   if(!node)return false;const id=++navigationVersion;
+  let selectedNode = node;
   try{
     if(node.role){window.RoleGraph?.openFlow?.(node.role);return true;}
+    if(node.section==='admin'){
+      const {refreshAccess}=await import('./account-access.js?v=20260919-access-1');
+      const access=await refreshAccess();if(id!==navigationVersion)return false;
+      if(access?.can_manage!==true){window.showToast?.('用户管理仅限主账号 rainbow_yu 使用。','info');return false;}
+    }
     if(node.id==='center')return true;
-    if(node.settings_section||node.id==='settings'){window.openSettings?.(node.settings_section);return true;}
+    if(node.settings_section||node.id==='settings'){return (await window.openSettings?.(node.settings_section))!==false;}
     if(!node.section)return false;
     // Same-page stations locate existing content without resetting the route,
     // rebuilding the rail or racing a router scroll-to-top.
@@ -394,7 +471,15 @@ export async function executeNodeAction(node,opts={}) {
       const E=await waitForElement(()=>document.getElementById('examples-filter')&&window.Examples?.openCoursePackModal&&window.Examples,id);
       if(node.review_action){await E.switchExamplesFilter('wrongbook');const W=await import('./wrongbook.js');await W.startWrongbookReview();}
       else if(node.teaching_action==='create'||node.id==='examples-create-course')await E.openCoursePackModal();
-      else if(node.filter_mode)await E.switchExamplesFilter(node.filter_mode);
+      else if(node.filter_mode){
+        if(await E.switchExamplesFilter(node.filter_mode)===false)return false;
+        if(id!==navigationVersion)return false;
+        if(node.curriculum_level){
+          const select=await waitForElement(()=>host.querySelector('.curriculum-filters [data-filter=level]'),id);
+          select.value=node.curriculum_level;select.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+        focusControl(host.querySelector(node.filter_mode==='curriculum'?'.curriculum-filters':'.examples-filter-tab.active'));
+      }
       else if(node.player_feature||node.id==='examples-notes'){await E.switchExamplesFilter('all');E.focusPlayerFeature(node.player_feature||'notes');focusControl(host.querySelector('.video-card'));}
       else if(node.id==='examples-tag-filter')focusControl(host.querySelector('#examples-tag-select'));
     }else if(node.section==='devtools'){
@@ -402,36 +487,66 @@ export async function executeNodeAction(node,opts={}) {
       if(node.devtool==='manim')await D.ensureManimEditor();if(id!==navigationVersion)return false;
       if(node.devtool_action==='ai_edit'){const panel=host.querySelector('#manim-ai-edit-float');panel.style.display='flex';focusControl(panel.querySelector('textarea'));}
       else if(node.devtool_action==='import')D.toggleImportPanel();
-      else if(node.devtool_action==='save')D.saveScriptFromWorkbench();
+      else if(node.devtool_action==='save')focusControl(host.querySelector('.ide-btn-save'));
       else if(node.devtool_action)focusControl(host.querySelector({run:'#btn-run-manim',keyframe:'#btn-manim-keyframe',summary:'.ide-btn-summary'}[node.devtool_action]));
       else if(node.devtool==='latex'){const target={'devtools-latex-import':'.dev-latex-toolbar-main button','devtools-latex-save':'.dev-latex-toolbar-main button:nth-child(2)','devtools-latex-copy':'.dev-latex-toolbar-main button:nth-child(3)','devtools-latex-word':'.dev-latex-toolbar-main button:nth-child(4)','devtools-latex-temml':'.dev-latex-temml-settings'}[node.id];if(target)focusControl(host.querySelector(target));}
     }else if(node.section==='calculate'&&node.tutor_target){
       await waitForElement(()=>host.querySelector('.tutor-composer')?.checkVisibility(),id);
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
       if(id!==navigationVersion)return false;
-      const el=host.querySelector(node.tutor_target),target=el?.checkVisibility()?el:host.querySelector('.tutor-composer');
+      const el=host.querySelector(node.tutor_target);
+      if(node.id==='calc-math-input')el?.click();
+      revealDetails(el);
+      const target=el?.checkVisibility()?el:host.querySelector('.tutor-composer');
       focusTutorTarget(target);
-      const selected=target===el?node:getNodeById('calc-normal');
-      window.dispatchEvent(new CustomEvent('graph-station-selected',{detail:{nodeId:selected.id,section:node.section}}));
+      selectedNode=target===el?node:getNodeById('calc-normal');
       if(target!==el)window.showToast?.('请先输入题目并解题，再查看'+node.name,'info');
     }
     else if(node.section==='agent'){
       await waitForElement(()=>host.querySelector('.assistant-shell'),id);
-      if(node.id==='agent-template'){window.showSection?.('my-formulas');}
+      if(node.agent_action==='decompose'){
+        const mode=await waitForElement(()=>host.querySelector('[name=mathTaskMode]'),id);
+        mode.checked=true;mode.dispatchEvent(new Event('change',{bubbles:true}));
+        focusControl(host.querySelector('textarea'));
+      }
+      else if(node.focus_target)focusControl(await waitForElement(()=>host.querySelector(node.focus_target),id));
+      else if(node.id==='agent-template'){return executeNodeAction(getNodeById('formulas-templates'),opts);}
       else if(node.id==='agent-settings')window.openSettings?.('agent');
       else focusControl(host.querySelector(node.id==='agent-clear'?'[data-agent=new]':node.id==='agent-examples'?'.assistant-samples button':'textarea'));
     }else if(node.section==='home'){
-      if(node.id==='tutorial')window.startTutorial?.();else focusControl(document.querySelector(node.id==='search'?'#nav-search-input':'.hero-cta,.hero-actions button'));
+      if(node.account_action){
+        const A=await import('./account-access.js?v=20260919-access-1');await A.refreshAccess();
+        if(id!==navigationVersion)return false;
+        const card=host.querySelector('.account-access-card');
+        if(node.account_action==='admin'){
+          const button=card?.querySelector('[data-access-admin]');
+          if(!button){focusControl(card);window.showToast?.('用户管理仅限主账号 rainbow_yu 使用。','info');return false;}
+          button.click();
+        }else focusControl(node.account_action==='vip'?card?.querySelector('.vip-contact'):card);
+      }
+      else if(node.panel_action){
+        const panel=await waitForElement(()=>document.querySelector('#knowledge-panel[data-floating-ready]'),id);
+        if(panel.classList.contains('collapsed'))panel.querySelector('#knowledge-panel-bubble')?.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+        focusControl(panel.querySelector('#knowledge-panel-header'));
+      }
+      else if(node.id==='tutorial')window.startTutorial?.();else focusControl(document.querySelector(node.id==='search'?'#nav-search-input':'.hero-cta,.hero-btns button,.hero-actions button'));
     }else if(node.section==='detect'){
-      const map={'detect-upload':'#image-upload','detect-handwrite':'#drawing-board','detect-lock':'#canvas-lock-btn','detect-save':'#btn-save-check','detect-copy-calc':'#btn-copy-calc','detect-open-devtools-latex':'#btn-edit-in-latex','detect-recognize':'#btn-recognize'};
-      if(node.id==='detect-upload'||node.id==='detect-handwrite'){const buttons=host.querySelectorAll('.tab-switch .tab-btn');buttons[node.id==='detect-upload'?1:0]?.click();}
+      const map={'detect-upload':'#image-upload','detect-handwrite':'#drawing-board','detect-pen':'[data-shortcut=toolPen]','detect-eraser':'[data-shortcut=toolEraser]','detect-undo':'[data-shortcut=undo]','detect-clear':'[data-shortcut=clearCanvas]','detect-lock':'#canvas-lock-btn','detect-save':'#btn-save-check','detect-copy-calc':'#btn-copy-calc','detect-open-devtools-latex':'#btn-edit-in-latex','detect-recognize':'.btn-detect-primary'};
+      if(node.id==='detect-upload'||['detect-handwrite','detect-pen','detect-eraser','detect-undo','detect-clear','detect-lock'].includes(node.id)){const buttons=host.querySelectorAll('.tab-switch .tab-btn');buttons[node.id==='detect-upload'?1:0]?.click();}
+      if(['detect-pen','detect-eraser'].includes(node.id))host.querySelector(map[node.id])?.click();
       focusControl(host.querySelector(map[node.id]||'#draw-tools button')||host);
     }else if(node.section==='my-formulas'){
       const tab={'formulas-scripts':'scripts','formulas-new-script':'scripts','formulas-run':'scripts','formulas-templates':'templates'}[node.id]||'formulas';
       await waitForElement(()=>host.querySelector('.formulas-sub-tab'),id);
       const buttons=[...host.querySelectorAll('.formulas-sub-tab')];const b=buttons.find(b=>b.dataset.tab===tab||b.getAttribute('onclick')?.includes("'"+tab+"'"))||buttons[tab==='scripts'?1:tab==='templates'?2:0];b?.click();
       if(node.id==='formulas-refresh')window.loadMyFormulas?.();focusControl(b);
+    }else if(node.doc_file){
+      const open=await waitForElement(()=>window.openDoc,id);await open(node.doc_file,node.name);
     }else focusControl(host);
+    if(id!==navigationVersion)return false;
+    if(document.getElementById(selectedNode.section)?.checkVisibility()) {
+      window.dispatchEvent(new CustomEvent('graph-station-selected',{detail:{nodeId:selectedNode.id,section:selectedNode.section}}));
+    }
     return true;
   }catch(error){if(id===navigationVersion)window.showToast?.(error.message,'error');return false;}
 }

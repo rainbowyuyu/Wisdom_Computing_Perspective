@@ -4,18 +4,18 @@ from pydantic import BaseModel, Field
 
 
 class AuthModel(BaseModel):
-    username: str
-    password: str
-    captcha: str
-    captcha_id: str
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=72)
+    captcha: str = Field(max_length=12)
+    captcha_id: str = Field(max_length=64)
 
 
 class CalcModel(BaseModel):
-    matrixA: str
-    matrixB: str
-    operation: str
+    matrixA: str = Field(max_length=6000)
+    matrixB: str = Field(max_length=6000)
+    operation: str = Field(max_length=40)
     # 可选：来自识别页的视觉描述 Prompt，用于给 Manim 生成代码时补充几何/结构信息
-    vision_prompt: Optional[str] = None
+    vision_prompt: Optional[str] = Field(default=None, max_length=4000)
 
 
 class FormulaModel(BaseModel):
@@ -64,11 +64,11 @@ class ChangePasswordModel(BaseModel):
 
 
 class ManimCodeModel(BaseModel):
-    code: str
+    code: str = Field(max_length=40000)
 
 
 class ManimKeyframeModel(BaseModel):
-    code: str
+    code: str = Field(max_length=40000)
     breakpoint_line: Optional[int] = None  # 1-based, 渲染到该行为止
 
 
@@ -79,10 +79,10 @@ class ManimCodeEditModel(BaseModel):
 
 
 class AgentRequest(BaseModel):
-    prompt: str
-    image_base64: Optional[str] = None
-    last_user_message: Optional[str] = None
-    last_assistant_message: Optional[str] = None
+    prompt: str = Field(max_length=6000)
+    image_base64: Optional[str] = Field(default=None, max_length=8000000)
+    last_user_message: Optional[str] = Field(default=None, max_length=6000)
+    last_assistant_message: Optional[str] = Field(default=None, max_length=6000)
 
 
 class ExampleVideo(BaseModel):

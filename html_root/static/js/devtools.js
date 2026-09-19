@@ -61,6 +61,9 @@ export function switchDevTool(tool) {
             renderRainbowLib(); // 渲染内容
         }
     }
+    if (document.getElementById('devtools')?.checkVisibility()) {
+        window.dispatchEvent(new CustomEvent('graph-station-selected', { detail: { nodeId: `devtools-${tool}`, section: 'devtools' } }));
+    }
 }
 
 // 2. 初始化入口
@@ -285,6 +288,10 @@ export async function previewKeyframes({signal} = {}) {
         const data = await res.json();
         if (loading) loading.style.display = 'none';
         if (data.status === 'success' && data.preview_url) {
+            if(data.repaired&&data.code&&monacoEditor?.getValue().trim()===code.trim()){
+                monacoEditor.pushUndoStop();monacoEditor.executeEdits('preview-repair',[{range:monacoEditor.getModel().getFullModelRange(),text:data.code}]);monacoEditor.pushUndoStop();
+                appendKeyframeLog('预览错误已自动修复，修改可撤销。');
+            }
             const base = window.location.origin || '';
             const url = data.preview_url.startsWith('/') ? base + data.preview_url : data.preview_url;
             appendKeyframeLog('关键帧渲染完成');
@@ -894,6 +901,7 @@ export async function runDevManim({signal} = {}) {
             if(event.message){log.textContent=(log.textContent+'\n'+event.message).slice(-24000);log.scrollTop=log.scrollHeight;}
             if(event.type==='complete'){
                 if(!/^\/videos\/[a-f0-9-]+\.mp4$/.test(event.video_url))throw new Error('视频地址无效');
+                if(event.repaired&&event.code&&monacoEditor?.getValue()===code){monacoEditor.pushUndoStop();monacoEditor.executeEdits('render-repair',[{range:monacoEditor.getModel().getFullModelRange(),text:event.code}]);monacoEditor.pushUndoStop();}
                 hideKeyframeInVideoArea();video.src=event.video_url;video.style.display='block';success=true;
             }
         },controller.signal);

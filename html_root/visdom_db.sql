@@ -1,7 +1,8 @@
 -- 智算视界 · 单文件安装与升级 · MySQL 8.0+
 -- 宝塔：先备份当前库，在 phpMyAdmin 左侧选中 wiscomper_com，再点 SQL，粘贴本文件全部内容执行。
 -- 使用当前选中的数据库，不创建数据库、不切换库名，不需要 CREATE DATABASE 权限。
--- 支持新库与原网站 18 表版本，补齐至 25 表，保留账户、算式、课包和旧错题。
+-- 支持空库、原网站 18 表及后续版本升级，补齐至 30 表，保留账户、权限、额度和学习数据。
+-- 执行完应显示 upgrade_status=OK，无需逐个执行 database/migrations 中的文件。
 -- 不执行 DROP TABLE、TRUNCATE、DELETE，不关闭外键检查，可重复执行。
 -- 命令行：mysql -u USER -p --default-character-set=utf8mb4 DATABASE_NAME < visdom_db.sql
 -- 要求已选中数据库。原库排序规则保持不变，新表默认兼容 utf8mb4_general_ci。
@@ -41,6 +42,44 @@ CREATE TABLE IF NOT EXISTS `user_profiles` (
 PREPARE wisdom_create_statement FROM @wisdom_create;
 EXECUTE wisdom_create_statement;
 DEALLOCATE PREPARE wisdom_create_statement;
+
+-- 账户权限、试用额度与管理员操作记录
+CREATE TABLE IF NOT EXISTS account_access (
+    user_id INT PRIMARY KEY,
+    role ENUM('member','vip','admin') NOT NULL DEFAULT 'member',
+    disabled BOOLEAN NOT NULL DEFAULT FALSE,
+    daily_limit INT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_access_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS access_settings (
+    id TINYINT PRIMARY KEY,
+    daily_limit INT NOT NULL DEFAULT 40,
+    contact_email VARCHAR(254) NOT NULL DEFAULT 'rainbowyu619@gmail.com',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT IGNORE INTO access_settings(id) VALUES(1);
+
+CREATE TABLE IF NOT EXISTS access_usage (
+    principal VARCHAR(80) NOT NULL,
+    period VARCHAR(10) NOT NULL,
+    feature VARCHAR(20) NOT NULL,
+    used INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY(principal,period,feature)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS access_audit (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    actor_id INT NOT NULL,
+    target_id INT NULL,
+    action VARCHAR(40) NOT NULL,
+    details JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX ix_access_audit_created(created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 2. 算式、完整题解、脚本、智能体模板与成就
 -- formulas
@@ -324,7 +363,33 @@ CREATE TABLE IF NOT EXISTS course_pack_resources (
     CONSTRAINT fk_resource_wrongbook FOREIGN KEY(wrongbook_id) REFERENCES learning_wrongbook(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- 7. 应用升级记录（保留已有记录，由应用按校验和确认迁移）
+-- 请求管理记录：仅主账号可读取，保留 90 天。
+CREATE TABLE IF NOT EXISTS request_records (
+    id CHAR(32) PRIMARY KEY,
+    owner_id INT NULL,
+    username VARCHAR(64) NOT NULL DEFAULT '',
+    role VARCHAR(16) NOT NULL DEFAULT 'guest',
+    feature VARCHAR(24) NOT NULL,
+    endpoint VARCHAR(100) NOT NULL,
+    problem MEDIUMTEXT NOT NULL,
+    has_image BOOLEAN NOT NULL DEFAULT FALSE,
+    content_truncated BOOLEAN NOT NULL DEFAULT FALSE,
+    device VARCHAR(40) NOT NULL DEFAULT '',
+    status VARCHAR(24) NOT NULL DEFAULT 'processing',
+    http_status SMALLINT NULL,
+    duration_ms INT UNSIGNED NULL,
+    job_id CHAR(32) NULL,
+    created_at DATETIME(3) NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX ix_requests_time(created_at,id),
+    INDEX ix_requests_owner_time(owner_id,created_at,id),
+    INDEX ix_requests_status_time(status,created_at,id),
+    INDEX ix_requests_feature_time(feature,created_at,id),
+    INDEX ix_requests_job(job_id),
+    CONSTRAINT fk_request_owner FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 7. 应用升级记录（完成校验后同步版本，保留已有校验和）
 -- schema_migrations
 CREATE TABLE IF NOT EXISTS `schema_migrations` (
   `version` varchar(128) NOT NULL,
@@ -338,6 +403,22 @@ CREATE TABLE IF NOT EXISTS `schema_migrations` (
 -- 使用普通 SQL 和会话级 PREPARE，不需要 SOURCE、DELIMITER 或存储过程权限。
 
 -- 如有不合法的旧关联，添加外键会报错并保留数据，请修正归属后重试。
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_danmaku' AND COLUMN_NAME='color'), 'DO 0', 'ALTER TABLE `example_video_danmaku` ADD COLUMN `color` INT DEFAULT 16777215 AFTER `time`');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_danmaku' AND COLUMN_NAME='mode'), 'DO 0', 'ALTER TABLE `example_video_danmaku` ADD COLUMN `mode` SMALLINT DEFAULT 1 AFTER `color`');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
 
 SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_danmaku' AND INDEX_NAME='ix_danmaku_video_time'), 'DO 0', 'ALTER TABLE `example_video_danmaku` ADD INDEX `ix_danmaku_video_time` (video_id,time,id)');
 
@@ -508,9 +589,138 @@ SELECT u.id,w.id,'video',w.video_id,GREATEST(w.time_sec,0),
 FROM user_wrongbook w JOIN users u
     ON BINARY u.username = BINARY w.user_id
 WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id);
+
+
+-- 9. 结构自检与升级版本登记（由 scripts/build_database_installer.py 同步生成）
+-- 缺少字段、索引、关联或历史校验和冲突时，不登记新版本，不覆盖已有记录。
+SET @wisdom_schema = '[
+{"table": "users", "columns": ["id", "username", "hashed_password", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "username", "columns": "username", "unique": 1}], "foreign_keys": []},
+{"table": "user_settings", "columns": ["user_id", "settings_json", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id", "unique": 1}], "foreign_keys": []},
+{"table": "user_profiles", "columns": ["user_id", "avatar_url", "nickname", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id", "unique": 1}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "username", "delete_rule": "CASCADE", "update_cascade": 1}]},
+{"table": "account_access", "columns": ["user_id", "role", "disabled", "daily_limit", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id", "unique": 1}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
+{"table": "access_settings", "columns": ["id", "daily_limit", "contact_email", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}], "foreign_keys": []},
+{"table": "access_usage", "columns": ["principal", "period", "feature", "used", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "principal,period,feature", "unique": 1}], "foreign_keys": []},
+{"table": "access_audit", "columns": ["id", "actor_id", "target_id", "action", "details", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_access_audit_created", "columns": "created_at", "unique": 0}], "foreign_keys": []},
+{"table": "formulas", "columns": ["id", "user_id", "latex", "note", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_formulas_owner_created", "columns": "user_id,created_at,id", "unique": 0}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "username", "delete_rule": "CASCADE", "update_cascade": 1}]},
+{"table": "formula_topics", "columns": ["id", "user_id", "formula_id", "tag", "weight", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "idx_user_tag", "columns": "user_id,tag", "unique": 0}, {"name": "idx_formula", "columns": "formula_id", "unique": 0}], "foreign_keys": [{"column": "formula_id", "parent": "formulas", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
+{"table": "formula_solutions", "columns": ["formula_id", "title", "step_count", "video_url", "payload", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "formula_id", "unique": 1}], "foreign_keys": [{"column": "formula_id", "parent": "formulas", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
+{"table": "animation_scripts", "columns": ["id", "user_id", "note", "code", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_scripts_owner_created", "columns": "user_id,created_at,id", "unique": 0}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "username", "delete_rule": "CASCADE", "update_cascade": 1}]},
+{"table": "agent_templates", "columns": ["id", "user_id", "name", "prompt", "steps_json", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_templates_owner_created", "columns": "user_id,created_at,id", "unique": 0}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "username", "delete_rule": "CASCADE", "update_cascade": 1}]},
+{"table": "user_achievements", "columns": ["id", "user_id", "achievement_id", "progress", "unlocked", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "uq_user_ach", "columns": "user_id,achievement_id", "unique": 1}], "foreign_keys": []},
+{"table": "course_packs", "columns": ["id", "user_id", "name", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_packs_owner_created", "columns": "user_id,created_at,id", "unique": 0}], "foreign_keys": []},
+{"table": "course_pack_documents", "columns": ["pack_id", "description", "lesson_json", "revision", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "pack_id", "unique": 1}], "foreign_keys": [{"column": "pack_id", "parent": "course_packs", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
+{"table": "course_pack_videos", "columns": ["pack_id", "video_id", "sort_order"], "indexes": [{"name": "PRIMARY", "columns": "pack_id,video_id", "unique": 1}, {"name": "ix_pack_order", "columns": "pack_id,sort_order", "unique": 0}], "foreign_keys": [{"column": "pack_id", "parent": "course_packs", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
+{"table": "example_video_likes", "columns": ["video_id", "user_id", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "video_id,user_id", "unique": 1}], "foreign_keys": []},
+{"table": "example_video_comments", "columns": ["id", "video_id", "user_id", "content", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_comments_video_created", "columns": "video_id,created_at,id", "unique": 0}], "foreign_keys": []},
+{"table": "example_video_danmaku", "columns": ["id", "video_id", "user_id", "text", "time", "color", "mode", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_danmaku_video_time", "columns": "video_id,time,id", "unique": 0}], "foreign_keys": []},
+{"table": "example_play_history", "columns": ["user_id", "video_id", "progress", "last_active"], "indexes": [{"name": "PRIMARY", "columns": "user_id,video_id", "unique": 1}], "foreign_keys": []},
+{"table": "example_video_notes", "columns": ["id", "user_id", "video_id", "time_sec", "content", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_notes_owner_video_time", "columns": "user_id,video_id,time_sec,id", "unique": 0}], "foreign_keys": []},
+{"table": "user_favorites", "columns": ["user_id", "video_id", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id,video_id", "unique": 1}], "foreign_keys": []},
+{"table": "watch_later", "columns": ["user_id", "video_id", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id,video_id", "unique": 1}], "foreign_keys": []},
+{"table": "user_wrongbook", "columns": ["id", "user_id", "video_id", "title", "time_sec", "note", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}], "foreign_keys": []},
+{"table": "learning_wrongbook", "columns": ["id", "owner_id", "legacy_id", "source_type", "video_id", "formula_id", "time_sec", "title", "problem", "answer", "note", "solution_snapshot", "fingerprint", "status", "difficulty", "review_count", "interval_days", "next_review_at", "last_reviewed_at", "revision", "created_at", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "uq_wrongbook_origin", "columns": "owner_id,fingerprint", "unique": 1}, {"name": "uq_wrongbook_legacy", "columns": "legacy_id", "unique": 1}, {"name": "ix_wrongbook_due", "columns": "owner_id,status,next_review_at,id", "unique": 0}, {"name": "ix_wrongbook_recent", "columns": "owner_id,updated_at,id", "unique": 0}, {"name": "ix_wrongbook_video", "columns": "owner_id,video_id,time_sec", "unique": 0}, {"name": "fk_wrongbook_formula", "columns": "formula_id", "unique": 0}], "foreign_keys": [{"column": "formula_id", "parent": "formulas", "parent_column": "id", "delete_rule": "SET NULL", "update_cascade": 0}, {"column": "owner_id", "parent": "users", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
+{"table": "learning_wrongbook_tags", "columns": ["entry_id", "tag"], "indexes": [{"name": "PRIMARY", "columns": "entry_id,tag", "unique": 1}, {"name": "ix_wrongbook_tag", "columns": "tag,entry_id", "unique": 0}], "foreign_keys": [{"column": "entry_id", "parent": "learning_wrongbook", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
+{"table": "learning_wrongbook_reviews", "columns": ["id", "entry_id", "grade", "note", "interval_days", "next_review_at", "reviewed_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_wrongbook_review", "columns": "entry_id,reviewed_at,id", "unique": 0}], "foreign_keys": [{"column": "entry_id", "parent": "learning_wrongbook", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
+{"table": "course_pack_resources", "columns": ["id", "pack_id", "kind", "formula_id", "wrongbook_id", "snapshot", "sort_order", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_pack_resource_order", "columns": "pack_id,sort_order,id", "unique": 0}, {"name": "uq_pack_formula", "columns": "pack_id,formula_id", "unique": 1}, {"name": "uq_pack_wrongbook", "columns": "pack_id,wrongbook_id", "unique": 1}], "foreign_keys": [{"column": "pack_id", "parent": "course_packs", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}, {"column": "formula_id", "parent": "formulas", "parent_column": "id", "delete_rule": "SET NULL", "update_cascade": 0}, {"column": "wrongbook_id", "parent": "learning_wrongbook", "parent_column": "id", "delete_rule": "SET NULL", "update_cascade": 0}]},
+{"table": "request_records", "columns": ["id", "owner_id", "username", "role", "feature", "endpoint", "problem", "has_image", "content_truncated", "device", "status", "http_status", "duration_ms", "job_id", "created_at", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_requests_time", "columns": "created_at,id", "unique": 0}, {"name": "ix_requests_owner_time", "columns": "owner_id,created_at,id", "unique": 0}, {"name": "ix_requests_status_time", "columns": "status,created_at,id", "unique": 0}, {"name": "ix_requests_feature_time", "columns": "feature,created_at,id", "unique": 0}, {"name": "ix_requests_job", "columns": "job_id", "unique": 0}], "foreign_keys": [{"column": "owner_id", "parent": "users", "parent_column": "id", "delete_rule": "SET NULL", "update_cascade": 0}]},
+{"table": "schema_migrations", "columns": ["version", "checksum", "applied_at"], "indexes": [{"name": "PRIMARY", "columns": "version", "unique": 1}], "foreign_keys": []}
+]';
+SET @wisdom_versions = '[
+  {
+    "version": "001_learning_records.sql",
+    "checksum": "4ce4e3d9091238723bcc8f0d1938247e99397ea6807eda64be21c3edff11aba6"
+  },
+  {
+    "version": "002_account_rename.sql",
+    "checksum": "a56e0712c4fdfe7d6e4aae5cd9a17d174056104cc3ed83d7a239957a77fd7321"
+  },
+  {
+    "version": "003_teaching_relations.sql",
+    "checksum": "4d7b1bb79769a5ce6701b1cda22306a30bda8b97d48ee88a82e00efe78e780d1"
+  },
+  {
+    "version": "004_course_resources.sql",
+    "checksum": "ee1e4911a8e4084512ad40386996a9366369b96699198eb3803c98315298e95f"
+  },
+  {
+    "version": "005_account_access.sql",
+    "checksum": "283739d568f5a77b4568cdcc8147974ce0a2befc5fec97b00e28aaf98f429f21"
+  },
+  {
+    "version": "006_request_records.sql",
+    "checksum": "83f0fabe24c26efae762c8d6cd958ec17773b833f94e1e1af27803f5cc81e042"
+  }
+]';
+
+SELECT COUNT(*) INTO @wisdom_missing_columns
+FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
+    table_name VARCHAR(64) PATH '$.table',
+    NESTED PATH '$.columns[*]' COLUMNS (column_name VARCHAR(64) PATH '$')
+)) required_column
+WHERE NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS c
+    WHERE c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME=required_column.table_name AND c.COLUMN_NAME=required_column.column_name);
+
+SELECT COUNT(*) INTO @wisdom_missing_indexes
+FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
+    table_name VARCHAR(64) PATH '$.table',
+    NESTED PATH '$.indexes[*]' COLUMNS (
+        index_name VARCHAR(64) PATH '$.name', column_names VARCHAR(512) PATH '$.columns', is_unique INT PATH '$.unique'
+    )
+)) required_index
+WHERE required_index.index_name IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.STATISTICS s
+    WHERE s.TABLE_SCHEMA=DATABASE() AND s.TABLE_NAME=required_index.table_name AND s.INDEX_NAME=required_index.index_name
+    GROUP BY s.INDEX_NAME
+    HAVING GROUP_CONCAT(s.COLUMN_NAME ORDER BY s.SEQ_IN_INDEX)=required_index.column_names
+        AND MAX(s.NON_UNIQUE)=1-required_index.is_unique
+);
+
+SELECT COUNT(*) INTO @wisdom_missing_relations
+FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
+    table_name VARCHAR(64) PATH '$.table',
+    NESTED PATH '$.foreign_keys[*]' COLUMNS (
+        column_name VARCHAR(64) PATH '$.column', parent_table VARCHAR(64) PATH '$.parent',
+        parent_column VARCHAR(64) PATH '$.parent_column', delete_rule VARCHAR(16) PATH '$.delete_rule',
+        update_cascade INT PATH '$.update_cascade'
+    )
+)) required_fk
+WHERE required_fk.column_name IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k
+    JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+      ON r.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND r.TABLE_NAME=k.TABLE_NAME AND r.CONSTRAINT_NAME=k.CONSTRAINT_NAME
+    WHERE k.CONSTRAINT_SCHEMA=DATABASE() AND k.TABLE_NAME=required_fk.table_name AND k.COLUMN_NAME=required_fk.column_name
+      AND k.REFERENCED_TABLE_NAME=required_fk.parent_table AND k.REFERENCED_COLUMN_NAME=required_fk.parent_column
+      AND r.DELETE_RULE=required_fk.delete_rule AND (required_fk.update_cascade=0 OR r.UPDATE_RULE='CASCADE')
+);
+
+SELECT COUNT(*) INTO @wisdom_migration_conflicts
+FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version', checksum CHAR(64) PATH '$.checksum')) expected
+JOIN schema_migrations existing ON existing.version=expected.version COLLATE utf8mb4_general_ci
+WHERE BINARY existing.checksum<>BINARY expected.checksum;
+
+SELECT COUNT(*) INTO @wisdom_pending_legacy
+FROM user_wrongbook w JOIN users u ON BINARY u.username=BINARY w.user_id
+WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id);
+
+SET @wisdom_upgrade_ok = (@wisdom_missing_columns=0 AND @wisdom_missing_indexes=0
+    AND @wisdom_missing_relations=0 AND @wisdom_migration_conflicts=0 AND @wisdom_pending_legacy=0);
+
+INSERT INTO schema_migrations(version,checksum)
+SELECT expected.version,expected.checksum
+FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version', checksum CHAR(64) PATH '$.checksum')) expected
+WHERE @wisdom_upgrade_ok AND NOT EXISTS (SELECT 1 FROM schema_migrations existing WHERE existing.version=expected.version COLLATE utf8mb4_general_ci);
 COMMIT;
 
--- phpMyAdmin 最后显示当前库、已建表数量和保留待处理的旧错题数量。
-SELECT DATABASE() AS current_database,
+-- OK 且执行过程无报错才表示完成。非零缺项或校验和冲突需要核对，不要清空业务表重建。
+SELECT IF(@wisdom_upgrade_ok, 'OK', 'NEEDS_ATTENTION') AS upgrade_status,
+    DATABASE() AS current_database,
     (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()) AS total_tables,
+    @wisdom_missing_columns AS missing_columns,
+    @wisdom_missing_indexes AS missing_indexes,
+    @wisdom_missing_relations AS missing_relations,
+    @wisdom_migration_conflicts AS migration_conflicts,
+    (SELECT COUNT(*) FROM schema_migrations WHERE version COLLATE utf8mb4_general_ci IN (
+        SELECT version COLLATE utf8mb4_general_ci FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version')) expected
+    )) AS applied_migrations,
+    @wisdom_pending_legacy AS pending_legacy_wrongbook,
     (SELECT COUNT(*) FROM user_wrongbook w WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id)) AS unmatched_legacy_wrongbook;

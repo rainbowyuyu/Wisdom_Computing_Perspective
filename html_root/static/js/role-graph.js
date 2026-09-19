@@ -1,3 +1,4 @@
+import { loadGraphAssets } from './lazy-assets.js';
 /**
  * 全站知识图谱 - 3D 力导向图
  * 节点：图标（img-nodes 风格 Sprite+Texture）+ 文字（text-nodes 风格 SpriteText）
@@ -393,10 +394,12 @@ export function initRoleGraph() {
             const dy = cam.position.y - coords.y;
             const dz = cam.position.z - coords.z;
             const dist = Math.hypot(dx, dy, dz);
-            const near = 200;
-            const far = 420;
+            // Scale label depth with the camera: the initial wide view must stay readable.
+            const cameraDistance = Math.hypot(cam.position.x, cam.position.y, cam.position.z);
+            const near = Math.max(260, cameraDistance * 0.8);
+            const far = Math.max(near + 300, cameraDistance * 1.8);
             let opacity = 1 - (dist - near) / (far - near);
-            sprite.material.opacity = Math.max(0.22, Math.min(1, opacity));
+            sprite.material.opacity = highlightNodes.has(node) ? 1 : Math.max(0.45, Math.min(1, opacity));
           }
         });
     }
@@ -565,30 +568,24 @@ export function initRoleGraph() {
   function ready() {
     return ensureDimensions() && window.ForceGraph3D && window.THREE;
   }
-  let initialized = false;
-  const initialize = () => {
-    if (initialized || disposed || !ready()) return;
-    initialized = true;
-    clearInterval(retryTimer);
-    try { doInit(); } catch (error) {
-      console.warn('3D graph unavailable', error);
-      explorer.querySelector('.graph-fallback').hidden = false;
-    }
+  let initialized=false,loading=false;
+  const fallback=explorer.querySelector('.graph-fallback');
+  const retry=document.createElement('button');retry.type='button';retry.textContent='重新加载图谱';retry.hidden=true;fallback.after(retry);
+  const initialize=async()=>{
+    if(initialized||disposed||loading||!ensureDimensions())return;
+    loading=true;fallback.hidden=false;fallback.textContent='正在加载知识图谱…';retry.hidden=true;
+    try{
+      await loadGraphAssets();
+      if(disposed)return;
+      if(!ready())throw new Error('图谱暂不可用');
+      doInit();initialized=true;fallback.hidden=true;
+    }catch(error){if(!disposed){fallback.textContent='图谱加载暂未完成，仍可通过节点搜索导航。';retry.hidden=false;}}
+    finally{loading=false;}
   };
-  const lazy = new IntersectionObserver(entries => {
-    if (entries.some(entry => entry.isIntersecting)) initialize();
-  }, {rootMargin:'100px'});
-  lazy.observe(container);
-  cleanups.push(() => lazy.disconnect());
-  let tries = 0;
-  retryTimer = setInterval(() => {
-    if (++tries > 80 || disposed || initialized) {
-      clearInterval(retryTimer);
-      if (!initialized && (!window.ForceGraph3D || !window.THREE)) explorer.querySelector('.graph-fallback').hidden = false;
-      return;
-    }
-    const rect=container.getBoundingClientRect();
-    if (rect.bottom > 0 && rect.top < innerHeight + 100) initialize();
-  }, 200);
+  listen(retry,'click',initialize);
+  const lazy=new IntersectionObserver(entries=>{
+    if(entries.some(entry=>entry.isIntersecting))initialize();
+  },{rootMargin:'100px'});
+  lazy.observe(container);cleanups.push(()=>lazy.disconnect());
   return cleanup;
 }

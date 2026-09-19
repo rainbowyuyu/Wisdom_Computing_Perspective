@@ -8,7 +8,7 @@ import sympy as sp
 from app.solution_models import Curve, Solution, SolutionStep, Visual
 
 X = sp.Symbol("x")
-FUNCTIONS = {"sin": sp.sin, "cos": sp.cos, "tan": sp.tan, "exp": sp.exp, "log": sp.log, "sqrt": sp.sqrt}
+FUNCTIONS = {"sin": sp.sin, "cos": sp.cos, "tan": sp.tan, "exp": sp.exp, "log": sp.log, "sqrt": sp.sqrt, "abs": sp.Abs, "Abs": sp.Abs}
 
 
 def numeric_latex(text):
@@ -56,9 +56,10 @@ def validate_summary_consistency(solution):
             raise ValueError(f"摘要中 {target} 的值与最后一步的 {result.strip()} 不一致，请保留正确分数并核对整个解答")
 
 
-def expression(text):
+def expression(text, symbols=None):
+    symbols = {"x": X} if symbols is None else symbols
     text = text.strip().replace("^", "**").replace("π", "pi").replace("×", "*").replace("−", "-")
-    text = re.sub(r"(?<=\d)(?=x|\()", "*", text)
+    text = re.sub(r"(?<=\d)(?=[a-zA-Z]|\()", "*", text)
     if len(text) > 180:
         raise ValueError("表达式过长")
     tree = ast.parse(text, mode="eval")
@@ -73,8 +74,8 @@ def expression(text):
             if not math.isfinite(node.value) or abs(node.value) > 1e6:
                 raise ValueError("数值超出范围")
             return sp.Rational(str(node.value))
-        if isinstance(node, ast.Name) and node.id in ("x", "pi", "e"):
-            return {"x": X, "pi": sp.pi, "e": sp.E}[node.id]
+        if isinstance(node, ast.Name) and node.id in {**symbols, "pi": sp.pi, "e": sp.E}:
+            return {"pi": sp.pi, "e": sp.E, **symbols}[node.id]
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
             return visit(node.operand) * (-1 if isinstance(node.op, ast.USub) else 1)
         if isinstance(node, ast.BinOp):
@@ -120,10 +121,22 @@ def plot(expr, label="f(x)", lo=-5, hi=5):
 def resolve_visual_functions(solution):
     """The AI chooses expressions; the math tool computes the plotted points."""
     for item in solution.steps:
+        if item.visual.circles:
+            for circle in item.visual.circles:
+                cx, cy = circle.center
+                item.visual.curves.append(Curve(label=circle.label, points=[
+                    (cx + circle.radius*math.cos(i*math.tau/160), cy + circle.radius*math.sin(i*math.tau/160)) for i in range(161)]))
+            item.visual.circles = []
         if item.visual.functions:
             curves = []
-            for spec in item.visual.functions:
-                curves.extend(plot(expression(spec.expression), spec.label, *spec.domain))
+            try:
+                for spec in item.visual.functions:
+                    curves.extend(plot(expression(spec.expression), spec.label, *spec.domain))
+            except (ValueError, SyntaxError, TypeError, OverflowError, ZeroDivisionError):
+                # Optional graphics must not discard a valid symbolic explanation.
+                # In particular, an unspecified parameter cannot be sampled as a number.
+                item.visual = Visual(kind="reasoning", caption="本步图像暂不可绘制：函数含未确定的参数或超出绘图范围，请结合公式阅读推导。")
+                continue
             item.visual.curves = curves[:6]
             item.visual.functions = []
             if not curves:

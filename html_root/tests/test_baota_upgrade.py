@@ -21,11 +21,15 @@ LEGACY = {
 def run_installer(cursor):
     sql = (ROOT / 'visdom_db.sql').read_text(encoding='utf-8')
     sql = re.sub(r'^\s*--[^\n]*', '', sql, flags=re.M)
+    result = None
     for statement in sql.split(';'):
         if statement.strip():
             cursor.execute(statement)
             if cursor.with_rows:
-                cursor.fetchall()
+                rows = cursor.fetchall()
+                if cursor.column_names[0] == 'upgrade_status':
+                    result = dict(zip(cursor.column_names, rows[0]))
+    return result
 
 
 def test_panel_sql_does_not_switch_database_or_need_routines():
@@ -60,6 +64,8 @@ def test_upgrade_18_tables_preserves_data_and_is_repeatable(collation):
             statement = re.sub(r'^\s*(?:KEY `ix_[^\n]+|CONSTRAINT `fk_(?:topic_formula)[^\n]+)\n', '', statement, flags=re.M)
             statement = re.sub(r'^\s*CONSTRAINT `fk_pack_video`[^\n]+\n', '', statement, flags=re.M)
             statement = statement.replace(' ON UPDATE CASCADE', '')
+            if table == 'example_video_danmaku':
+                statement = re.sub(r'^\s*`(?:color|mode)`[^\n]+\n', '', statement, flags=re.M)
             statement = re.sub(r'`fk_\w+_username`', f'`{table}_ibfk_1`', statement)
             statement = re.sub(r',\s*\) ENGINE', '\n) ENGINE', statement)
             cursor.execute(statement)
@@ -73,20 +79,28 @@ def test_upgrade_18_tables_preserves_data_and_is_repeatable(collation):
         pack = cursor.lastrowid
         cursor.execute("INSERT INTO course_pack_videos(pack_id,video_id) VALUES(%s,'old-video')", (pack,))
         cursor.execute("INSERT INTO user_wrongbook(user_id,video_id,title,note) VALUES('原用户','v','旧错题','旧订正'),('原用户','v','旧错题','另一条'),('不存在的用户','v','孤立旧题','保留')")
+        cursor.execute("INSERT INTO example_video_danmaku(video_id,user_id,text,time) VALUES('v','原用户','旧弹幕',1.5)")
         conn.commit()
         before = {}
+        original_columns = {}
         for table in LEGACY:
             cursor.execute(f'SELECT * FROM `{table}`')
             before[table] = cursor.fetchall()
-        run_installer(cursor)
-        run_installer(cursor)
+            original_columns[table] = ','.join('`' + column + '`' for column in cursor.column_names)
+        for _ in range(2):
+            result = run_installer(cursor)
+            assert result['upgrade_status'] == 'OK', result
+            assert result['applied_migrations'] == 6
+            assert result['unmatched_legacy_wrongbook'] == 1
         cursor.execute('SELECT DATABASE()')
         assert cursor.fetchone()[0] == name
         cursor.execute('SHOW TABLES')
-        assert len(cursor.fetchall()) == 25
+        assert len(cursor.fetchall()) == 30
         for table in LEGACY:
-            cursor.execute(f'SELECT * FROM `{table}`')
+            cursor.execute(f'SELECT {original_columns[table]} FROM `{table}`')
             assert cursor.fetchall() == before[table], table
+        cursor.execute('SELECT color,mode FROM example_video_danmaku')
+        assert cursor.fetchall() == [(16777215, 1)]
         cursor.execute('SELECT note FROM learning_wrongbook ORDER BY legacy_id')
         assert cursor.fetchall() == [('旧订正',), ('另一条',)]
         cursor.execute("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME='ix_packs_owner_created'")

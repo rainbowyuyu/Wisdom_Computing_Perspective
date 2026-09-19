@@ -61,7 +61,7 @@ def test_home_background_and_task_feedback(origin, home, calculate, width, theme
         send({'type':'step','index':0,'step':solution['steps'][0]})
         page.wait_for_function("document.querySelector('.tutor-job-track').getAttribute('aria-valuenow')==='25'")
         send({'type':'complete','solution':solution})
-        end()
+        # Completion must release the UI even if the server leaves HTTP open.
         page.wait_for_function('!window.StepTutor.getState().busy')
         assert page.locator('.tutor-job-track').get_attribute('aria-valuenow') == '100'
         page.locator('[data-action=render]').click()
@@ -84,7 +84,6 @@ def test_home_background_and_task_feedback(origin, home, calculate, width, theme
         page.wait_for_selector('.tutor-job[data-phase=render]')
         send({'type':'complete','video_url':'/videos/solution_'+'a'*32+'.mp4',
               'chapters':[{'title':step['title'],'start':i*5,'end':(i+1)*5} for i,step in enumerate(solution['steps'])]}, '/api/solve/render')
-        end('/api/solve/render')
         page.wait_for_function('!window.StepTutor.getState().rendering')
         assert page.locator('.tutor-job').get_attribute('data-phase') == 'done'
         assert page.locator('.tutor-job-track').get_attribute('aria-valuenow') == '100'

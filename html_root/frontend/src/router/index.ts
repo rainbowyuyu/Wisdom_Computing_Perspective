@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
 
 const routes: RouteRecordRaw[] = [
+  { path: "/admin", name: "admin", component: () => import("../views/AdminPage.vue") },
+  { path: "/home", redirect: "/" },
   {
     path: "/",
     name: "home",

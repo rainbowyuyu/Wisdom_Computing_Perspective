@@ -80,11 +80,7 @@ function initMathLiveKeyboardClose() {
 
 function tryInit() {
     if (initMathLiveKeyboardClose()) return;
-    let attempts = 0;
-    const maxAttempts = 50;
-    const t = setInterval(() => {
-        if (initMathLiveKeyboardClose() || ++attempts >= maxAttempts) clearInterval(t);
-    }, 100);
+    customElements.whenDefined('math-field').then(initMathLiveKeyboardClose);
 }
 
 export function initMathLiveKeyboard() {

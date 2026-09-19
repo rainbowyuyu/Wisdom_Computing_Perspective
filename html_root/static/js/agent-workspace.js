@@ -1,3 +1,4 @@
+import { mountTaskBoard, queueMathTask, shouldDelegate, hasMathTasks, activeMathTasks } from '/static/js/agent-task-board.js?v=20260919-tasks-1';
 import { escapeText as esc } from './solution-visual.js';
 import { textWithMath } from './math-text.js';
 import { libraryRequest, openSavedSolution } from './solution-library.js';
@@ -80,13 +81,17 @@ export function stopAgent(){version++;controller?.abort();controller=null;
     if(state.steps[state.index]?.status==='running')state.steps[state.index].status='stopped';state.busy=false;state.status='已停止，已完成的结果保留。';publish();}
 
 export async function executeAgent(prompt=state.draft,image=state.image){
-    if(state.busy)return;prompt=String(prompt||'').trim();if(!prompt&&!image)return;
+    prompt=String(prompt||'').trim();
+    if(!image&&shouldDelegate(prompt)){await queueMathTask(prompt);return;}
+    if(state.busy)return;if(!prompt&&!image)return;
     const request={prompt:prompt||'识别图片中的完整题目并分步解答。',image_base64:image};
     const previous=state.messages.slice(-8),id=++version,aborter=new AbortController();controller=aborter;
     Object.assign(state,{busy:true,error:'',status:'正在理解需求并选择工具…',steps:[],index:-1,result:null,lastRequest:request,draft:'',image:null,templateSaved:false,templateSaving:false});
     state.messages.push({role:'user',text:request.prompt,image});publish();
     try{
-        state.username=await account(aborter.signal);
+        const who=await fetch('/api/user/me',{credentials:'include',signal:aborter.signal});
+        if(who.status!==401&&!who.ok)throw new Error('账户服务暂不可用，请稍后重试。');
+        state.username=who.ok?(await who.json()).username:null;
         const response=await fetch('/api/agent/execute',{method:'POST',headers:{'Content-Type':'application/json'},signal:aborter.signal,body:JSON.stringify({...request,last_user_message:previous.filter(m=>m.role==='user').at(-1)?.text?.slice(-4000),last_assistant_message:previous.filter(m=>m.role==='assistant').at(-1)?.text?.slice(-4000)})});
         const data=await response.json();abortCheck(aborter.signal);if(!response.ok||data.status!=='success')throw new Error(data.message||'智能体未能生成计划，请补充要求。');
         if(!Array.isArray(data.steps)||!data.steps.length)throw new Error('未收到可执行的计划，请重试。');
@@ -112,35 +117,58 @@ function updateDock(){
 export function prefillAgent(text){state.draft=String(text||'');window.showSection?.('agent');publish();}
 export function mountAgent(host){
     try{const pending=sessionStorage.getItem('pending_agent_prompt');if(pending){state.draft=pending;sessionStorage.removeItem('pending_agent_prompt');}}catch{}
-    host.innerHTML=`<div class="assistant-shell"><aside class="assistant-sidebar"><span class="assistant-eyebrow">智算视界 / ASSISTANT</span><h2>从想法，到答案。</h2><p>让识别、推导与动画<br>在一次对话中衔接。</p><button data-agent="new"><i class="fa-solid fa-plus"></i> 新对话</button><div class="assistant-capabilities"><span>你可以交给我</span><p><i class="fa-solid fa-square-root-variable"></i> 解题与可视化</p><p><i class="fa-regular fa-image"></i> 图片题目识别</p><p><i class="fa-solid fa-code"></i> 动画代码创作</p><p><i class="fa-regular fa-bookmark"></i> 整理到我的算式</p></div><button data-agent="library">打开我的算式 ↗</button></aside><main class="assistant-main"><header><div><span class="assistant-eyebrow">学习与创作伙伴</span><h2>智算智能体</h2></div><span class="assistant-state">准备就绪</span></header><div class="assistant-thread" aria-label="对话记录"><div class="assistant-welcome"><div class="assistant-mark">✦</div><h3>今天，想探索什么？</h3><p>输入题目、上传图片，或描述你想实现的动画。</p><div class="assistant-samples">${samples.map(([title,prompt])=>`<button data-prompt="${esc(prompt)}"><span>${title}</span><small>${esc(prompt)}</small><i>↗</i></button>`).join('')}</div></div><div class="assistant-messages"></div><div class="assistant-plan" hidden><div class="assistant-plan-heading">执行进度 <span></span></div><ol></ol></div><div class="assistant-feedback" role="status" aria-live="polite"></div><div class="assistant-result-actions"><button data-agent="result" hidden>查看结果</button><button data-agent="retry" hidden>重试任务</button><button data-agent="template" hidden>存为模板</button></div></div><form class="assistant-composer"><div class="assistant-attachment" hidden><img alt="待识别的题目图片"><button type="button" data-agent="remove-image" aria-label="移除图片">×</button></div><textarea id="agent-prompt" rows="2" maxlength="6000" placeholder="描述你的问题，或粘贴一张题目图片…" aria-label="告诉智能体你的需求"></textarea><div class="assistant-composer-bottom"><label class="assistant-upload" title="上传题目图片"><i class="fa-regular fa-image"></i><input type="file" accept="image/png,image/jpeg,image/webp" hidden></label><span>Enter 发送 · Shift + Enter 换行</span><button type="button" data-agent="stop" hidden>停止任务</button><button type="submit" id="agent-submit-btn">发送 <i class="fa-solid fa-arrow-up"></i></button></div></form></main></div>`;
-    const $=s=>host.querySelector(s),input=$('textarea');let messageCount=-1,lastPlan='',disposed=false;
+    host.innerHTML=`<div class="assistant-shell"><aside class="assistant-sidebar"><span class="assistant-eyebrow">智算视界 / ASSISTANT</span><h2>从想法，到答案。</h2><p>让识别、推导与动画<br>在一次对话中衔接。</p><button data-agent="new"><i class="fa-solid fa-plus"></i> 新对话</button><div class="assistant-capabilities"><span>你可以交给我</span><p><i class="fa-solid fa-square-root-variable"></i> 解题与可视化</p><p><i class="fa-regular fa-image"></i> 图片题目识别</p><p><i class="fa-solid fa-code"></i> 动画代码创作</p><p><i class="fa-regular fa-bookmark"></i> 整理到我的算式</p></div><button data-agent="library">打开我的算式 ↗</button></aside><main class="assistant-main"><header><div><span class="assistant-eyebrow">学习与创作伙伴</span><h2>智算智能体</h2></div><span class="assistant-state">准备就绪</span></header><div class="assistant-thread" aria-label="对话记录"><div class="assistant-math-tasks"></div><div class="assistant-welcome"><div class="assistant-mark">✦</div><h3>今天，想探索什么？</h3><p>输入题目、上传图片，或描述你想实现的动画。</p><div class="assistant-samples">${samples.map(([title,prompt])=>`<button data-prompt="${esc(prompt)}"><span>${title}</span><small>${esc(prompt)}</small><i>↗</i></button>`).join('')}</div></div><div class="assistant-messages"></div><div class="assistant-plan" hidden><div class="assistant-plan-heading">执行进度 <span></span></div><ol></ol></div><div class="assistant-feedback" role="status" aria-live="polite"></div><div class="assistant-result-actions"><button data-agent="result" hidden>查看结果</button><button data-agent="retry" hidden>重试任务</button><button data-agent="template" hidden>存为模板</button></div></div><form class="assistant-composer"><div class="assistant-attachment" hidden><img alt="待识别的题目图片"><button type="button" data-agent="remove-image" aria-label="移除图片">×</button></div><textarea id="agent-prompt" rows="2" maxlength="6000" placeholder="描述你的问题，或粘贴一张题目图片…" aria-label="告诉智能体你的需求"></textarea><label class="agent-task-mode"><input type="checkbox" name="mathTaskMode"> 拆解题目 · 后台任务（可同时安排多道题）</label><div class="assistant-composer-bottom"><label class="assistant-upload" title="上传题目图片"><i class="fa-regular fa-image"></i><input type="file" accept="image/png,image/jpeg,image/webp" hidden></label><span>Enter 发送 · Shift + Enter 换行</span><button type="button" data-agent="stop" hidden>停止任务</button><button type="submit" id="agent-submit-btn">发送 <i class="fa-solid fa-arrow-up"></i></button></div></form></main></div>`;
+    const $=s=>host.querySelector(s),input=$('textarea');let draftContext='';let messageCount=-1,lastPlan='',disposed=false;
     const binding=new AbortController(),on=(el,type,fn)=>el.addEventListener(type,fn,{signal:binding.signal});
+    const fitViewport=()=>{
+        const panel=$('.assistant-main');if(!panel?.getClientRects().length)return;
+        const top=panel.getBoundingClientRect().top+window.scrollY;
+        panel.style.setProperty('--assistant-viewport-height',`${Math.max(450,Math.min(800,window.innerHeight-top-16))}px`);
+    };
+    const resizeObserver=new ResizeObserver(fitViewport);
+    [host,...document.querySelectorAll('.navbar,.agent-update-banner')].forEach(el=>resizeObserver.observe(el));
+    on(window,'resize',fitViewport);
     function update(){
         if(disposed)return;
         $('.assistant-composer-bottom > span').textContent=enterSends()?'Enter 发送 · Shift + Enter 换行':'Enter 换行 · Ctrl / ⌘ + Enter 发送';
         if(document.activeElement!==input)input.value=state.draft;
-        $('.assistant-state').textContent=state.busy?'处理中':state.error?'需要重试':'准备就绪';
+        $('.assistant-state').textContent=state.busy?'处理中':activeMathTasks()?`${activeMathTasks()} 道题处理中`:state.error?'需要重试':'准备就绪';
         $('.assistant-feedback').textContent=state.messages.length?state.status:'';$('.assistant-feedback').classList.toggle('is-error',!!state.error);
-        $('[type=submit]').disabled=state.busy;$('[data-agent=stop]').hidden=!state.busy;$('[data-agent=new]').disabled=state.busy;
+        $('[type=submit]').disabled=state.busy&&!$('[name=mathTaskMode]').checked;$('[data-agent=stop]').hidden=!state.busy;$('[data-agent=new]').disabled=state.busy;
         $('[data-agent=template]').disabled=state.templateSaved||state.templateSaving;$('[data-agent=template]').textContent=state.templateSaved?'已存为模板':state.templateSaving?'保存中…':'存为模板';
         $('[data-agent=retry]').hidden=!state.error||state.busy;$('[data-agent=template]').hidden=state.busy||!!state.error||!state.steps.length;$('[data-agent=result]').hidden=!state.result;if(state.result)$('[data-agent=result]').textContent=state.result.label;
-        $('.assistant-welcome').hidden=!!state.messages.length;$('.assistant-attachment').hidden=!state.image;if(state.image)$('.assistant-attachment img').src=state.image;else $('.assistant-attachment img').removeAttribute('src');
-        if(messageCount!==state.messages.length){messageCount=state.messages.length;$('.assistant-messages').innerHTML=state.messages.map((message,i)=>`<article class="assistant-message ${message.role}"><span>${message.role==='user'?'你':'智算'}</span><div data-message="${i}"></div>${message.image?`<img class="assistant-message-image" src="${esc(message.image)}" alt="题目图片">`:''}</article>`).join('');host.querySelectorAll('[data-message]').forEach(el=>textWithMath(el,state.messages[Number(el.dataset.message)].text));$('.assistant-thread').scrollTop=$('.assistant-thread').scrollHeight;}
+        $('.assistant-welcome').hidden=!!state.messages.length||hasMathTasks();$('.assistant-attachment').hidden=!state.image;if(state.image)$('.assistant-attachment img').src=state.image;else $('.assistant-attachment img').removeAttribute('src');
+        if(messageCount!==state.messages.length){messageCount=state.messages.length;$('.assistant-messages').innerHTML=state.messages.map((message,i)=>`<article class="assistant-message ${message.role}"><span>${message.role==='user'?'你':'智算'}</span><div data-message="${i}"></div>${message.image?`<img class="assistant-message-image" src="${esc(message.image)}" alt="题目图片">`:''}</article>`).join('');host.querySelectorAll('[data-message]').forEach(el=>textWithMath(el,state.messages[Number(el.dataset.message)].text));if(state.messages.length)$('.assistant-thread').scrollTop=$('.assistant-thread').scrollHeight;}
         const key=JSON.stringify(state.steps);if(key!==lastPlan){lastPlan=key;$('.assistant-plan').hidden=!state.steps.length;$('.assistant-plan-heading span').textContent=`${state.steps.filter(s=>s.status==='done').length} / ${state.steps.length}`;$('.assistant-plan ol').innerHTML=state.steps.map(s=>`<li class="${s.status}"><span class="assistant-step-icon">${s.status==='done'?'✓':s.status==='error'?'!':s.status==='running'?'◌':'○'}</span><div><strong>${esc(names[s.section]||s.section)}</strong><small>${esc(s.detail||({pending:'等待执行',running:'执行中…',done:'已完成',error:'执行未完成',stopped:'已停止'}[s.status]))}</small></div></li>`).join('');}
     }
     async function attach(file){if(!file)return;if(!/^image\/(png|jpeg|webp)$/.test(file.type)||file.size>8*1024*1024){state.error='请选择不超过 8MB 的 PNG、JPG 或 WebP 图片。';state.status=state.error;publish();return;}
         const reader=new FileReader();reader.onload=()=>{state.image=String(reader.result);state.error='';publish();};reader.readAsDataURL(file);
     }
-    on(input,'input',()=>state.draft=input.value);on(input,'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&(enterSends()||e.ctrlKey||e.metaKey)){e.preventDefault();if(!state.busy){executeAgent(input.value);input.value='';}}});
+    const submit=async()=>{
+        const prompt=input.value.trim();if(!prompt&&!state.image)return;
+        if($('[name=mathTaskMode]').checked||(!state.image&&shouldDelegate(prompt))){
+            if(state.image){state.error='请先通过图片识题转成完整题面，再提交拆解任务。';state.status=state.error;publish();return;}
+            if(await queueMathTask(prompt,draftContext)){input.value='';state.draft='';draftContext='';}
+        }else{executeAgent(prompt);input.value='';}
+    };
+    on($('[name=mathTaskMode]'),'change',update);
+    on(window,'agent-new-math-task',event=>{
+        $('[name=mathTaskMode]').checked=true;
+        state.draft=event.detail?.problem||'';draftContext=event.detail?.context||'';
+        input.value=state.draft;input.focus();update();
+    });
+    on(window,'math-tasks-state',update);
+    const disposeTasks=mountTaskBoard($('.assistant-math-tasks'));
+    on(input,'input',()=>state.draft=input.value);on(input,'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&(enterSends()||e.ctrlKey||e.metaKey)){e.preventDefault();if(!state.busy||$('[name=mathTaskMode]').checked)submit();}});
     on(input,'paste',e=>{const file=[...e.clipboardData.items].find(item=>item.type.startsWith('image/'))?.getAsFile();if(file){e.preventDefault();attach(file);}});
-    on($('[type=file]'),'change',e=>{attach(e.target.files[0]);e.target.value='';});on($('form'),'submit',e=>{e.preventDefault();executeAgent(input.value);input.value='';});
+    on($('[type=file]'),'change',e=>{attach(e.target.files[0]);e.target.value='';});on($('form'),'submit',e=>{e.preventDefault();submit();});
     on(host,'click',e=>{const button=e.target.closest('button');if(!button)return;if(button.dataset.prompt){state.draft=button.dataset.prompt;input.value=state.draft;input.focus();return;}
         const action=button.dataset.agent;if(action==='stop')stopAgent();if(action==='result')openResult();if(action==='retry'&&state.lastRequest)executeAgent(state.lastRequest.prompt,state.lastRequest.image_base64);if(action==='library')window.showSection?.('my-formulas');
         if(action==='template'){saveTemplate(button);return;}
         if(action==='remove-image'){state.image=null;publish();}if(action==='new'&&!state.busy){Object.assign(state,{messages:[],steps:[],error:'',result:null,draft:'',image:null,status:'准备就绪'});input.value='';publish();}
     });
     views.add(update);update();window.AgentWorkspace={execute:executeAgent,stop:stopAgent,prefill:prefillAgent,getState:()=>({...state})};
-    return()=>{disposed=true;binding.abort();views.delete(update);};
+    return()=>{disposed=true;resizeObserver.disconnect();disposeTasks();binding.abort();views.delete(update);};
 }
 
 async function saveTemplate(button){

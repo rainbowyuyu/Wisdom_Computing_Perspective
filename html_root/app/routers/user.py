@@ -1,5 +1,6 @@
 # 用户：设置、资料、修改用户名/密码、头像上传
 import json
+import asyncio
 import logging
 import os
 import re
@@ -21,6 +22,23 @@ def _username_from_session(auth_session: Optional[str] = None):
     if not auth_session:
         return None
     return SESSION_STORE.get(auth_session)
+
+
+@router.get('/stats')
+def user_stats(auth_session: Optional[str] = Cookie(None)):
+    """One small account-owned response instead of four full content lists."""
+    username=_username_from_session(auth_session)
+    if not username:
+        return JSONResponse(status_code=401,content={'status':'error','message':'请先登录'})
+    from ..database import transaction
+    with transaction() as (_,cursor):
+        cursor.execute('''SELECT
+            (SELECT COUNT(*) FROM formulas WHERE user_id=%s) AS formulas,
+            (SELECT COUNT(*) FROM animation_scripts WHERE user_id=%s) AS scripts,
+            (SELECT COUNT(*) FROM agent_templates WHERE user_id=%s) AS templates,
+            (SELECT COUNT(*) FROM learning_wrongbook WHERE owner_id=(SELECT id FROM users WHERE username=%s)) AS wrongbook''',
+            (username,username,username,username))
+        return {'status':'success','data':cursor.fetchone()}
 
 
 @router.get("/settings")
@@ -146,6 +164,9 @@ async def change_username(data: ChangeUsernameModel, auth_session: Optional[str]
     username = _username_from_session(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
+    from ..access import load_principal, is_owner
+    if is_owner(await asyncio.to_thread(load_principal,username)):
+        return JSONResponse(status_code=403,content={'status':'error','message':'主管理员账号名受保护，请保留当前账号名。'})
     new_username = (data.new_username or "").strip()[:64]
     if not new_username or new_username == username:
         return JSONResponse(status_code=400, content={"status": "error", "message": "新用户名无效或未变更"})

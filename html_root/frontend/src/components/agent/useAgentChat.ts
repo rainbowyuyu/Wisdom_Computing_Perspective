@@ -218,8 +218,8 @@ export function useAgentChat() {
           ...ctx,
         }),
       });
-      if (!res.ok) throw new Error(`请求失败（${res.status}）`);
       const data: AgentExecuteResponse = await res.json();
+      if (!res.ok) throw new Error(data.message || `请求失败（${res.status}）`);
       if (version !== requestVersion) return;
 
       // 替换 loading

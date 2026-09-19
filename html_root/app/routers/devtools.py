@@ -20,7 +20,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..config import VIDEOS_DIR, client, api_key
 from ..llm_errors import llm_error_message
-from .solve import ai_client, stop_process
+from ..async_cleanup import finish_cleanup
+from .solve import ai_client, stop_process, RENDER_SLOTS
 from ..models import ManimCodeModel, ManimCodeEditModel, ManimKeyframeModel
 
 logger = logging.getLogger(__name__)
@@ -115,14 +116,15 @@ def _apply_breakpoint(code: str, breakpoint_line: int) -> str:
     return before + ' '*statement.col_offset + 'return  # preview boundary\n' + ''.join(lines[position:])
 
 
-@router.post("/render_keyframe")
-async def render_keyframe(data: ManimKeyframeModel, request: Request):
+async def _render_keyframe_once(data: ManimKeyframeModel, request: Request):
     proc=None; temporary=None; acquired=False
     try:
         code=normalize_scene_code(data.code)
         validate_edit_code(code)
         code=_apply_breakpoint(code,data.breakpoint_line) if data.breakpoint_line is not None else code
+        queued=time.monotonic()
         while not acquired:
+            if time.monotonic()-queued>=60:raise TimeoutError('渲染资源繁忙，排队超时，请稍后重试。')
             if await request.is_disconnected(): return JSONResponse(status_code=499,content={'status':'error','message':'已停止预览'})
             try: await asyncio.wait_for(DEV_RENDER_SLOTS.acquire(),2);acquired=True
             except asyncio.TimeoutError: pass
@@ -145,79 +147,40 @@ async def render_keyframe(data: ManimKeyframeModel, request: Request):
         shutil.copy2(candidates[0],Path(VIDEOS_DIR)/output)
         return {'status':'success','preview_url':'/videos/'+output}
     except asyncio.CancelledError: raise
-    except Exception as error: return JSONResponse(status_code=400,content={'status':'error','message':str(error)[-2500:]})
+    except Exception as error: return JSONResponse(status_code=400,content={'status':'error','message':type(error).__name__+': '+str(error)[-2500:]})
     finally:
-        if proc and proc.poll() is None: await asyncio.to_thread(stop_process,proc)
-        if temporary: temporary.cleanup()
-        if acquired: DEV_RENDER_SLOTS.release()
+        await finish_cleanup(cleanup_renderer(proc,temporary,acquired))
 
 
 @router.post("/run_manim")
-async def run_custom_manim(data: ManimCodeModel):
-    forbidden = ["import os", "import sys", "import subprocess", "rm -rf", "shutil"]
-    for keyword in forbidden:
-        if keyword in data.code:
-            return JSONResponse(status_code=400, content={"status": "error", "message": f"安全拦截: 禁止使用 '{keyword}'"})
-
-    task_id = str(uuid.uuid4())
-    py_filename = f"dev_{task_id}.py"
-    py_path = os.path.join(VIDEOS_DIR, py_filename)
-    media_dir = os.path.abspath(VIDEOS_DIR)
-    output_file = f"{task_id}.mp4"
-
+async def run_custom_manim(data: ManimCodeModel, request: Request):
+    # Legacy JSON clients use the same bounded, cancellable renderer as SSE.
+    response=await run_manim_stream_endpoint(data,request)
     try:
-        with open(py_path, "w", encoding="utf-8") as f:
-            f.write(data.code)
-        cmd = [
-            sys.executable, "-m", "manim",
-            "-ql", "--media_dir", media_dir, "-o", output_file,
-            os.path.abspath(py_path), "GenScene",
-        ]
-        logger.info(f"Running Manim DevTools: {' '.join(cmd)}")
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=60),
-        )
-        if result.returncode == 0:
-            possible_paths = [
-                os.path.join(media_dir, output_file),
-                os.path.join(media_dir, "videos", py_filename.replace(".py", ""), "480p15", "GenScene.mp4"),
-                os.path.join(media_dir, "videos", py_filename.replace(".py", ""), "480p15", output_file),
-            ]
-            final_path = os.path.join(VIDEOS_DIR, output_file)
-            found = False
-            for p in possible_paths:
-                if os.path.exists(p):
-                    import shutil
-                    shutil.move(p, final_path)
-                    found = True
-                    break
-            if found:
-                try:
-                    os.remove(py_path)
-                except Exception:
-                    pass
-                return {"status": "success", "video_url": f"/videos/{output_file}"}
-            logger.error(f"Render success but file not found. Search paths: {possible_paths}")
-            return JSONResponse(status_code=500, content={"status": "error", "message": "渲染成功但未找到输出文件"})
-        error_msg = result.stderr if result.stderr else result.stdout
-        error_lines = [line for line in error_msg.split("\n") if "Error" in line or "Exception" in line or "Traceback" in line]
-        if not error_lines:
-            error_lines = error_msg.split("\n")[-10:]
-        return JSONResponse(status_code=400, content={"status": "error", "message": "\n".join(error_lines)})
-    except subprocess.TimeoutExpired:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "渲染超时"})
-    except Exception as e:
-        logger.error(f"run_custom_manim: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        async for frame in response.body_iterator:
+            event=json.loads(frame[6:])
+            if event['type']=='complete':return {'status':'success','video_url':event['video_url'],**{k:event[k] for k in ('code','repaired') if k in event}}
+            if event['type']=='error':return JSONResponse(status_code=400,content={'status':'error','message':event['message']})
+    finally:
+        await response.body_iterator.aclose()
+    return JSONResponse(status_code=408,content={'status':'error','message':'渲染已停止，请重试。'})
 
 
-DEV_RENDER_SLOTS = asyncio.Semaphore(2)
+DEV_RENDER_SLOTS = RENDER_SLOTS
 
 
-@router.post("/run_manim_stream")
-async def run_manim_stream_endpoint(data: ManimCodeModel, request: Request):
+async def cleanup_renderer(proc, temporary, acquired):
+    try:
+        if proc and proc.poll() is None:
+            await asyncio.to_thread(stop_process,proc)
+    finally:
+        try:
+            if temporary: await asyncio.to_thread(temporary.cleanup)
+        finally:
+            if acquired: DEV_RENDER_SLOTS.release()
+
+
+async def _run_manim_stream_once(data: ManimCodeModel, request: Request):
     def event(kind, **values):
         return 'data: '+json.dumps({'type':kind,**values},ensure_ascii=False)+'\n\n'
     async def generate():
@@ -226,7 +189,9 @@ async def run_manim_stream_endpoint(data: ManimCodeModel, request: Request):
             code=normalize_scene_code(data.code)
             validate_edit_code(code)
             yield event('start',message='正在准备渲染资源…')
+            queued=time.monotonic()
             while not acquired:
+                if time.monotonic()-queued>=60:raise TimeoutError('渲染资源繁忙，排队超时，请稍后重试。')
                 if await request.is_disconnected(): return
                 try: await asyncio.wait_for(DEV_RENDER_SLOTS.acquire(),5);acquired=True
                 except asyncio.TimeoutError: yield event('heartbeat',message='正在等待渲染资源…')
@@ -255,11 +220,84 @@ async def run_manim_stream_endpoint(data: ManimCodeModel, request: Request):
             shutil.copy2(candidates[0],Path(VIDEOS_DIR)/output)
             yield event('complete',video_url='/videos/'+output,message='渲染完成')
         except asyncio.CancelledError: raise
-        except Exception as error: yield event('error',message=str(error)[-4000:])
+        except Exception as error: yield event('error',message=type(error).__name__+': '+str(error)[-4000:])
         finally:
-            if proc and proc.poll() is None: await asyncio.to_thread(stop_process,proc)
-            if temporary: temporary.cleanup()
-            if acquired: DEV_RENDER_SLOTS.release()
+            await finish_cleanup(cleanup_renderer(proc,temporary,acquired))
+    return StreamingResponse(generate(),media_type='text/event-stream',headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
+
+
+async def repair_code(code, failure, budget):
+    from ..render_repair import judge_and_repair
+    answer=await judge_and_repair(ai_client,'code',{'code':code},failure,budget)
+    if not answer.code or answer.code.strip()==code.strip():
+        raise ValueError('模型没有给出有效的脚本修复。')
+    result=normalize_scene_code(answer.code)
+    if len(result)>40000:raise ValueError('修复脚本超过长度限制，请简化动画后重试。')
+    validate_edit_code(result)
+    return result
+
+
+@router.post('/render_keyframe')
+async def render_keyframe(data: ManimKeyframeModel, request: Request):
+    return await _render_keyframe_with_repair(data,request,{'used':False})
+
+
+async def _render_keyframe_with_repair(data,request,budget):
+    from ..render_repair import eligible, repair_progress
+    result=await _render_keyframe_once(data,request)
+    if not isinstance(result,JSONResponse) or data.breakpoint_line is not None:return result
+    message=json.loads(result.body).get('message','')
+    if budget['used'] or not eligible(message) or await request.is_disconnected():return result
+    fixed=None
+    async for update in repair_progress(lambda:repair_code(data.code,message,budget),request):
+        if update['type']=='repair_result':fixed=update['value']
+        elif update['type']=='repair_failed':
+            return JSONResponse(status_code=400,content={'status':'error','message':'预览失败，自动修复未完成：'+update['message']})
+    if fixed is None:return JSONResponse(status_code=499,content={'status':'error','message':'已停止预览'})
+    result=await _render_keyframe_once(ManimKeyframeModel(code=fixed),request)
+    if isinstance(result,dict):result.update(code=fixed,repaired=True)
+    else:
+        return JSONResponse(status_code=400,content={'status':'error','message':'自动修复后预览仍失败：'+json.loads(result.body).get('message','')})
+    return result
+
+
+@router.post('/run_manim_stream')
+async def run_manim_stream_endpoint(data: ManimCodeModel, request: Request):
+    return await _run_manim_with_repair(data,request,{'used':False})
+
+
+async def _run_manim_with_repair(data,request,budget):
+    from ..render_repair import eligible, repair_progress
+    def event(kind,**values):
+        return 'data: '+json.dumps({'type':kind,**values},ensure_ascii=False)+'\n\n'
+    async def generate():
+        code=data.code;repaired=False
+        for attempt in range(2):
+            if await request.is_disconnected():return
+            response=await _run_manim_stream_once(ManimCodeModel(code=code),request)
+            failed=None
+            try:
+                async for frame in response.body_iterator:
+                    item=json.loads(frame[6:])
+                    if item['type']=='error':failed=item
+                    else:
+                        if item['type']=='complete' and repaired:item.update(code=code,repaired=True)
+                        yield event(item.pop('type'),**item)
+            finally:await finish_cleanup(response.body_iterator.aclose())
+            if not failed:return
+            if budget['used'] or attempt or not eligible(failed['message']):
+                yield event('error',message=('自动修复后仍未完成。' if repaired else '')+failed['message']);return
+            yield event('repair',message='正在请模型判断渲染错误并修复脚本（最多一次）…')
+            fixed=None
+            async for update in repair_progress(lambda:repair_code(code,failed['message'],budget),request):
+                kind=update.pop('type')
+                if kind=='repair_result':fixed=update['value']
+                elif kind=='repair_failed':
+                    yield event('error',message='自动修复未完成：'+update['message']+' 原脚本已保留。');return
+                else:yield event(kind,**update)
+            if fixed is None:return
+            code=fixed;repaired=True
+            yield event('repair',message='修复代码已通过语法与安全检查，正在重新渲染…')
     return StreamingResponse(generate(),media_type='text/event-stream',headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
 
 
@@ -299,8 +337,8 @@ async def generate_video_copy(data: ManimCodeModel):
         text = completion.choices[0].message.content.strip()
         return {"status": "success", "copy": text}
     except Exception as e:
-        logger.error(f"generate_video_copy error: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": "生成视频文案时出错：" + str(e)})
+        logger.warning("generate_video_copy failed: %s", type(e).__name__)
+        return JSONResponse(status_code=500, content={"status": "error", "message": llm_error_message(e)})
 
 
 def _is_add_or_play_line(line: str) -> bool:

@@ -833,9 +833,10 @@ export async function runScriptFromDetail() {
                     if (data.type === 'log' && data.message && logEl) {
                         logEl.textContent += data.message + '\n';
                         logEl.scrollTop = logEl.scrollHeight;
-                    } else if (data.type === 'start' && logEl) {
+                    } else if (['start','repair','heartbeat'].includes(data.type) && logEl) {
                         logEl.textContent += (data.message || '') + '\n';
                     } else if (data.type === 'complete' && data.video_url && video) {
+                        if(data.repaired&&data.code&&formulasMonacoEditor?.getValue()===code){formulasMonacoEditor.pushUndoStop();formulasMonacoEditor.executeEdits('render-repair',[{range:formulasMonacoEditor.getModel().getFullModelRange(),text:data.code}]);formulasMonacoEditor.pushUndoStop();}
                         video.src = data.video_url + '?t=' + Date.now();
                         video.style.display = 'block';
                         if (logEl) logEl.textContent += '渲染完成。\n';

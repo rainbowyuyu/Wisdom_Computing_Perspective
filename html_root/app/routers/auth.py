@@ -1,9 +1,10 @@
 # 认证：验证码、注册、登录、登出、当前用户、用户名查重
 import logging
+import os
 import uuid
 import bcrypt
 from typing import Optional
-from fastapi import APIRouter, Response, Cookie, Query
+from fastapi import APIRouter, Response, Cookie, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..config import get_db_connection
@@ -28,13 +29,12 @@ async def get_captcha():
 
 
 @router.post("/register")
-async def register(data: AuthModel):
-    stored_code = CAPTCHA_STORE.get(data.captcha_id)
+def register(data: AuthModel):
+    stored_code = CAPTCHA_STORE.pop(data.captcha_id, None)
     if not stored_code:
         return JSONResponse(status_code=400, content={"status": "error", "message": "验证码已过期，请刷新"})
     if stored_code != data.captcha.upper():
         return JSONResponse(status_code=400, content={"status": "error", "message": "验证码错误"})
-    del CAPTCHA_STORE[data.captcha_id]
 
     conn = None
     cursor = None
@@ -49,7 +49,7 @@ async def register(data: AuthModel):
         conn.commit()
         return {"status": "success", "message": "注册成功"}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=503, content={"status": "error", "message": "账户服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -58,11 +58,10 @@ async def register(data: AuthModel):
 
 
 @router.post("/login")
-async def login(data: AuthModel, response: Response):
-    stored_code = CAPTCHA_STORE.get(data.captcha_id)
+def login(data: AuthModel, response: Response, request: Request):
+    stored_code = CAPTCHA_STORE.pop(data.captcha_id, None)
     if not stored_code or stored_code != data.captcha.upper():
         return JSONResponse(status_code=400, content={"status": "error", "message": "验证码错误"})
-    del CAPTCHA_STORE[data.captcha_id]
 
     conn = None
     cursor = None
@@ -72,13 +71,18 @@ async def login(data: AuthModel, response: Response):
         cursor.execute("SELECT * FROM users WHERE username = %s", (data.username,))
         user = cursor.fetchone()
         if user and bcrypt.checkpw(data.password.encode(), user["hashed_password"].encode()):
+            from ..access import load_principal, AccessDenied
+            try:principal=load_principal(user['username'])
+            except AccessDenied as error:return JSONResponse(status_code=error.status,content={'status':'error','message':str(error),'code':error.code})
             session_id = str(uuid.uuid4())
             SESSION_STORE[session_id] = user["username"]
-            response.set_cookie(key="auth_session", value=session_id, max_age=86400, httponly=True, samesite="lax")
-            return {"status": "success", "username": user["username"]}
+            trusted_proxy = request.client and request.client.host in os.getenv('TRUSTED_PROXY_IPS', '127.0.0.1,::1').split(',')
+            secure = request.url.scheme == 'https' or (trusted_proxy and request.headers.get('x-forwarded-proto') == 'https')
+            response.set_cookie(key="auth_session", value=session_id, max_age=86400, httponly=True, samesite="lax", secure=bool(secure))
+            return {"status": "success", "username": user["username"],"role":principal['role']}
         return JSONResponse(status_code=401, content={"status": "error", "message": "用户名或密码错误"})
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=503, content={"status": "error", "message": "账户服务暂不可用，请稍后重试。"})
     finally:
         if cursor:
             cursor.close()
@@ -87,13 +91,15 @@ async def login(data: AuthModel, response: Response):
 
 
 @router.get("/user/me")
-async def get_current_user(auth_session: Optional[str] = Cookie(None)):
+def get_current_user(auth_session: Optional[str] = Cookie(None)):
     if not auth_session:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Not logged in"})
     username = SESSION_STORE.get(auth_session)
     if not username:
         return JSONResponse(status_code=401, content={"status": "error", "message": "Session expired"})
-    return {"status": "success", "username": username}
+    from ..access import load_principal
+    principal=load_principal(username)
+    return {"status": "success", "username": username,"role":principal['role']}
 
 
 @router.get("/user/check-username")

@@ -1,3 +1,4 @@
+import os
 """我的算式：保存、列表、删除、更新 + 主题标签与知识概览"""
 import asyncio
 import logging
@@ -85,7 +86,7 @@ def _infer_formula_topics(latex: str, note: str = "") -> List[Tuple[str, float]]
     """
     base_tags = _heuristic_tags(latex)
     # 未配置大模型：直接返回启发式标签
-    if not api_key:
+    if not api_key or os.getenv("AI_FORMULA_TAGGING", "0") != "1":
         return [(t, 1.0) for t in base_tags]
 
     try:
@@ -137,7 +138,7 @@ def _infer_formula_topics(latex: str, note: str = "") -> List[Tuple[str, float]]
 
 
 @router.post("/save")
-async def save_formula(data: FormulaModel, auth_session: str | None = Cookie(None)):
+def save_formula(data: FormulaModel, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != data.username:
         return JSONResponse(status_code=403, content={"status":"error","message":"无权修改其他账户的算式"})
     conn = None
@@ -245,7 +246,7 @@ async def delete_formula(id: int, username: str, auth_session: str | None = Cook
 
 
 @router.put("/update")
-async def update_formula(data: FormulaUpdateModel, auth_session: str | None = Cookie(None)):
+def update_formula(data: FormulaUpdateModel, auth_session: str | None = Cookie(None)):
     if username_for_session(auth_session) != data.username:
         return JSONResponse(status_code=403, content={"status":"error","message":"无权修改其他账户的算式"})
     conn = None

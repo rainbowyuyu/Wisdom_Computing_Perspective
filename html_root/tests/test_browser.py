@@ -1,9 +1,13 @@
 """Run with WISDOM_BROWSER_TESTS=1 and the backend/Vite servers running."""
 import json
 import os
+import subprocess
+import re
 from pathlib import Path
 
 import pytest
+from urllib.parse import urlsplit
+from test_solution_library import accounts, live_library_server
 
 pytestmark = pytest.mark.skipif(os.getenv('WISDOM_BROWSER_TESTS') != '1', reason='Requires running UI servers')
 
@@ -17,12 +21,37 @@ def browser():
         b.close()
 
 
+@pytest.fixture(scope='module')
+def chapter_video(tmp_path_factory):
+    """A deterministic seekable clip, independent of expired runtime renders."""
+    path=tmp_path_factory.mktemp('chapters')/'chapters.mp4'
+    subprocess.run(['ffmpeg','-y','-f','lavfi','-i','color=c=navy:s=320x180:r=5:d=20',
+                    '-c:v','libx264','-pix_fmt','yuv420p',str(path),'-loglevel','error'],check=True)
+    return {'type':'complete','video_url':'/videos/solution_deadbeef.mp4',
+            'chapters':[{'title':f'步骤 {i+1}','start':i*5,'end':(i+1)*5} for i in range(4)]},path.read_bytes()
+
+
+def serve_chapter(route,media):
+    requested=re.fullmatch(r'bytes=(\d+)-(\d*)',route.request.headers.get('range',''))
+    headers={'Accept-Ranges':'bytes'}
+    if requested:
+        start=int(requested[1]);end=min(int(requested[2]) if requested[2] else len(media)-1,len(media)-1)
+        headers['Content-Range']=f'bytes {start}-{end}/{len(media)}'
+        route.fulfill(status=206,content_type='video/mp4',headers=headers,body=media[start:end+1])
+    else:route.fulfill(content_type='video/mp4',headers=headers,body=media)
+
+
 @pytest.fixture(params=['http://127.0.0.1:8000/?section=calculate', 'http://127.0.0.1:5173/calculate'])
-def page(browser, request):
+def page(browser, request, live_library_server):
+    origin, (_, sessions) = live_library_server
     page = browser.new_page(viewport={'width':1440,'height':1000}, device_scale_factor=1)
+    page.context.add_cookies([{'name':'auth_session','value':sessions[0],'url':origin}])
     page.errors=[]
     page.on('pageerror', lambda error: page.errors.append(str(error)))
-    page.goto(request.param, wait_until='domcontentloaded')
+    if ':5173' in request.param:
+        page.route('**/api/**', lambda route: route.fulfill(response=route.fetch(
+            url=origin+urlsplit(route.request.url).path+('?' + urlsplit(route.request.url).query if urlsplit(route.request.url).query else ''))))
+    page.goto(request.param.replace('http://127.0.0.1:8000', origin), wait_until='domcontentloaded')
     page.wait_for_selector('.step-tutor textarea')
     yield page
     errors = page.errors
@@ -143,7 +172,7 @@ def test_graph_navigation_pause_and_remount(page):
     assert page.locator('.graph-search-results button').count() >= 1
     page.evaluate("window.showSection('calculate')")
     page.wait_for_selector('.step-tutor textarea')
-    if ':8000' in page.url:
+    if ':5173' not in page.url:
         page.wait_for_function("document.querySelector('#role-graph-3d').dataset.graphState === 'paused'")
     page.evaluate("window.showSection('home')")
     page.wait_for_selector('.graph-explorer input')
@@ -157,16 +186,14 @@ def test_graph_navigation_pause_and_remount(page):
     page.locator('.role-graph-wrap').screenshot(path=str(folder/f'{name}-graph-verified.png'))
 
 
-def test_video_chapter_contract(page):
-    result_path=Path('tests/render-result.json')
-    if not result_path.exists(): pytest.skip('Run the real render verification first')
-    # Replay a completed real render to test player controls without rerendering it.
-    rendered=json.loads(result_path.read_text())
+def test_video_chapter_contract(page,chapter_video):
+    rendered,media=chapter_video
+    page.route('**/videos/solution_deadbeef.mp4',lambda route:serve_chapter(route,media))
     page.route('**/api/solve/render', lambda route: route.fulfill(status=200,content_type='text/event-stream',body='data: '+json.dumps(rendered)+'\n\n'))
     solve(page, 'x^2-5*x+6=0')
     page.locator('[data-action=render]').click()
     page.wait_for_selector('.tutor-video video')
-    page.wait_for_function("document.querySelector('.tutor-video video').readyState >= 1")
+    page.wait_for_function("const v=document.querySelector('.tutor-video video');v.readyState>=2&&v.seekable.length&&v.seekable.end(0)>=19")
     page.locator('[data-chapter="2"]').click()
     assert page.locator('.tutor-video video').evaluate('v=>v.currentTime') >= 10
     assert page.locator('.tutor-step-count').inner_text() == '步骤 3 / 4'
@@ -174,12 +201,15 @@ def test_video_chapter_contract(page):
     page.wait_for_function('window.StepTutor.getState().index===3')
 
 
-def test_agent_skips_chat_and_serializes_two_calculation_steps(browser):
-    result_path = Path('tests/render-result.json')
-    if not result_path.exists(): pytest.skip('Run live render verification first')
+def test_agent_skips_chat_and_serializes_two_calculation_steps(browser,live_library_server,chapter_video):
     page = browser.new_page()
+    origin,(_,sessions)=live_library_server
+    page.context.add_cookies([{'name':'auth_session','value':sessions[0],'url':origin}])
+    page.route('**/api/**',lambda route:route.fulfill(response=route.fetch(
+        url=origin+urlsplit(route.request.url).path+('?' + urlsplit(route.request.url).query if urlsplit(route.request.url).query else ''))))
     calls = []
-    rendered = json.loads(result_path.read_text())
+    rendered,media=chapter_video
+    page.route('**/videos/solution_deadbeef.mp4',lambda route:serve_chapter(route,media))
     page.route('**/api/solve/render', lambda route: route.fulfill(status=200, content_type='text/event-stream', body='data: '+json.dumps(rendered)+'\n\n'))
     page.on('request', lambda request: calls.append(request.url) if request.url.endswith('/api/solve/stream') else None)
     page.goto('http://127.0.0.1:5173/calculate', wait_until='domcontentloaded')

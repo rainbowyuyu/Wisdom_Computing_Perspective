@@ -52,17 +52,17 @@
     </script>
     <!-- Driver.js (用于新手引导) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
     <!-- MathLive (用于可视化公式编辑) -->
-    <script defer src="https://unpkg.com/mathlive"></script>
+    <script async src="https://unpkg.com/mathlive"></script>
     <!-- Marked (Markdown 解析) -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Highlight.js (代码高亮) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <!-- Cropper.js (图片裁剪编辑) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
 
     <!-- 核心样式 -->
     <link rel="stylesheet" href="css/main.css?v=20260918-hero-1">
@@ -82,13 +82,14 @@
       }
     }
     </script>
-    <link rel="stylesheet" href="/static/css/pages/step-tutor.css?v=20260918-progress-1">
+    <link rel="stylesheet" href="/static/css/pages/step-tutor.css?v=20260919-teaching-2">
     <link rel="stylesheet" href="/static/css/refinements.css?v=20260918-hero-1">
     <link rel="stylesheet" href="/static/css/pages/home-background.css?v=20260918-horizontal-fade-4">
-<link rel="stylesheet" href="/static/css/pages/assistant-workspace.css">
-<link rel="stylesheet" href="/static/css/pages/teaching-workspace.css">
+<link rel="stylesheet" href="/static/css/pages/assistant-workspace.css?v=20260919-tasks-1">
+<link rel="stylesheet" href="/static/css/pages/teaching-workspace.css?v=20260919-teaching-2">
 <link rel="stylesheet" href="/static/css/pages/wrongbook.css">
 <link rel="stylesheet" href="/static/css/pages/achievement-cards.css?v=20260917-artwork-3">
+<link rel="stylesheet" href="/static/css/pages/account-access.css?v=20260919-access-1">
 </head>
 <body>
     <div class="home-page-background" aria-hidden="true"></div>
@@ -120,6 +121,7 @@
             <button class="nav-btn" onclick="openSettings()" title="系统设置"><i class="fa-solid fa-gear"></i></button>
         </div>
 
+        <div class="header-account-access mobile-account-access" data-account-header aria-live="polite"></div>
         <!-- 移动端汉堡按钮 (新增) -->
         <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
             <i class="fa-solid fa-bars"></i>
@@ -134,6 +136,7 @@
                 <span id="username-span" class="header-username"></span>
                 <i class="fa-solid fa-arrow-right-from-bracket header-logout-icon" style="cursor:pointer; margin-left:10px;" onclick="logout()" title="退出"></i>
             </span>
+            <div class="header-account-access" data-account-header aria-live="polite"></div>
         </div>
     </nav>
 
@@ -161,10 +164,10 @@
         </div>
     </div>
 
-    <!-- 顶部更新消息：v0.4.5 -->
+    <!-- 顶部更新消息：v0.4.6 -->
     <div class="agent-update-banner" id="agent-update-banner">
-        <span class="agent-update-text">新更新：首页全屏渐变、解题进度与日志阅读优化，部署和数据库升级更方便</span>
-        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志', 'update-v-0.4.5')" class="agent-update-detail" title="查看更新详情（定位到 v0.4.5）">v0.4.5 更新详情</a>
+        <span class="agent-update-text">新更新：安全性加强，使用速度加强，整体体验更加流畅</span>
+        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志', 'update-v-0.4.6')" class="agent-update-detail" title="查看更新详情（定位到 v0.4.6）">v0.4.6 更新详情</a>
         <button type="button" class="agent-update-close" onclick="closeAgentBanner()" title="关闭" aria-label="关闭"><i class="fa-solid fa-times"></i></button>
     </div>
 
@@ -738,128 +741,10 @@
         <!-- 5. 帮助 Section -->
         <section id="help" class="section">
             <h2 class="section-title">常见问题与指南</h2>
-            <div class="help-container" style="max-width:800px; margin:0 auto;">
-
-                <!-- 帮助内搜索：实时过滤下方问答 -->
-                <div class="help-search-bar">
-                    <div class="help-search-inner">
-                        <i class="fa-solid fa-magnifying-glass help-search-icon"></i>
-                        <input id="help-search-input" type="search" placeholder="在帮助中搜索，例如：智能体 / 教学案例 / 动画超时…" autocomplete="off">
-                    </div>
-                    <p class="help-search-hint">输入关键字后，将自动筛选下方问题，并展开包含该关键字的问答。</p>
-                </div>
-
-                <!-- 智能体入口 -->
-                <div class="tutorial-banner agent-help-banner" onclick="showSection('agent')">
-                    <div class="banner-icon">
-                        <i class="fa-solid fa-robot"></i>
-                    </div>
-                    <div class="banner-content">
-                        <h3>智能体</h3>
-                        <p>用自然语言描述需求，自动跳转到识别、计算或开发者工具并执行对应任务。</p>
-                    </div>
-                    <div class="banner-action">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> 去使用
-                    </div>
-                </div>
-
-                <div class="tutorial-banner" onclick="startTutorial()">
-                    <div class="banner-icon">
-                        <i class="fa-solid fa-graduation-cap"></i>
-                    </div>
-                    <div class="banner-content">
-                        <h3>新手入门指南</h3>
-                        <p>点击这里开启交互式教学，30 秒掌握核心功能。</p>
-                    </div>
-                    <div class="banner-action">
-                        <i class="fa-solid fa-circle-play"></i> 观看
-                    </div>
-                </div>
-
-                <!-- 1. 智能体与按角色快速开始 -->
-                <details open>
-                    <summary>智能体 &amp; 按角色快速开始怎么用？</summary>
-                    <p><b>智能体</b>是本站的“一句话调度”入口。你只需用自然语言描述想做的事（或上传一张公式/题目图片），系统会理解意图并自动：
-                    <br>· 跳转到【智能识别 / 动态计算 / 开发者工具 / 我的算式 / 教学案例】等页面；
-                    <br>· 预填识别到的 LaTeX 公式，或填入 Manim 代码，必要时自动点击「生成可视化动画」等按钮；
-                    <br>· 对整道题目先给出<b>文字版解题步骤</b>，再生成可视化演示。</p>
-                    <p><b>按角色快速开始</b>位于首页 Hero 下方，提供 学生 / 教师 / 内容创作者 / 开发者 四种入口：
-                    <br>· 点击「用智能体执行」：为该角色预填推荐提示词，一键唤起智能体完成整条路径（例如教师从识别→工作台→课包，创作者从脚本→成片→发布包）；
-                    <br>· 点击「观看操作流程」：不调用智能体，只通过交互式教程演示完整操作步骤，你可以跟着自己点。</p>
-                    <p>💡 顶部导航、首页卡片与帮助页 Banner 都可以直接进入智能体。</p>
-                </details>
-
-                <!-- 2. 识别与输入 -->
-                <details>
-                    <summary>系统支持哪些手写格式和数学内容？</summary>
-                    <p>目前系统针对<b>线性代数</b>进行了深度优化。
-                    <br>✅ <b>完美支持：</b> 矩阵（方阵、列向量、稀疏矩阵）、行列式、基础代数运算（加减乘除）、微积分符号（积分、极限）等。
-                    <br>💡 <b>建议：</b> 书写时请尽量保持字符间距，避免连笔；使用黑色或深蓝色墨水在白纸上书写效果最佳。</p>
-                </details>
-
-                <details>
-                    <summary>识别结果不准确怎么办？</summary>
-                    <p>AI 识别可能受光线、角度或字迹潦草程度影响。如果识别有误，您无需重新上传，可以直接使用我们内置的<b>双向编辑功能</b>：
-                    <br>1. <b>可视化修改：</b> 直接点击“识别结果”区域的公式，像在 Word 中一样修改数字。
-                    <br>2. <b>代码修改：</b> 点击右上角的“查看源码”，直接修改 LaTeX 代码，结果会实时同步。</p>
-                </details>
-
-                <details>
-                    <summary>上传图片有什么要求？</summary>
-                    <p>支持 JPG, PNG 格式。建议图片清晰、光线均匀、无阴影遮挡。尽量让公式位于图片中心，且背景干净（避免复杂的格纹或背景图案干扰 AI 识别）。</p>
-                </details>
-
-                <!-- 3. 计算与动画 -->
-                <details>
-                    <summary>生成的动画超时或报错怎么办？</summary>
-                    <p>通常是因为<b>数学逻辑</b>或<b>代码结构</b>有问题。建议：
-                    <br>1. <b>检查矩阵维度：</b> 矩阵乘法 A×B 时，A 的列数必须等于 B 的行数；行列式只对方阵有效。
-                    <br>2. <b>简化算式：</b> 目前单次渲染最长约 300 秒，若算式特别复杂或嵌套过深，建议先拆成多个步骤；通用计算模式会自动拆成「计算 + 可视化」两个视频，容错率更高。
-                    <br>3. <b>利用自动修正：</b> 对智能体生成的 Manim 代码，系统会在渲染失败时自动把错误日志发给大模型进行一次修正并重试；若仍失败，可在【开发者工具】中手动调整后重新运行。</p>
-                </details>
-
-                <details>
-                    <summary>渲染动画需要多久？生成的视频可以下载吗？</summary>
-                    <p>简单通用算法通常在 <b>30-50 秒</b>内完成。复杂的算法如复杂的微积分矩阵的推演和可视化可能需要 <b>100-150 秒</b>，如果超过 <b>300秒</b> 由于服务器算力限制暂时会判定为超时，请简化算式或稍后再试。
-                    <br>动画生成后，您可以点击视频播放器右下角的“三个点”图标选择<b>“下载”</b>，或右键点击视频选择“视频另存为”，将其保存到本地用于PPT演示或教学。</p>
-                </details>
-
-                <!-- 4. 我的算式、教学案例、课件包 -->
-                <details>
-                    <summary>“我的算式”“教学案例”“我的课件”分别做什么？</summary>
-                    <p><b>我的算式</b>是你的云端公式笔记本：
-                    <br>· 在识别或编辑完公式后点击「保存并查看」，公式会保存到这里；
-                    <br>· 在「动态计算」页点击<b>导入</b>即可从库中一键填入公式。</p>
-                    <p><b>教学案例</b>是可反复观看的动画视频库，提供：
-                    <br>· 收藏 / 稍后看 / 标签筛选；
-                    <br>· 时间戳笔记与「从 x:xx 继续观看」的复习推荐；
-                    <br>· 一键复制直达链接（可带时间点），方便分享。</p>
-                    <p><b>我的课件</b>面向教师：
-                    <br>· 在教学案例播放页点击「加入课件包」，系统会为你自动创建「我的课件包」；
-                    <br>· 在案例筛选栏选择「我的课件」，即可看到课包内的所有视频；
-                    <br>· 你也可以通过「创建课包」弹窗跟随手动流程完成：识别公式 → 工作台生成动画 → 加入课件包。</p>
-                </details>
-
-                <details>
-                    <summary>关于数据隐私与安全</summary>
-                    <p>我们非常重视您的隐私。
-                    <br>1. 您上传的用于识别的图片<b>不会</b>被永久存储，处理完成后会定期清除。
-                    <br>2. 您保存到“我的算式”中的公式数据存储在加密数据库中，仅您自己可见。</p>
-                </details>
-
-                <details>
-                    <summary>是否收费？</summary>
-                    <p><b>智算视界 (Wisdom Computing Perspective)</b> 目前是一个开源教育驱动的项目。基础功能（OCR 识别、标准清晰度 Manim 渲染、云端存储）对所有注册用户目前是<b>免费</b>的。</p>
-                </details>
-
-                <!-- 底部联系方式 -->
-                <div style="margin-top: 3rem; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
-                    <p>没找到您需要的答案？</p>
-                    <p>欢迎发送邮件至 <a href="mailto:rainbowyu619@gmail.com" target="_blank" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">rainbowyu619@gmail.com</a> 联系技术团队。</p>
-                </div>
-            </div>
+            <div class="help-container" style="max-width:880px; margin:0 auto;"><p role="status">正在加载帮助…</p></div>
         </section>
 
+        <section id="admin" class="section"><div data-admin-host></div></section>
     </main>
 
     <!-- 登录/注册 模态框 -->
@@ -1860,12 +1745,10 @@
     </div>
 
     <!-- HLS.js：MSE 流媒体播放（.m3u8），与原生 MP4 并存 -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" crossorigin="anonymous"></script>
     <!-- Three.js + 3d-force-graph（UMD 单实例）process polyfill 解决浏览器中 process 未定义 -->
     <script>window.process = { env: { NODE_ENV: 'production' } };</script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.79.1/dist/3d-force-graph.min.js"></script>
     <!-- 模块化 JS 入口 -->
-    <script type="module" src="/static/js/main.js?v=20260918-release-045"></script>
+    <script type="module" src="/static/js/main.js?v=20260918-adaptive-1"></script>
 </body>
 </html>

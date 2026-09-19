@@ -24,6 +24,10 @@ def test_fresh_sql_and_repeatable_migrations_preserve_legacy(monkeypatch):
         cursor.execute("INSERT INTO users(username,hashed_password) VALUES('schema_test','not-a-login-hash')")
         cursor.execute("INSERT INTO user_wrongbook(user_id,video_id,title,time_sec,note) VALUES('schema_test','example','旧题',4,'原始笔记')")
         admin.commit()
+        # The standalone installer now records completed migrations itself.
+        # Re-import it to migrate legacy rows added after the first installation.
+        from test_baota_upgrade import run_installer
+        assert run_installer(cursor)['upgrade_status'] == 'OK'
         monkeypatch.setattr(database,'get_db_connection',lambda:mysql.connector.connect(**options,database=name))
         database.apply_migrations();database.apply_migrations()
         admin.commit()  # End the old transaction before observing migration writes.

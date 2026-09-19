@@ -3,7 +3,7 @@ import { escapeText as esc, visualMarkup } from './solution-visual.js';
 
 export function solutionMarkdown(record) {
     const {problem}=record;const solution=normalizeSolution(record.solution);
-    return `# ${solution.title}\n\n题目：${normalizeMathText(problem)}\n\n${solution.steps.map((s,i)=>`## ${i+1}. ${s.title}\n\n${normalizeMathText(s.explanation)}\n\n${s.formula?`$$\n${s.formula}\n$$`:''}${s.hint?`\n\n提示：${normalizeMathText(s.hint)}`:''}`).join('\n\n')}\n\n${normalizeMathText(solution.summary)}\n\n${solution.verification}\n${record.video?`\n动画：${new URL(record.video.url,location.origin).href}\n`:''}`;
+    return `# ${solution.title}\n\n题目：${normalizeMathText(problem)}\n\n${solution.task_goal?'本次子目标：'+normalizeMathText(solution.task_goal)+'\n\n':''}${solution.steps.map((s,i)=>`## ${i+1}. ${s.title}\n\n${normalizeMathText(s.explanation)}\n\n${s.formula?`$$\n${s.formula}\n$$`:''}${s.hint?`\n\n提示：${normalizeMathText(s.hint)}`:''}`).join('\n\n')}\n\n${normalizeMathText(solution.summary)}\n\n${solution.verification}\n${record.video?`\n动画：${new URL(record.video.url,location.origin).href}\n`:''}`;
 }
 
 export function exportSolution(record) {
@@ -40,6 +40,17 @@ export function openSolutionRecord(record) {
       ${record.video?'<video class="reader-video" controls playsinline preload="metadata"></video>':''}</div>
       <footer class="reader-footer"><p role="status">${record.id?'已保存至账户，可随时回来阅读':'课包中收录的题解快照'}</p><div><button type="button" data-reader="copy">复制解答</button><button type="button" data-reader="wrongbook">加入错题本</button><button type="button" data-reader="pack">加入课包</button><button type="button" data-reader="export">导出笔记</button><button type="button" class="reader-primary" data-reader="open">继续探索 <i class="fa-solid fa-arrow-up-right-from-square"></i></button></div></footer>`;
     let current=0;
+    if(record.solution.task_goal&&!record.id){
+        dialog.querySelector('.reader-header .reader-kicker').textContent='智能体 · 子任务题解';
+        dialog.querySelector('.reader-footer [role=status]').textContent='本次仅解答所列子目标；可保存到我的算式或继续探索。';
+        const save=document.createElement('button');save.type='button';save.dataset.reader='save';save.textContent='保存到我的算式';
+        dialog.querySelector('.reader-footer>div').prepend(save);
+    }
+    if(record.solution.source==='curriculum'&&!record.id){
+        dialog.setAttribute('aria-label','阅读典型例题');
+        dialog.querySelector('.reader-header .reader-kicker').textContent='教学案例 · 典型例题';
+        dialog.querySelector('.reader-footer [role=status]').textContent='本站典型题解；继续探索可生成动画或保存到我的算式。';
+    }
     function select(index,seek=true) {
         current=index;const step=record.solution.steps[index];
         const article=dialog.querySelector('.reader-step');
@@ -52,7 +63,7 @@ export function openSolutionRecord(record) {
     textWithMath(dialog.querySelector('.reader-header h3'),record.solution.title);
     textWithMath(dialog.querySelector('.reader-conclusion p'),record.solution.summary);
     textWithMath(dialog.querySelector('.reader-conclusion small'),record.solution.verification);
-    textWithMath(dialog.querySelector('.reader-problem'),record.problem);
+    textWithMath(dialog.querySelector('.reader-problem'),record.problem+(record.context?'\n\n补充条件：'+record.context:'')+(record.solution.task_goal?'\n\n本次子目标：'+record.solution.task_goal:''));
     dialog.querySelectorAll('[data-reader-step]').forEach((el,i)=>textWithMath(el,`${i+1}. ${record.solution.steps[i].title}`));
     const video=dialog.querySelector('video');
     if(video){video.src=record.video.url;video.addEventListener('timeupdate',()=>{const index=record.video.chapters.findIndex(c=>video.currentTime>=c.start&&video.currentTime<c.end);if(index>=0&&index!==current)select(index,false);});}
@@ -63,6 +74,15 @@ export function openSolutionRecord(record) {
         if(button.dataset.readerStep!=null){select(Number(button.dataset.readerStep));return;}
         const action=button.dataset.reader;
         if(action==='close')dialog.close();
+        if(action==='save'){
+            if(button.disabled)return;button.disabled=true;
+            try{
+                const saved=await libraryRequest('',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
+                record.id=saved.id;record.username=saved.username;button.textContent='已保存';
+                dialog.querySelector('[role=status]').textContent='已保存到我的算式';
+                window.dispatchEvent(new CustomEvent('formula-library-updated'));
+            }catch(error){button.disabled=false;dialog.querySelector('[role=status]').textContent=error.message;}
+        }
         if(action==='pack'){dialog.close();const C=await import('./course-packs.js');C.chooseCourseMaterial({kind:'solution',source_id:record.id||null,snapshot:{title:record.solution.title,problem:record.problem,answer:record.solution.summary,solution:record}});}
         if(action==='export')exportSolution(record);
         if(action==='wrongbook'){dialog.close();const W=await import('./wrongbook.js');W.editWrongbook({source_type:'solution',formula_id:record.id,snapshot:record,problem:record.problem,title:record.solution.title,answer:record.solution.summary});}

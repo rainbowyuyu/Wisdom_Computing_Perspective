@@ -1,3 +1,4 @@
+import { mountTaskProgress } from '/static/js/task-progress.js';
 /**
  * 智算星云 - 全局浮动面板
  * 统计性与功能性并存，每页展示相关用户统计与快捷入口
@@ -25,51 +26,28 @@ function getCurrentUser() {
 }
 
 /** 获取用户相关统计数据（供各页星云展示） */
+let statsCache=null,statsPending=null,statsEpoch=0;
+function invalidateStats(){statsEpoch++;statsCache=null;statsPending=null;}
+window.addEventListener('auth-state-change',invalidateStats);
+for(const type of ['wrongbook-updated','course-packs-updated','formula-library-updated','formula-library-deleted'])window.addEventListener(type,invalidateStats);
 async function fetchUserStats() {
-    const user = getCurrentUser();
-    const stats = {
-        formulas: 0,
-        scripts: 0,
-        templates: 0,
-        wrongbook: 0,
-        tutorialDone: !!localStorage.getItem('tutorial_played')
-    };
-    if (user) {
-        try {
-            const [formulasRes, scriptsRes, templatesRes] = await Promise.all([
-                fetch(`/api/formulas/list?username=${encodeURIComponent(user)}`).catch(() => null),
-                fetch(`/api/animation_scripts/list?username=${encodeURIComponent(user)}`).catch(() => null),
-                fetch(`/api/agent_templates/list?username=${encodeURIComponent(user)}`).catch(() => null)
-            ]);
-            if (formulasRes) {
-                const d = await formulasRes.json();
-                if (d.status === 'success' && Array.isArray(d.data)) stats.formulas = d.data.length;
-            }
-            if (scriptsRes) {
-                const d = await scriptsRes.json();
-                if (d.status === 'success' && Array.isArray(d.data)) stats.scripts = d.data.length;
-            }
-            if (templatesRes) {
-                const td = await templatesRes.json();
-                if (td.status === 'success' && Array.isArray(td.data)) stats.templates = td.data.length;
-            }
-        } catch (_) {}
-    }
-    if (user) {
-        try {
-            const wr = await fetch(`/api/wrongbook/list?username=${encodeURIComponent(user)}`, { credentials: 'include' }).catch(() => null);
-            if (wr) {
-                const wd = await wr.json();
-                if (wd.status === 'success' && Array.isArray(wd.data)) stats.wrongbook = wd.stats?.total ?? wd.total ?? wd.data.length;
-            }
-        } catch (_) {}
-    } else {
-        try {
-            const w = JSON.parse(localStorage.getItem(WRONGBOOK_STORAGE_KEY) || '[]');
-            stats.wrongbook = Array.isArray(w) ? w.length : 0;
-        } catch (_) {}
-    }
-    return stats;
+    const user=getCurrentUser();
+    const stats={formulas:0,scripts:0,templates:0,wrongbook:0,tutorialDone:!!localStorage.getItem('tutorial_played')};
+    if(!user){try{const rows=JSON.parse(localStorage.getItem(WRONGBOOK_STORAGE_KEY)||'[]');stats.wrongbook=Array.isArray(rows)?rows.length:0;}catch{}return stats;}
+    if(statsCache?.user===user&&Date.now()-statsCache.at<30000)return {...stats,...statsCache.data};
+    if(statsPending?.user===user)return statsPending.promise;
+    const version=statsEpoch;
+    const promise=(async()=>{
+        try{
+            const response=await fetch('/api/user/stats',{credentials:'include',signal:AbortSignal.timeout(10000)});
+            const data=await response.json();
+            if(!response.ok||data.status!=='success')throw new Error('统计暂不可用');
+            if(version===statsEpoch)statsCache={user,at:Date.now(),data:data.data};
+            return {...stats,...data.data};
+        }catch{return stats;}
+        finally{if(version===statsEpoch)statsPending=null;}
+    })();
+    statsPending={user,promise};return promise;
 }
 
 /** 成就式进度条（条状图） */
@@ -351,65 +329,93 @@ function escapeHtml(s) {
 function getActiveDevtool() {
     const btn = document.querySelector('#devtools .tab-btn.active');
     if (!btn) return null;
+    if (btn.dataset.tool) return btn.dataset.tool;
     const m = String(btn.getAttribute('onclick') || '').match(/switchDevTool\s*\(\s*['"](\w+)['"]\s*\)/);
     return m ? m[1] : null;
 }
 
-/** 将当前站点滚动到地铁导航最中央 */
+/** 用视口坐标定位；收起、展开及窗口缩放后仍能正确居中。 */
 function centerMetroCurrent(metroWrap) {
-    const line = metroWrap.querySelector('.knowledge-metro-line');
-    const current = metroWrap.querySelector('.knowledge-metro-station.current');
-    if (!line || !current) return;
-    const doCenter = () => {
-        const track = line.querySelector('.knowledge-metro-track');
-        if (!track || track.scrollWidth <= line.clientWidth) return;
-        const currCenter = current.offsetLeft + current.offsetWidth / 2;
-        const targetScroll = Math.max(0, currCenter - line.clientWidth / 2);
-        line.scrollTo({ left: targetScroll, behavior: 'smooth' });
-    };
-    requestAnimationFrame(() => requestAnimationFrame(doCenter));
+    requestAnimationFrame(() => {
+        const line = metroWrap.querySelector('.knowledge-metro-line');
+        const current = line?.querySelector('.knowledge-metro-station.current');
+        if (!line?.isConnected || !line.clientWidth || !current) return;
+        const target = line.scrollLeft + current.getBoundingClientRect().left
+            + current.offsetWidth / 2 - line.getBoundingClientRect().left - line.clientWidth / 2;
+        line.scrollTo({ left: Math.max(0, target), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    });
 }
 
-/** 地铁式横向导航：prev — [当前] — next */
-let selectedMetroNode=null;
-window.addEventListener('graph-station-selected',({detail})=>{
-    selectedMetroNode=getNodeById(detail.nodeId);
-    const wrap=document.getElementById('knowledge-panel-metro');if(!wrap||!selectedMetroNode)return;
-    wrap.querySelectorAll('.knowledge-metro-station').forEach(button=>{
-        const active=button.dataset.nodeId===detail.nodeId;
-        button.classList.toggle('current',active);
-        if(active)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
-    });
-    const pill=wrap.querySelector('.knowledge-metro-current-pill');
-    if(pill)pill.innerHTML='<i class="fa-solid fa-location-dot"></i> 当前站：'+escapeHtml(selectedMetroNode.name);
-    centerMetroCurrent(wrap);
+let selectedMetroNode = null;
+let metroResizeObserver;
+window.addEventListener('nebula-panel-toggle', ({ detail }) => {
+    if (detail?.collapsed !== false) return;
+    const wrap = document.getElementById('knowledge-panel-metro');
+    if (wrap) centerMetroCurrent(wrap);
 });
+window.addEventListener('graph-station-selected', ({ detail }) => {
+    const node = getNodeById(detail?.nodeId);
+    // Ignore missing nodes and late navigation results from another page/tab.
+    if (!node || node.section !== currentPanelSection) return;
+    if (node.section === 'devtools' && node.devtool && node.devtool !== getActiveDevtool()) return;
+    selectedMetroNode = node;
+    refreshMetroNav(currentPanelSection);
+});
+
 function renderMetroNav(sectionId) {
     const devtool = sectionId === 'devtools' ? getActiveDevtool() : null;
-    const path = getMetroPathForSection(sectionId, devtool);
-    if(selectedMetroNode?.section!==sectionId)selectedMetroNode=null;
-    if(selectedMetroNode&&path.some(node=>node.id===selectedMetroNode.id))path.forEach(node=>node.current=node.id===selectedMetroNode.id);
-    if (!path || path.length === 0) return { html: '', hasNav: false };
-    const currentNode = path.find((n) => n.current) || path[path.length - 1];
-    const currentName = currentNode ? escapeHtml(currentNode.name) : '';
-    const items = path.map((n) => {
-        const node = getNodeById(n.id);
-        const icon = node && node.icon ? node.icon : 'fa-solid fa-circle-dot';
-        const isCurrent = !!n.current;
-        const sec = escapeHtml(n.section || '');
-        const dev = escapeHtml(n.devtool || '');
-        const nodeId = escapeHtml(n.id || '');
-        return `<button type="button" class="knowledge-metro-station ${isCurrent ? 'current' : ''}" ${isCurrent?'aria-current="step"':''} data-section="${sec}" data-devtool="${dev}" data-node-id="${nodeId}"><span class="knowledge-metro-dot"></span><span class="knowledge-metro-label">${escapeHtml(n.name)}</span></button>`;
-    });
-    const html = `
-        <div class="knowledge-metro-current">
-            <span class="knowledge-metro-current-pill">
-                <i class="fa-solid fa-location-dot"></i>
-                当前站：${currentName || '未知位置'}
-            </span>
-        </div>
-        <div class="knowledge-metro-line"><div class="knowledge-metro-track">${items.join('<span class="knowledge-metro-connector"></span>')}</div></div>`;
-    return { html, hasNav: true };
+    if (selectedMetroNode?.section !== sectionId || (devtool && selectedMetroNode?.devtool !== devtool)) selectedMetroNode = null;
+    const path = getMetroPathForSection(sectionId, devtool, selectedMetroNode?.id);
+    const current = path.find(n => n.current);
+    if (!current) return { html: '', hasNav: false };
+    const station = n => `<button type="button" class="knowledge-metro-station ${n.current ? 'current' : ''}"
+        ${n.current ? 'aria-current="step"' : ''} data-node-id="${escapeHtml(n.id)}" data-relation="${n.relation}">
+        <span class="knowledge-metro-dot" aria-hidden="true"></span><span class="knowledge-metro-label">${escapeHtml(n.name)}</span></button>`;
+    const group = (relation, label) => {
+        const nodes = path.filter(n => n.relation === relation);
+        return `<div class="knowledge-metro-branch" role="group" aria-label="${label}">
+            <span class="knowledge-metro-caption">${label}${nodes.length ? ' · ' + nodes.length : ''}</span>
+            <div class="knowledge-metro-options">${nodes.length ? nodes.map(station).join('') : '<span class="knowledge-metro-empty">暂无连接</span>'}</div></div>`;
+    };
+    const connector = '<span class="knowledge-metro-connector" aria-hidden="true">→</span>';
+    return { hasNav: true, html: `
+        <div class="knowledge-metro-current"><span class="knowledge-metro-current-pill">
+            <i class="fa-solid fa-location-dot" aria-hidden="true"></i> 当前站：${escapeHtml(current.name)}</span></div>
+        <div class="knowledge-metro-line" aria-label="知识图谱连接导航">
+            <div class="knowledge-metro-track">${group('incoming', '前序入口')}${connector}${station(current)}${connector}${group('outgoing', '后续去向')}</div>
+        </div>` };
+}
+
+function refreshMetroNav(sectionId) {
+    const wrap = document.getElementById('knowledge-panel-metro');
+    if (!wrap) return;
+    const result = renderMetroNav(sectionId);
+    metroResizeObserver?.disconnect();
+    const hadFocus = wrap.contains(document.activeElement);
+    wrap.innerHTML = result.html;
+    wrap.style.display = result.hasNav ? '' : 'none';
+    wrap.onclick = e => {
+        const btn = e.target.closest('.knowledge-metro-station');
+        if (!btn || !wrap.contains(btn)) return;
+        e.stopPropagation();
+        const node = getNodeById(btn.dataset.nodeId);
+        if (node) void executeNodeAction(node, { skipFocus: true });
+    };
+    const line = wrap.querySelector('.knowledge-metro-line');
+    if (!line) return;
+    // Wheel scrolling is scoped to the rail; touch/trackpad and keyboard remain native.
+    line.addEventListener('wheel', e => {
+        if (e.ctrlKey || e.shiftKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+        const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? line.clientWidth : 1);
+        const next = Math.max(0, Math.min(line.scrollWidth - line.clientWidth, line.scrollLeft + delta));
+        if (Math.abs(next - line.scrollLeft) < 1) return;
+        e.preventDefault();
+        line.scrollLeft = next;
+    }, { passive: false });
+    if (hadFocus) line.querySelector('[aria-current="step"]')?.focus({ preventScroll: true });
+    metroResizeObserver = new ResizeObserver(() => centerMetroCurrent(wrap));
+    metroResizeObserver.observe(line);
+    centerMetroCurrent(wrap);
 }
 
 /** 旧版简单统计行（兼容） */
@@ -432,6 +438,11 @@ function renderStatsRow(items) {
 const MILESTONE = 20;
 
 const SECTION_CONFIG = {
+    admin: {
+        title: '账户管理',
+        subtitle: '用户权限与使用额度',
+        body: `<div class="knowledge-panel-tips"><p>在管理页搜索用户，调整 VIP、每日额度或账户状态。保存后，新的权限会用于后续请求。</p><p>个人额度留空时跟随默认值，管理记录可追溯最近的调整。</p><button type="button" class="knowledge-shortcut-btn full" onclick="showSection('home'); event.stopPropagation();"><i class="fa-solid fa-house"></i> 返回首页</button></div>`
+    },
     home: {
         title: '智算星云',
         subtitle: '成就与快捷入口',
@@ -590,35 +601,7 @@ export async function refreshKnowledgePanel(sectionId) {
     titleEl.textContent = config.title;
     subtitleEl.textContent = config.subtitle;
 
-    const metroEl = document.getElementById('knowledge-panel-metro');
-    const metroResult = renderMetroNav(sectionId);
-    if (metroEl) {
-        if (metroResult.hasNav) {
-            metroEl.innerHTML = metroResult.html;
-            metroEl.style.display = '';
-            metroEl.querySelectorAll('.knowledge-metro-station').forEach((btn) => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const nodeId = btn.dataset.nodeId;
-                    if (nodeId) {
-                        const node = getNodeById(nodeId);
-                        if (node) {
-                            executeNodeAction(node, { skipFocus: true });
-                            return;
-                        }
-                    }
-                    const sec = btn.dataset.section;
-                    const dev = btn.dataset.devtool;
-                    if (sec && typeof window.showSection === 'function') window.showSection(sec);
-                    if (sec === 'devtools' && dev && typeof window.switchDevTool === 'function') setTimeout(() => window.switchDevTool(dev), 100);
-                });
-            });
-            centerMetroCurrent(metroEl);
-        } else {
-            metroEl.innerHTML = '';
-            metroEl.style.display = 'none';
-        }
-    }
+    refreshMetroNav(sectionId);
 
     if (config.body === 'dynamic') {
         dynamicEl.style.display = '';
@@ -668,83 +651,7 @@ export async function refreshKnowledgePanel(sectionId) {
 
 /** 星云内渲染进度：展开态显示进度条，折叠态小球水面填满 + 「渲染中」 */
 export function initRenderProgressInNebula() {
-    const panel = document.getElementById('knowledge-panel');
-    const content = document.getElementById('knowledge-panel-content');
-    const bubble = document.getElementById('knowledge-panel-bubble');
-    const bubbleLogo = panel?.querySelector('.knowledge-bubble-logo');
-    const bubbleRenderWrap = document.getElementById('knowledge-bubble-render-wrap');
-    const bubbleWater = document.getElementById('knowledge-bubble-water');
-    const bubblePct = document.getElementById('knowledge-bubble-render-pct');
-    const renderBlock = document.getElementById('knowledge-panel-render-progress');
-    const renderSource = document.getElementById('knowledge-render-source');
-    const renderPercent = document.getElementById('knowledge-render-percent');
-    const renderBar = document.getElementById('knowledge-render-bar');
-
-    if (!panel || !content || !bubble || !bubbleLogo || !bubbleRenderWrap || !renderBlock) return;
-
-    const SOURCE_LABELS = { calculate: '动态计算', devtools: '开发者工具' };
-
-    function updateExpanded(source, progress, isIndeterminate) {
-        if (!renderSource || !renderPercent || !renderBar) return;
-        if (source) renderSource.textContent = SOURCE_LABELS[source] || source;
-        if (isIndeterminate) {
-            renderPercent.textContent = '…';
-            renderBar.style.width = '0%';
-            renderBlock?.classList.add('is-indeterminate');
-        } else if (progress != null && progress >= 0) {
-            renderPercent.textContent = progress.toFixed(1) + '%';
-            renderBar.style.width = progress + '%';
-            renderBlock?.classList.remove('is-indeterminate');
-        }
-    }
-
-    function updateCollapsed(source, progress, isIndeterminate) {
-        if (!bubbleWater || !bubblePct) return;
-        if (isIndeterminate) {
-            bubbleWater.style.height = '50%';
-            bubbleWater.classList.add('is-indeterminate');
-            bubblePct.textContent = '';
-        } else {
-            bubbleWater.style.height = (progress || 0) + '%';
-            bubbleWater.classList.remove('is-indeterminate');
-            bubblePct.textContent = (progress != null && progress >= 0) ? progress.toFixed(0) + '%' : '';
-        }
-    }
-
-    function showRenderUI(source, progress, isIndeterminate) {
-        renderBlock.style.display = '';
-        bubbleLogo.style.display = 'none';
-        bubbleRenderWrap.style.display = 'flex';
-        updateExpanded(source, progress, isIndeterminate);
-        updateCollapsed(source, progress, isIndeterminate);
-    }
-
-    function hideRenderUI() {
-        renderBlock.style.display = 'none';
-        bubbleLogo.style.display = '';
-        bubbleRenderWrap.style.display = 'none';
-        if (bubbleWater) {
-            bubbleWater.style.height = '0%';
-            bubbleWater.classList.remove('is-indeterminate');
-        }
-    }
-
-    window.addEventListener('render-start', (e) => {
-        const source = e.detail?.source || 'calculate';
-        const isIndeterminate = source === 'devtools';
-        showRenderUI(source, 0, isIndeterminate);
-    });
-
-    window.addEventListener('render-progress', (e) => {
-        const { source, progress } = e.detail || {};
-        const isIndeterminate = source === 'devtools';
-        updateExpanded(source, progress, isIndeterminate);
-        updateCollapsed(source, progress, isIndeterminate);
-    });
-
-    window.addEventListener('render-end', () => {
-        hideRenderUI();
-    });
+    mountTaskProgress();
 }
 
 /** 成就轮播：多成就时定时横向滚动 */

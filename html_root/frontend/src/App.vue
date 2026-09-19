@@ -39,6 +39,7 @@
         </button>
       </div>
 
+      <div class="header-account-access mobile-account-access" data-account-header aria-live="polite"></div>
       <!-- 移动端汉堡按钮 -->
       <button class="mobile-menu-btn" @click="toggleMobileMenu">
         <i class="fa-solid fa-bars"></i>
@@ -83,6 +84,7 @@
             title="退出"
           ></i>
         </span>
+        <div class="header-account-access" data-account-header aria-live="polite"></div>
       </div>
     </nav>
 
@@ -108,25 +110,26 @@
         </div>
 
         <div class="mobile-auth-section">
-          <button class="login-btn full-width" @click="() => { openAuthModal(); toggleMobileMenu(); }">
+          <div v-if="isLoggedIn" class="mobile-account-identity"><strong>{{ username }}</strong><button @click="logout">退出登录</button></div>
+          <button v-else class="login-btn full-width" @click="() => { openAuthModal(); toggleMobileMenu(); }">
             登录 / 注册
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 顶部更新消息：v0.4.5 -->
+    <!-- 顶部更新消息：v0.4.6 -->
     <div class="agent-update-banner" id="agent-update-banner" v-show="showAgentBanner">
       <span class="agent-update-text">
-        新更新：首页全屏渐变、解题进度与日志阅读优化，部署和数据库升级更方便
+        新更新：安全性加强，使用速度加强，整体体验更加流畅
       </span>
       <a
         href="javascript:void(0)"
         class="agent-update-detail"
-        title="查看更新详情（定位到 v0.4.5）"
+        title="查看更新详情（定位到 v0.4.6）"
         @click="openUpdateDoc"
       >
-        v0.4.5 更新详情
+        v0.4.6 更新详情
       </a>
       <button
         type="button"
@@ -172,7 +175,8 @@ type SectionId =
   | "calculate"
   | "examples"
   | "devtools"
-  | "help";
+  | "help"
+  | "admin";
 
 const navToPath: Record<SectionId, string> = {
   home: "/",
@@ -182,6 +186,7 @@ const navToPath: Record<SectionId, string> = {
   calculate: "/calculate",
   examples: "/examples",
   devtools: "/devtools",
+  admin: "/admin",
   help: "/help"
 };
 
@@ -205,7 +210,7 @@ const username = ref("");
 const userAvatar = ref("");
 
 const mobileMenuVisible = ref(false);
-const showAgentBanner = ref(localStorage.getItem("wisdom.release.dismissed")!=="0.4.5");
+const showAgentBanner = ref(localStorage.getItem("wisdom.release.dismissed")!=="0.4.6");
 
 const navItems = [
   { id: "home", label: "首页" },
@@ -232,8 +237,16 @@ function toggleMobileMenu() {
   mobileMenuVisible.value = !mobileMenuVisible.value;
 }
 
-function openSettings(section?: string) {
-  console.log("openSettings", section);
+async function openSettings(section?: string) {
+  mobileMenuVisible.value = false;
+  const url = '/static/js/settings-shell.js';
+  try {
+    const settings = await import(/* @vite-ignore */ url);
+    return await settings.openSettings(section);
+  } catch {
+    (window as any).showToast?.('设置暂时无法打开，请刷新后重试', 'error');
+    return false;
+  }
 }
 
 function openAuthModal() {
@@ -247,11 +260,11 @@ async function logout() {
 
 function closeAgentBanner() {
   showAgentBanner.value = false;
-  localStorage.setItem("wisdom.release.dismissed","0.4.5");
+  localStorage.setItem("wisdom.release.dismissed","0.4.6");
 }
 
 function openUpdateDoc() {
-  (window as any).openDoc?.("update.md","更新日志","update-v-0.4.5");
+  (window as any).openDoc?.("update.md","更新日志","update-v-0.4.6");
 }
 
 function scrollToSelector(selector: string) {
@@ -261,14 +274,17 @@ function scrollToSelector(selector: string) {
   }
 }
 
-function startTutorial() {
-  console.log("start tutorial");
+async function startTutorial() {
+  const url = '/static/js/site-tour.js';
+  try { const tour = await import(/* @vite-ignore */ url);await tour.startSiteTour(); }
+  catch { (window as any).showToast?.('入门引导暂时无法加载，请重试', 'error'); }
 }
 
 let disposeSiteSearch: (() => void) | undefined;
 let appDisposed=false;
 onUnmounted(()=>{appDisposed=true;disposeSiteSearch?.();});
 onMounted(() => {
+  (window as any).startTutorial = startTutorial;
   const searchUrl='/static/js/site-search.js';
   import(/* @vite-ignore */ searchUrl).then(module=>{if(!appDisposed)disposeSiteSearch=module.initNavSearch();}).catch(()=>{});
   (window as any).toggleAuthModal=(show:boolean)=>{if(show)openAuthModal();};

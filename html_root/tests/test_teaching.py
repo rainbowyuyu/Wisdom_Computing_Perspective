@@ -71,9 +71,12 @@ def test_danmaku_broadcast_persistence_and_resume(accounts):
 
 
 @pytest.mark.parametrize('prompt,expected',[('打开教案',{'examples_action':'lesson'}),('创建课包',{'examples_action':'create_pack'}),('打开我的课件',{'examples_filter':'courseware'}),('打开播放器弹幕',{'examples_action':'danmaku'})])
-def test_agent_teaching_routes_without_model(prompt,expected):
+def test_agent_teaching_routes_without_model(prompt,expected,accounts):
     with TestClient(app) as c:
-        step=c.post('/api/agent/execute',json={'prompt':prompt}).json()['steps'][0]
+        c.cookies.set('auth_session',accounts[1][0])
+        response=c.post('/api/agent/execute',json={'prompt':prompt})
+        assert response.status_code==200,response.text
+        step=response.json()['steps'][0]
         assert step['section']=='examples'
         for key,value in expected.items():assert step[key]==value
 
