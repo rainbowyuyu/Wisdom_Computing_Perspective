@@ -23,7 +23,7 @@
             <i class="fa-brands fa-github" />
           </a>
           <a
-            href="https://www.bilibili.com/video/BV1n3dGYJEEJ/"
+            href="https://www.bilibili.com/video/BV1sxeS6MEWE/?vd_source=947c20a2be9c3b661ee26e445f2291d8"
             target="_blank"
             class="social-link"
             title="Bilibili"

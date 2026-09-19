@@ -21,7 +21,7 @@ from logic.solution_engine import local_solution
 @pytest.fixture(autouse=True)
 def fake_access(monkeypatch):
     monkeypatch.setattr('app.request_records.journal.put',lambda *args:False)
-    monkeypatch.setattr('app.access.load_principal',lambda user:{'id':1,'username':user,'role':'member','disabled':False,'daily_limit':40})
+    monkeypatch.setattr('app.access.load_principal',lambda user:{'id':1,'username':user,'role':'member','disabled':False,'daily_limit':40,'email_verified':True})
     monkeypatch.setattr('app.access.consume',lambda *args,**kwargs:None)
 
 

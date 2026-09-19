@@ -22,7 +22,7 @@ def ledger(tmp_path,monkeypatch):
     monkeypatch.setattr('app.request_records.journal.put',lambda *args:False)
     ledger=guard.UsageLedger(tmp_path/'quota.db')
     monkeypatch.setattr(guard,'ledger',ledger);monkeypatch.setattr('app.request_guard.ledger',ledger)
-    monkeypatch.setattr(access,'load_principal',lambda user:{'id':1,'role':'member','username':user})
+    monkeypatch.setattr(access,'load_principal',lambda user:{'id':1,'role':'member','username':user,'email_verified':True})
     monkeypatch.setattr(access,'consume',lambda *args,**kwargs:None)
     monkeypatch.setenv('AI_CALLS_PER_MINUTE','100');monkeypatch.setenv('API_REQUESTS_PER_MINUTE','100')
     return ledger

@@ -70,11 +70,11 @@ def test_origin_reaches_real_login_and_sets_correct_session_cookie(monkeypatch, 
     monkeypatch.setenv('API_REQUESTS_PER_MINUTE', '30')
     username = 'origin_regression_user'
     cursor = Mock()
-    cursor.fetchone.return_value = {'username':username, 'hashed_password':bcrypt.hashpw(b'test-only-password', bcrypt.gensalt(rounds=4)).decode()}
+    cursor.fetchone.return_value = {'id':1, 'username':username, 'hashed_password':bcrypt.hashpw(b'test-only-password', bcrypt.gensalt(rounds=4)).decode()}
     conn = Mock()
     conn.cursor.return_value = cursor
-    monkeypatch.setattr(auth, 'get_db_connection', lambda:conn)
-    monkeypatch.setattr('app.access.load_principal', lambda _: {'id':1, 'username':username, 'role':'member'})
+    monkeypatch.setattr('app.database.get_db_connection', lambda:conn)
+    monkeypatch.setattr(auth, 'load_principal', lambda _: {'id':1, 'username':username, 'role':'member','email_verified':True})
     app = FastAPI()
     app.add_middleware(RequestGuard)
     app.include_router(auth.router, prefix='/api')

@@ -118,18 +118,18 @@
       </div>
     </div>
 
-    <!-- 顶部更新消息：v0.4.6 -->
+    <!-- 顶部更新消息：v0.4.7 -->
     <div class="agent-update-banner" id="agent-update-banner" v-show="showAgentBanner">
       <span class="agent-update-text">
-        新更新：安全性加强，使用速度加强，整体体验更加流畅
+        新更新：邮箱验证与密码找回，设置更清楚，使用更顺畅
       </span>
       <a
         href="javascript:void(0)"
         class="agent-update-detail"
-        title="查看更新详情（定位到 v0.4.6）"
+        title="查看更新详情（定位到 v0.4.7）"
         @click="openUpdateDoc"
       >
-        v0.4.6 更新详情
+        v0.4.7 更新详情
       </a>
       <button
         type="button"
@@ -210,7 +210,7 @@ const username = ref("");
 const userAvatar = ref("");
 
 const mobileMenuVisible = ref(false);
-const showAgentBanner = ref(localStorage.getItem("wisdom.release.dismissed")!=="0.4.6");
+const showAgentBanner = ref(localStorage.getItem("wisdom.release.dismissed")!=="0.4.7");
 
 const navItems = [
   { id: "home", label: "首页" },
@@ -260,11 +260,11 @@ async function logout() {
 
 function closeAgentBanner() {
   showAgentBanner.value = false;
-  localStorage.setItem("wisdom.release.dismissed","0.4.6");
+  localStorage.setItem("wisdom.release.dismissed","0.4.7");
 }
 
 function openUpdateDoc() {
-  (window as any).openDoc?.("update.md","更新日志","update-v-0.4.6");
+  (window as any).openDoc?.("update.md","更新日志","update-v-0.4.7");
 }
 
 function scrollToSelector(selector: string) {
@@ -288,7 +288,10 @@ onMounted(() => {
   const searchUrl='/static/js/site-search.js';
   import(/* @vite-ignore */ searchUrl).then(module=>{if(!appDisposed)disposeSiteSearch=module.initNavSearch();}).catch(()=>{});
   (window as any).toggleAuthModal=(show:boolean)=>{if(show)openAuthModal();};
-  fetch('/api/user/me',{credentials:'include'}).then(r=>r.ok?r.json():null).then(data=>{if(data?.username)signedIn(data.username);}).catch(()=>{});
+  (window as any).openEmailVerification=(email='')=>authDialog.value?.showVerification(email);
+  fetch('/api/user/me',{credentials:'include'}).then(r=>r.ok?r.json():null).then(data=>{
+    if(data?.username){signedIn(data.username);if(data.email_verified===false)authDialog.value?.showVerification(data.email);}
+  }).catch(()=>{});
   // 将部分操作暴露给全局，以兼容旧代码中的 window.App 调用
   const app = getLegacyApp();
   app.__setCurrentSection = (id: string) => {

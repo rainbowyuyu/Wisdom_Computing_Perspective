@@ -74,7 +74,7 @@ def test_course_draft_survives_login_and_saves_to_database(teaching_page, live_l
     else:
         auth.locator('.auth-captcha-row img').wait_for()
         with page.expect_response(lambda r: '/api/captcha' in r.url) as captcha:
-            auth.get_by_role('button', name='刷新验证码').click()
+            auth.get_by_role('button', name='刷新图片验证码', exact=True).click()
         auth.get_by_label('用户名').fill(users[0])
         auth.get_by_label('密码', exact=True).fill('Library-QA-test-password')
         auth.locator('input[autocomplete=off]').fill(CAPTCHA_STORE[captcha.value.headers['x-captcha-id']])

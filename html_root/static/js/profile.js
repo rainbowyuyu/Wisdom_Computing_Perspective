@@ -2,6 +2,7 @@
 import { showToast, toggleModal } from './ui.js';
 
 let currentUserAvatarUrl = null;
+let emailChangeTimer = null;
 
 function showHint(id, text, isError) {
     const el = document.getElementById(id);
@@ -33,8 +34,9 @@ export async function loadProfile() {
         guest.style.display = 'none';
         content.style.display = 'block';
 
-        const profileRes = await fetch('/api/user/profile', { credentials: 'include' }).then(r => r.json());
-        const profile = (profileRes.status === 'success' && profileRes.profile) ? profileRes.profile : { username: me.username, avatar_url: null, nickname: null };
+        // Unverified accounts can read /user/me but cannot access profile APIs yet.
+        const profileRes = me.email_verified === false ? null : await fetch('/api/user/profile', { credentials: 'include' }).then(r => r.json());
+        const profile = (profileRes?.status === 'success' && profileRes.profile) ? profileRes.profile : { username: me.username, avatar_url: null, nickname: null, email: me.email, email_address: me.email_address, email_verified: me.email_verified };
 
         const img = document.getElementById('profile-avatar-img');
         const placeholder = document.getElementById('profile-avatar-placeholder');
@@ -54,11 +56,136 @@ export async function loadProfile() {
         const usernameDisplay = document.getElementById('profile-username-display');
         if (usernameDisplay) usernameDisplay.textContent = profile.username || me.username;
 
+        const emailDisplay = document.getElementById('profile-email-display');
+        if (emailDisplay) emailDisplay.textContent = profile.email || me.email || '暂未绑定';
+        const emailStatus = document.getElementById('profile-email-status');
+        if (emailStatus) {
+            const verified = Boolean(profile.email_verified ?? me.email_verified);
+            emailStatus.textContent = verified ? '已验证' : ((profile.email || me.email) ? '待验证' : '未绑定');
+            emailStatus.classList.toggle('is-verified', verified);
+            emailStatus.classList.toggle('is-pending', !verified);
+        }
+        const verifyButton = document.getElementById('profile-email-verify-btn');
+        if (verifyButton) {
+            verifyButton.dataset.email = profile.email_address || me.email_address || '';
+            verifyButton.hidden = Boolean(profile.email_verified ?? me.email_verified);
+        }
+
         currentUserAvatarUrl = profile.avatar_url || null;
         updateHeaderAvatar(profile.avatar_url || null);
     } catch (e) {
         guest.style.display = 'block';
         content.style.display = 'none';
+    }
+}
+
+function setEmailHint(text, isError = false) {
+    const el = document.getElementById('change-email-hint');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('is-error', Boolean(isError));
+    el.classList.toggle('is-success', Boolean(text) && !isError);
+}
+
+/** 打开更换邮箱弹窗，验证码只发送到新邮箱。 */
+export async function openChangeEmailModal() {
+    const guest = document.getElementById('change-email-guest');
+    const form = document.getElementById('change-email-form');
+    const email = document.getElementById('change-email-new');
+    const code = document.getElementById('change-email-code');
+    if (email) email.value = '';
+    if (code) code.value = '';
+    setEmailHint('');
+    try {
+        const res = await fetch('/api/user/me', { credentials: 'include' });
+        const me = await res.json().catch(() => ({}));
+        const signedIn = res.ok && me.status === 'success' && me.username;
+        if (guest) guest.style.display = signedIn ? 'none' : 'block';
+        if (form) form.style.display = signedIn ? 'block' : 'none';
+    } catch (_) {
+        if (guest) guest.style.display = 'block';
+        if (form) form.style.display = 'none';
+    }
+    toggleModal('change-email-modal', true);
+}
+
+export function closeChangeEmailModal() {
+    toggleModal('change-email-modal', false);
+    if (emailChangeTimer) { clearInterval(emailChangeTimer); emailChangeTimer = null; }
+    const button = document.getElementById('btn-change-email-code');
+    if (button) { button.disabled = false; button.textContent = '获取验证码'; }
+}
+
+export async function sendChangeEmailCode() {
+    const email = (document.getElementById('change-email-new')?.value || '').trim();
+    const button = document.getElementById('btn-change-email-code');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setEmailHint('请输入有效的新邮箱地址。', true);
+        return;
+    }
+    if (emailChangeTimer) return;
+    if (button) { button.disabled = true; button.textContent = '发送中…'; }
+    setEmailHint('正在发送验证码…');
+    try {
+        const res = await fetch('/api/email/send-code', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, purpose: 'change_email' })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.status !== 'success') {
+            setEmailHint(data.message || '验证码发送失败，请稍后重试。', true);
+            if (button) { button.disabled = false; button.textContent = '获取验证码'; }
+            return;
+        }
+        let remain = Math.max(30, Number(data.retry_after) || 60);
+        setEmailHint(data.message || '验证码已发送，请查收新邮箱。');
+        if (button) button.textContent = `${remain}s 后重发`;
+        emailChangeTimer = setInterval(() => {
+            remain -= 1;
+            if (!button) return;
+            if (remain <= 0) {
+                clearInterval(emailChangeTimer); emailChangeTimer = null;
+                button.disabled = false; button.textContent = '重新获取';
+            } else button.textContent = `${remain}s 后重发`;
+        }, 1000);
+    } catch (_) {
+        setEmailHint('网络连接失败，请稍后重试。', true);
+        if (button) { button.disabled = false; button.textContent = '获取验证码'; }
+    }
+}
+
+export async function submitChangeEmailModal() {
+    const email = (document.getElementById('change-email-new')?.value || '').trim();
+    const code = (document.getElementById('change-email-code')?.value || '').trim();
+    const button = document.getElementById('btn-change-email-submit');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setEmailHint('请先填写有效的新邮箱地址。', true); return;
+    }
+    if (!/^\d{6}$/.test(code)) {
+        setEmailHint('请输入 6 位邮箱验证码。', true); return;
+    }
+    if (button) { button.disabled = true; button.textContent = '验证中…'; }
+    setEmailHint('正在确认邮箱归属…');
+    try {
+        const res = await fetch('/api/email/change', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.status !== 'success') {
+            setEmailHint(data.message || '邮箱更换失败，请检查验证码。', true);
+            return;
+        }
+        if (typeof showToast === 'function') showToast('邮箱已更新并完成验证', 'success');
+        closeChangeEmailModal();
+        await loadProfile();
+        window.dispatchEvent(new CustomEvent('auth-state-change'));
+    } catch (_) {
+        setEmailHint('网络连接失败，请稍后重试。', true);
+    } finally {
+        if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-check"></i> 验证并更换'; }
     }
 }
 

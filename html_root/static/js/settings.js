@@ -2,6 +2,7 @@
 
 import { toggleModal, showToast } from './ui.js';
 import * as Profile from './profile.js';
+import { canUseAccountFeatures } from './account-session.js';
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
 let saveToServerTimer = null;
@@ -418,6 +419,7 @@ export async function saveSettingsToAccount() {
 /** 登录后调用：拉取云端设置并应用到页面与本地 */
 export async function loadUserSettings() {
     try {
+        if (!await canUseAccountFeatures()) return;
         const res = await fetch('/api/user/settings', { credentials: 'include' });
         const data = await res.json();
         if (data.status === 'success' && data.settings && typeof data.settings === 'object') {

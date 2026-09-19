@@ -6,8 +6,28 @@ from pydantic import BaseModel, Field
 class AuthModel(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=72)
-    captcha: str = Field(max_length=12)
-    captcha_id: str = Field(max_length=64)
+    captcha: str = Field(default="", max_length=12)
+    captcha_id: str = Field(default="", max_length=64)
+    email: Optional[str] = Field(default=None, max_length=254)
+    email_code: Optional[str] = Field(default=None, max_length=12)
+
+
+class EmailCodeRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    purpose: str = Field(pattern=r'^(register|verify|reset|change_email)$')
+    captcha: Optional[str] = Field(default=None, max_length=12)
+    captcha_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class EmailVerifyModel(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    code: str = Field(min_length=4, max_length=12)
+
+
+class PasswordResetModel(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    code: str = Field(min_length=4, max_length=12)
+    new_password: str = Field(min_length=6, max_length=72)
 
 
 class CalcModel(BaseModel):

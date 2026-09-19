@@ -1,15 +1,16 @@
+import { canUseAccountFeatures } from './account-session.js';
 import { escapeText as esc } from './solution-visual.js';
 import { textWithMath } from './math-text.js';
 import { syncBackgroundTasks } from '/static/js/task-progress.js';
 
 const state={jobs:[],pending:null,error:'',owner:null,loading:false};
-const views=new Set();let timer=null,polling=false,epoch=0,submitting=false;
+const views=new Set();let timer=null,polling=false,epoch=0,submitting=false,accessBlocked=false;
 const active=job=>['queued','planning','running'].includes(job.status);
 const statusNames={queued:'排队中',planning:'正在拆解',running:'处理中',done:'已完成',error:'部分失败',partial:'待补充条件',needs_information:'待补充条件',cancelled:'已停止',interrupted:'待恢复',blocked:'等待前置结果'};
 const publish=()=>{syncBackgroundTasks(state.jobs);views.forEach(view=>view());window.dispatchEvent(new CustomEvent('math-tasks-state'));};
 export const hasMathTasks=()=>state.jobs.length>0||!!state.pending;
 export const activeMathTasks=()=>state.jobs.filter(active).length;
-function schedule(){clearTimeout(timer);if(!document.hidden&&(views.size||state.jobs.some(active)))timer=setTimeout(refreshTasks,state.jobs.some(active)?2000:10000);}
+function schedule(){clearTimeout(timer);if(!accessBlocked&&!document.hidden&&(views.size||state.jobs.some(active)))timer=setTimeout(refreshTasks,state.jobs.some(active)?2000:10000);}
 
 async function api(path='',options={}){
     const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
@@ -23,10 +24,13 @@ async function api(path='',options={}){
 }
 
 export async function refreshTasks(){
-    if(polling)return;
+    if(polling||accessBlocked)return;
     const run=epoch;polling=true;
-    try{const data=await api();if(run!==epoch)return;state.jobs=data.items;state.owner=data.owner;state.error='';}
-    catch(error){if(run!==epoch)return;if(error.status===401){state.jobs=[];state.owner=null;}else state.error=error.message;}
+    try{
+        if(!await canUseAccountFeatures()){if(run===epoch){accessBlocked=true;state.jobs=[];state.error='请完成邮箱验证后查看后台任务。';}return;}
+        if(run!==epoch)return;
+        const data=await api();if(run!==epoch)return;state.jobs=data.items;state.owner=data.owner;state.error='';}
+    catch(error){if(run!==epoch)return;if([401,403].includes(error.status)){accessBlocked=true;state.jobs=[];state.owner=null;}state.error=error.message;}
     finally{polling=false;if(run===epoch)publish();schedule();}
 }
 
@@ -41,6 +45,8 @@ export async function queueMathTask(problem,context='',autoRender=true,forceDeco
     if(!request.problem){state.error='请先输入完整题目。';publish();return false;}
     const run=epoch;submitting=true;publish();
     try{
+        if(!await canUseAccountFeatures()){state.error='请完成邮箱验证后继续提交，题目已保留。';publish();return false;}
+        if(run!==epoch)return false;
         const job=await api('',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)});
         if(run!==epoch)return false;
         state.pending=null;state.jobs=[job,...state.jobs.filter(j=>j.id!==job.id)];
@@ -105,7 +111,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeou
 window.addEventListener('auth-state-change',event=>{
     const next=event.detail?.username||null;
     const pending=state.owner===null?state.pending:null;
-    epoch++;state.jobs=[];state.owner=next;state.error='';state.pending=pending;publish();
+    accessBlocked=false;clearTimeout(timer);epoch++;state.jobs=[];state.owner=next;state.error='';state.pending=pending;publish();
     if(next&&pending&&!submitting)queueMathTask(pending.problem,pending.context,pending.auto_render,pending.force_decompose);
     else if(views.size)refreshTasks();
 });

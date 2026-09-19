@@ -153,6 +153,22 @@ def build(check=False):
         ddl = f'ALTER TABLE `example_video_danmaku` ADD COLUMN `{column}` {definition}'
         execute(f"IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_danmaku' AND COLUMN_NAME='{column}'), 'DO 0', {literal(ddl)})")
 
+    # 旧库的 users 表没有邮箱字段；使用会话级 PREPARE 兼容 MySQL 5.7，
+    # 新库则保持幂等，不重复添加字段或索引。
+    for column, definition in [
+        ('email', 'VARCHAR(254) CHARACTER SET ascii COLLATE ascii_bin NULL AFTER `hashed_password`'),
+        ('email_verified', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `email`'),
+        ('email_verified_at', 'TIMESTAMP NULL DEFAULT NULL AFTER `email_verified`'),
+    ]:
+        ddl = f'ALTER TABLE `users` ADD COLUMN `{column}` {definition}'
+        execute(f"IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='{column}'), 'DO 0', {literal(ddl)})")
+    ddl = 'ALTER TABLE `users` ADD UNIQUE KEY `uq_users_email` (`email`)'
+    execute("IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND INDEX_NAME='uq_users_email'), 'DO 0', " + literal(ddl) + ")")
+
+    # 已有安装的邮箱验证码表需要扩展用途枚举，支持更换绑定邮箱。
+    ddl = "ALTER TABLE `account_email_codes` MODIFY COLUMN `purpose` ENUM('register','verify','reset','change_email') NOT NULL"
+    execute("IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='account_email_codes' AND COLUMN_NAME='purpose'), " + literal(ddl) + ", 'DO 0')")
+
     module = ast.parse((ROOT / 'app/database.py').read_text(encoding='utf-8'))
     indexes = next(ast.literal_eval(node.value) for node in module.body
                    if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'INDEXES' for t in node.targets))

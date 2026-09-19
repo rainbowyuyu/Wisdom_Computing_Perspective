@@ -1,7 +1,7 @@
 -- 智算视界 · 单文件安装与升级 · MySQL 5.7 / 8.0
 -- 宝塔：先备份当前库，在 phpMyAdmin 左侧选中 wiscomper_com，再点 SQL，粘贴本文件全部内容执行。
 -- 使用当前选中的数据库，不创建数据库、不切换库名，不需要 CREATE DATABASE 权限。
--- 支持空库、原网站 18 表及后续版本升级，补齐至 30 表，保留账户、权限、额度和学习数据。
+-- 支持空库、原网站 18 表及后续版本升级，补齐所需表，保留账户、权限、额度和学习数据。
 -- 执行完应显示 upgrade_status=OK，无需逐个执行 database/migrations 中的文件。
 -- 不执行 DROP TABLE、TRUNCATE、DELETE，不关闭外键检查，可重复执行。
 -- 命令行：mysql -u USER -p --default-character-set=utf8mb4 DATABASE_NAME < visdom_db.sql
@@ -16,9 +16,39 @@ CREATE TABLE IF NOT EXISTS `users` (
   `id` int NOT NULL AUTO_INCREMENT,
   `username` varchar(255) NOT NULL,
   `hashed_password` varchar(255) NOT NULL,
+  `email` varchar(254) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+  `email_verified` tinyint(1) NOT NULL DEFAULT 0,
+  `email_verified_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `username` (`username`)
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `uq_users_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 邮箱验证码由服务端写入，验证码只保存摘要，十分钟后失效且只能使用一次。
+CREATE TABLE IF NOT EXISTS `account_email_codes` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int DEFAULT NULL,
+  `email` varchar(254) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `purpose` enum('register','verify','reset','change_email') NOT NULL,
+  `code_hash` char(64) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `consumed_at` datetime DEFAULT NULL,
+  `attempts` tinyint unsigned NOT NULL DEFAULT 0,
+  `requester_ip_hash` char(64) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `ix_email_code_lookup` (`email`,`purpose`,`created_at`),
+  KEY `ix_email_code_user` (`user_id`,`created_at`),
+  KEY `ix_email_code_created` (`created_at`),
+  CONSTRAINT `fk_email_code_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS account_email_limits (
+    bucket CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+    window_start DATETIME NOT NULL,
+    used INT UNSIGNED NOT NULL DEFAULT 0,
+    INDEX ix_email_limit_window(window_start)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- user_settings
@@ -420,6 +450,46 @@ EXECUTE wisdom_statement;
 
 DEALLOCATE PREPARE wisdom_statement;
 
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='email'), 'DO 0', 'ALTER TABLE `users` ADD COLUMN `email` VARCHAR(254) CHARACTER SET ascii COLLATE ascii_bin NULL AFTER `hashed_password`');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='email_verified'), 'DO 0', 'ALTER TABLE `users` ADD COLUMN `email_verified` TINYINT(1) NOT NULL DEFAULT 0 AFTER `email`');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='email_verified_at'), 'DO 0', 'ALTER TABLE `users` ADD COLUMN `email_verified_at` TIMESTAMP NULL DEFAULT NULL AFTER `email_verified`');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND INDEX_NAME='uq_users_email'), 'DO 0', 'ALTER TABLE `users` ADD UNIQUE KEY `uq_users_email` (`email`)');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
+SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='account_email_codes' AND COLUMN_NAME='purpose'), 'ALTER TABLE `account_email_codes` MODIFY COLUMN `purpose` ENUM(''register'',''verify'',''reset'',''change_email'') NOT NULL', 'DO 0');
+
+PREPARE wisdom_statement FROM @wisdom_ddl;
+
+EXECUTE wisdom_statement;
+
+DEALLOCATE PREPARE wisdom_statement;
+
 SET @wisdom_ddl = IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='example_video_danmaku' AND INDEX_NAME='ix_danmaku_video_time'), 'DO 0', 'ALTER TABLE `example_video_danmaku` ADD INDEX `ix_danmaku_video_time` (video_id,time,id)');
 
 PREPARE wisdom_statement FROM @wisdom_ddl;
@@ -600,7 +670,23 @@ FROM (
     SELECT 'users' AS `table_name`, 'id' AS `column_name`
     UNION ALL SELECT 'users', 'username'
     UNION ALL SELECT 'users', 'hashed_password'
+    UNION ALL SELECT 'users', 'email'
+    UNION ALL SELECT 'users', 'email_verified'
+    UNION ALL SELECT 'users', 'email_verified_at'
     UNION ALL SELECT 'users', 'created_at'
+    UNION ALL SELECT 'account_email_codes', 'id'
+    UNION ALL SELECT 'account_email_codes', 'user_id'
+    UNION ALL SELECT 'account_email_codes', 'email'
+    UNION ALL SELECT 'account_email_codes', 'purpose'
+    UNION ALL SELECT 'account_email_codes', 'code_hash'
+    UNION ALL SELECT 'account_email_codes', 'expires_at'
+    UNION ALL SELECT 'account_email_codes', 'consumed_at'
+    UNION ALL SELECT 'account_email_codes', 'attempts'
+    UNION ALL SELECT 'account_email_codes', 'requester_ip_hash'
+    UNION ALL SELECT 'account_email_codes', 'created_at'
+    UNION ALL SELECT 'account_email_limits', 'bucket'
+    UNION ALL SELECT 'account_email_limits', 'window_start'
+    UNION ALL SELECT 'account_email_limits', 'used'
     UNION ALL SELECT 'user_settings', 'user_id'
     UNION ALL SELECT 'user_settings', 'settings_json'
     UNION ALL SELECT 'user_settings', 'updated_at'
@@ -779,6 +865,13 @@ SELECT COUNT(*) INTO @wisdom_missing_indexes
 FROM (
     SELECT 'users' AS `table_name`, 'PRIMARY' AS `index_name`, 'id' AS `column_names`, 1 AS `is_unique`
     UNION ALL SELECT 'users', 'username', 'username', 1
+    UNION ALL SELECT 'users', 'uq_users_email', 'email', 1
+    UNION ALL SELECT 'account_email_codes', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'account_email_codes', 'ix_email_code_lookup', 'email,purpose,created_at', 0
+    UNION ALL SELECT 'account_email_codes', 'ix_email_code_user', 'user_id,created_at', 0
+    UNION ALL SELECT 'account_email_codes', 'ix_email_code_created', 'created_at', 0
+    UNION ALL SELECT 'account_email_limits', 'PRIMARY', 'bucket', 1
+    UNION ALL SELECT 'account_email_limits', 'ix_email_limit_window', 'window_start', 0
     UNION ALL SELECT 'user_settings', 'PRIMARY', 'user_id', 1
     UNION ALL SELECT 'user_profiles', 'PRIMARY', 'user_id', 1
     UNION ALL SELECT 'account_access', 'PRIMARY', 'user_id', 1
@@ -847,7 +940,8 @@ WHERE required_index.index_name IS NOT NULL AND NOT EXISTS (
 
 SELECT COUNT(*) INTO @wisdom_missing_relations
 FROM (
-    SELECT 'user_profiles' AS `table_name`, 'user_id' AS `column_name`, 'users' AS `parent_table`, 'username' AS `parent_column`, 'CASCADE' AS `delete_rule`, 1 AS `update_cascade`
+    SELECT 'account_email_codes' AS `table_name`, 'user_id' AS `column_name`, 'users' AS `parent_table`, 'id' AS `parent_column`, 'CASCADE' AS `delete_rule`, 0 AS `update_cascade`
+    UNION ALL SELECT 'user_profiles', 'user_id', 'users', 'username', 'CASCADE', 1
     UNION ALL SELECT 'account_access', 'user_id', 'users', 'id', 'CASCADE', 0
     UNION ALL SELECT 'formulas', 'user_id', 'users', 'username', 'CASCADE', 1
     UNION ALL SELECT 'formula_topics', 'formula_id', 'formulas', 'id', 'CASCADE', 0
@@ -882,6 +976,8 @@ FROM (
     UNION ALL SELECT '004_course_resources.sql', 'ee1e4911a8e4084512ad40386996a9366369b96699198eb3803c98315298e95f'
     UNION ALL SELECT '005_account_access.sql', '283739d568f5a77b4568cdcc8147974ce0a2befc5fec97b00e28aaf98f429f21'
     UNION ALL SELECT '006_request_records.sql', '83f0fabe24c26efae762c8d6cd958ec17773b833f94e1e1af27803f5cc81e042'
+    UNION ALL SELECT '007_email_verification.sql', '8794e3dca870e567496faa33b8ffc8f186719433ca8d9423706cb73d716bd1c3'
+    UNION ALL SELECT '008_email_change.sql', 'ed01d7c521935c0eb0184784c94776d3160423f7ce8d506bce447403b20cdcda'
 ) expected
 JOIN schema_migrations existing ON existing.version=expected.version COLLATE utf8mb4_general_ci
 WHERE BINARY existing.checksum<>BINARY expected.checksum;
@@ -902,6 +998,8 @@ FROM (
     UNION ALL SELECT '004_course_resources.sql', 'ee1e4911a8e4084512ad40386996a9366369b96699198eb3803c98315298e95f'
     UNION ALL SELECT '005_account_access.sql', '283739d568f5a77b4568cdcc8147974ce0a2befc5fec97b00e28aaf98f429f21'
     UNION ALL SELECT '006_request_records.sql', '83f0fabe24c26efae762c8d6cd958ec17773b833f94e1e1af27803f5cc81e042'
+    UNION ALL SELECT '007_email_verification.sql', '8794e3dca870e567496faa33b8ffc8f186719433ca8d9423706cb73d716bd1c3'
+    UNION ALL SELECT '008_email_change.sql', 'ed01d7c521935c0eb0184784c94776d3160423f7ce8d506bce447403b20cdcda'
 ) expected
 WHERE @wisdom_upgrade_ok AND NOT EXISTS (SELECT 1 FROM schema_migrations existing WHERE existing.version=expected.version COLLATE utf8mb4_general_ci);
 COMMIT;
@@ -922,6 +1020,8 @@ SELECT IF(@wisdom_upgrade_ok, 'OK', 'NEEDS_ATTENTION') AS upgrade_status,
     UNION ALL SELECT '004_course_resources.sql', 'ee1e4911a8e4084512ad40386996a9366369b96699198eb3803c98315298e95f'
     UNION ALL SELECT '005_account_access.sql', '283739d568f5a77b4568cdcc8147974ce0a2befc5fec97b00e28aaf98f429f21'
     UNION ALL SELECT '006_request_records.sql', '83f0fabe24c26efae762c8d6cd958ec17773b833f94e1e1af27803f5cc81e042'
+    UNION ALL SELECT '007_email_verification.sql', '8794e3dca870e567496faa33b8ffc8f186719433ca8d9423706cb73d716bd1c3'
+    UNION ALL SELECT '008_email_change.sql', 'ed01d7c521935c0eb0184784c94776d3160423f7ce8d506bce447403b20cdcda'
 ) expected
     )) AS applied_migrations,
     @wisdom_pending_legacy AS pending_legacy_wrongbook,

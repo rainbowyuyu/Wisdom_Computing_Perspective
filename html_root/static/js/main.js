@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // 新增功能条：若用户曾关闭则不再显示
-    if (localStorage.getItem('wisdom.release.dismissed')==='0.4.6') {
+    if (localStorage.getItem('wisdom.release.dismissed')==='0.4.7') {
       const el = document.getElementById('agent-update-banner');
       if (el) el.style.display = 'none';
     }
@@ -226,6 +226,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initStepTutor();
     initFloatingPanel();
+    // Initial section navigation closes old dialogs; reopen the required account
+    // verification only after that navigation has finished.
+    if(document.getElementById('auth-modal')?.dataset.requiresVerify==='true')Auth.openEmailVerification();
 });
 
 // 按版本记住公告关闭状态，新版本仍会展示。
@@ -233,7 +236,7 @@ window.closeAgentBanner = function () {
   const el = document.getElementById('agent-update-banner');
   if (el) {
     el.style.display = 'none';
-    localStorage.setItem('wisdom.release.dismissed', '0.4.6');
+    localStorage.setItem('wisdom.release.dismissed', '0.4.7');
   }
 };
 
@@ -601,7 +604,6 @@ window.toggleAuthModal = UI.toggleAuthModal;
 window.switchInputMode = UI.switchInputMode;
 window.switchAuthMode = (mode) => {
     UI.switchAuthMode(mode);
-    Auth.refreshCaptcha(mode);
     if (mode === 'register') Auth.clearUsernameHint?.();
 };
 window.clearCanvas = Canvas.clearCanvas;
@@ -621,6 +623,12 @@ window.openInDevLatexFromDetect = Detect.editInDevtoolsFromDetect;
 window.startAnimation = () => window.StepTutor?.solve(window.StepTutor.getState().draftProblem);
 window.handleLogin = Auth.handleLogin;
 window.handleRegister = Auth.handleRegister;
+window.sendRegisterEmailCode = Auth.sendRegisterEmailCode;
+window.sendForgotCode = Auth.sendForgotCode;
+window.resetForgotPassword = Auth.resetForgotPassword;
+window.sendVerifyEmailCode = Auth.sendVerifyEmailCode;
+window.verifyCurrentEmail = Auth.verifyCurrentEmail;
+window.openEmailVerification = Auth.openEmailVerification;
 window.refreshCaptcha = Auth.refreshCaptcha;
 window.logout = Auth.logout;
 window.Settings = Settings;

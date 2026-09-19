@@ -3,10 +3,13 @@
 import { toggleAuthModal, showToast } from './ui.js';
 import * as Formulas from "./formulas.js";
 import * as Settings from "./settings.js";
+import { escapeText } from './solution-visual.js';
 
 // 登录、注册各自保存验证码 ID，避免并行刷新时互相覆盖导致第一次总报错
 let currentCaptchaIdLogin = '';
 let currentCaptchaIdRegister = '';
+let currentCaptchaIdForgot = '';
+const captchaRuns={};
 
 // 用户名查重：最近一次检查结果（用于禁用注册按钮）
 let lastUsernameAvailable = null;
@@ -14,8 +17,10 @@ let usernameCheckDebounceTimer = 0;
 
 // --- 初始化：检查服务端 Session ---
 export async function initAuth() {
+    setupUsernameCheck();
     refreshCaptcha('login');
     refreshCaptcha('register');
+    refreshCaptcha('forgot');
 
     // 修改：不再读取 localStorage，而是向后端询问 Session 状态
     try {
@@ -35,6 +40,11 @@ export async function initAuth() {
         const data = await res.json();
 
         if (data.status === 'success' && data.username) {
+            if(data.email_verified===false){
+                updateUserDisplay(data.username,null,false);
+                openEmailVerification(data.email_address || data.email);
+                return;
+            }
             const profileRes = await fetch('/api/user/profile', { credentials: 'include' }).then(r => r.json()).catch(() => ({}));
             const avatarUrl = (profileRes.status === 'success' && profileRes.profile && profileRes.profile.avatar_url) ? profileRes.profile.avatar_url : null;
             updateUserDisplay(data.username, avatarUrl);
@@ -50,7 +60,6 @@ export async function initAuth() {
         // 网络错误或其他异常，静默处理（未登录是正常状态）
         // 不输出错误日志，避免控制台噪音
     }
-    setupUsernameCheck();
 }
 
 /** 请求后端检查用户名是否可用 */
@@ -176,25 +185,27 @@ export function clearUsernameHint() {
 
 // ... (refreshCaptcha 保持不变) ...
 export async function refreshCaptcha(type) {
-    const imgId = type === 'login' ? 'captcha-img-login' : 'captcha-img-reg';
+    const imgId = type === 'login' ? 'captcha-img-login' : type === 'forgot' ? 'captcha-img-forgot' : 'captcha-img-reg';
     const imgEl = document.getElementById(imgId);
     if (!imgEl) return;
+    const run=captchaRuns[type]=(captchaRuns[type]||0)+1;
     imgEl.style.opacity = '0.5';
     try {
-        const res = await fetch('/api/captcha');
-        const newId = res.headers.get('X-Captcha-ID');
-        if (type === 'login') {
-            if (newId) currentCaptchaIdLogin = newId;
-        } else {
-            if (newId) currentCaptchaIdRegister = newId;
-        }
+        const res = await fetch('/api/captcha',{signal:AbortSignal.timeout(12000)});
+        if(!res.ok)throw new Error('captcha');
         const blob = await res.blob();
+        if(captchaRuns[type]!==run)return;
+        const newId = res.headers.get('X-Captcha-ID');
+        if (type === 'login') { if (newId) currentCaptchaIdLogin = newId; }
+        else if (type === 'forgot') { if (newId) currentCaptchaIdForgot = newId; }
+        else { if (newId) currentCaptchaIdRegister = newId; }
+        if(imgEl.src.startsWith('blob:'))URL.revokeObjectURL(imgEl.src);
         const url = URL.createObjectURL(blob);
         imgEl.src = url;
     } catch (e) {
         console.error("Captcha error", e);
     } finally {
-        imgEl.style.opacity = '1';
+        if(captchaRuns[type]===run)imgEl.style.opacity = '1';
     }
 }
 
@@ -225,6 +236,7 @@ export async function handleLogin() {
         const res = await fetch('/api/login', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            signal: AbortSignal.timeout(45000),
             body: JSON.stringify({
                 username: u,
                 password: p,
@@ -236,6 +248,11 @@ export async function handleLogin() {
         const data = await res.json();
 
         if(data.status === 'success') {
+            if(data.email_verified===false){
+                updateUserDisplay(data.username,null,false);
+                openEmailVerification(data.email_address || data.email);
+                return;
+            }
             toggleAuthModal(false);
             let avatarUrl = null;
             try {
@@ -277,17 +294,19 @@ export async function handleRegister() {
     const u = document.getElementById('reg-user').value;
     const p = document.getElementById('reg-pass').value;
     const pConfirm = document.getElementById('reg-pass-confirm').value; // 获取确认密码
+    const email = document.getElementById('reg-email').value.trim();
+    const emailCode = document.getElementById('reg-email-code').value.trim();
     const c = document.getElementById('reg-captcha').value;
     const agree = document.getElementById('reg-agree').checked; // 获取复选框
 
-    if(!u || !p || !pConfirm || !c) {
+    if(!u || !p || !pConfirm || !email || !emailCode) {
         showToast("请填写完整信息", "error");
         return;
     }
 
     // 新增：密码一致性校验
-    if (p !== pConfirm) {
-        showToast("两次输入的密码不一致，请重新输入", "error");
+    if (p !== pConfirm || p.length<6) {
+        showToast("密码至少 6 位，且两次输入需一致", "error");
         return;
     }
 
@@ -306,9 +325,12 @@ export async function handleRegister() {
         const res = await fetch('/api/register', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            signal: AbortSignal.timeout(45000),
             body: JSON.stringify({
                 username: u,
                 password: p,
+                email,
+                email_code: emailCode,
                 captcha: c,
                 captcha_id: currentCaptchaIdRegister
             })
@@ -345,7 +367,7 @@ export function getCurrentUser() {
 }
 
 // --- 辅助：更新 UI 显示用户名与头像 ---
-function updateUserDisplay(username, avatarUrl) {
+function updateUserDisplay(username, avatarUrl, email_verified=true) {
     // 1. 隐藏导航栏登录按钮
     document.querySelectorAll('.login-btn').forEach(b => b.style.display = 'none');
 
@@ -378,7 +400,7 @@ function updateUserDisplay(username, avatarUrl) {
             : '<i class="fa-regular fa-user-circle" style="margin-right:8px;"></i>';
         mobileAuthSection.innerHTML = `
             <div class="mobile-menu-username" onclick="openSettings('profile'); toggleMobileMenu();">
-                ${avatarHtml} <span class="mobile-menu-username-text">${username}</span>
+                ${avatarHtml} <span class="mobile-menu-username-text">${escapeText(username)}</span>
             </div>
             <button class="mobile-menu-logout-btn" onclick="logout()">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i> 退出登录
@@ -388,7 +410,7 @@ function updateUserDisplay(username, avatarUrl) {
     if (window.Profile && typeof window.Profile.updateHeaderAvatar === 'function') {
         window.Profile.updateHeaderAvatar(avatarUrl || null);
     }
-    window.dispatchEvent(new CustomEvent('auth-state-change', { detail: { username, avatarUrl } }));
+    window.dispatchEvent(new CustomEvent('auth-state-change', { detail: { username, avatarUrl, email_verified } }));
 }
 
 // --- 登出：调用接口清除服务端 session 与 cookie，再刷新 ---
@@ -399,4 +421,103 @@ export async function logout() {
         console.error("Logout failed", e);
     }
     location.reload();
+}
+
+
+export function openEmailVerification(emailAddress='') {
+    const modal=document.getElementById('auth-modal');
+    if(!modal)return;
+    // Access errors can arrive together. Reopening must preserve input and cooldown.
+    if(modal.dataset.requiresVerify==='true') {
+        toggleAuthModal(true);
+        return;
+    }
+    modal.dataset.requiresVerify='true';
+    const input=document.getElementById('verify-email');
+    const usableEmail = emailAddress && !String(emailAddress).includes('*') ? String(emailAddress) : '';
+    const hasBoundEmail = Boolean(emailAddress);
+    const title = document.getElementById('verify-email-title');
+    const hint = document.getElementById('verify-email-hint');
+    const codeButton = document.getElementById('btn-verify-code');
+    if (title) title.textContent = hasBoundEmail ? '验证邮箱' : '绑定邮箱';
+    if (hint) hint.textContent = hasBoundEmail
+        ? '你的学习资料会保留。请填写当前绑定邮箱并获取验证码，验证后继续使用。'
+        : '你的学习资料会保留。当前账户还未绑定邮箱，请填写常用邮箱并获取验证码，完成绑定后继续使用。';
+    if (codeButton && !codeButton.disabled) codeButton.textContent = hasBoundEmail ? '获取验证码' : '发送绑定验证码';
+    if(input) {
+        input.value = usableEmail;
+        input.placeholder = hasBoundEmail ? (usableEmail ? '当前绑定邮箱' : '当前绑定：'+emailAddress) : '请输入常用邮箱地址';
+    }
+    // This form must work before verification: never request gated profile APIs here.
+    toggleAuthModal(true);
+}
+
+function authNotice(form, message, failed=false) {
+    const status=document.querySelector('#'+form+' [role=status]');
+    if(status){status.textContent=message;status.classList.toggle('auth-error',failed);}
+    else showToast(message,failed?'error':'success');
+}
+async function accountPost(path,body){
+    const res=await fetch(path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
+    const data=await res.json();
+    if(!res.ok || data.status!=='success')throw new Error(data.message||'请检查填写内容后重试。');
+    return data;
+}
+function cooldown(button){
+    const until=Date.now()+60000, label=button.textContent;
+    button.dataset.cooldown='true';button.disabled=true;
+    const tick=()=>{
+        const seconds=Math.max(0,Math.ceil((until-Date.now())/1000));
+        button.textContent=seconds+' 秒后重发';
+        if(!seconds){clearInterval(timer);delete button.dataset.cooldown;button.disabled=false;button.textContent=label;}
+    };
+    const timer=setInterval(tick,500);tick();
+}
+async function sendCode(purpose,prefix,form,buttonId,captchaId){
+    const button=document.getElementById(buttonId);
+    if(button.disabled)return;
+    const email=document.getElementById(prefix+'-email').value.trim();
+    const captcha=document.getElementById(prefix+'-captcha')?.value.trim();
+    if(!email || (purpose!=='verify'&&!captcha)){authNotice(form,'请先填写邮箱'+(purpose==='verify'?'地址。':'和图片验证码。'),true);return;}
+    const label=button.textContent;button.disabled=true;button.textContent='发送中…';
+    try{
+        const data=await accountPost(purpose==='reset'?'/api/password/forgot/request':'/api/email/send-code',
+            {email,purpose,captcha,captcha_id:captchaId});
+        authNotice(form,data.message+' 邮件可能在垃圾箱中。');
+        button.textContent=label;cooldown(button);
+    }catch(e){authNotice(form,e.name==='TimeoutError'?'发送较慢，请稍后查收邮件或重试。':e.message,true);}
+    finally{
+        if(!button.dataset.cooldown){button.disabled=false;button.textContent=label;}
+        if(purpose!=='verify'){
+            await refreshCaptcha(purpose==='reset'?'forgot':'register');
+            document.getElementById(prefix+'-captcha').value='';
+        }
+    }
+}
+export function sendRegisterEmailCode(){return sendCode('register','reg','register-form','btn-reg-email-code',currentCaptchaIdRegister);}
+export function sendForgotCode(){return sendCode('reset','forgot','forgot-form','btn-forgot-code',currentCaptchaIdForgot);}
+export function sendVerifyEmailCode(){return sendCode('verify','verify','email-verify-form','btn-verify-code','');}
+
+export async function resetForgotPassword(){
+    const button=document.getElementById('btn-reset-password');if(button.disabled)return;
+    const email=document.getElementById('forgot-email').value.trim(), code=document.getElementById('forgot-email-code').value.trim();
+    const password=document.getElementById('forgot-new-pass').value, confirm=document.getElementById('forgot-new-pass-confirm').value;
+    if(!email || !code || password.length<6 || password!==confirm){authNotice('forgot-form','请填写邮箱验证码，确认两次密码一致且至少 6 位。',true);return;}
+    button.disabled=true;button.textContent='正在重置…';
+    try{
+        await accountPost('/api/password/forgot/reset',{email,code,new_password:password});
+        document.getElementById('forgot-form').reset();
+        window.switchAuthMode?.('login');showToast('密码已重置，请使用新密码登录。','success');
+    }catch(e){authNotice('forgot-form',e.name==='TimeoutError'?'请求超时，请稍后重试。':e.message,true);}
+    finally{button.disabled=false;button.textContent='重置密码';}
+}
+export async function verifyCurrentEmail(){
+    const button=document.getElementById('btn-verify-submit');if(button.disabled)return;
+    const email=document.getElementById('verify-email').value.trim(),code=document.getElementById('verify-email-code').value.trim();
+    if(!email||!code){authNotice('email-verify-form','请输入邮箱和验证码。',true);return;}
+    button.disabled=true;button.textContent='正在验证…';
+    try{await accountPost('/api/email/verify',{email,code});location.reload();}
+    catch(e){authNotice('email-verify-form',e.name==='TimeoutError'?'请求超时，请稍后重试。':e.message,true);}
+    finally{button.disabled=false;button.textContent='验证并继续';}
 }

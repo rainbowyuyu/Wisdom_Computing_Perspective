@@ -30,7 +30,7 @@ def test_installer_contains_every_declared_table():
     # Provider leases and background jobs are private SQLite operational stores.
     required-={'usage','leases','math_jobs','provider_circuit'}
     assert required<=declared,required-declared
-    assert len(declared)==30
+    assert len(declared)==32
     assert not re.search(r'^\s*(SOURCE|DROP|TRUNCATE)\b',script,re.M|re.I)
 
 
@@ -58,7 +58,7 @@ def test_rerun_recovers_install_interrupted_before_version_registration():
         for _ in range(2):
             result = run_installer(cursor)
             assert result['upgrade_status'] == 'OK', result
-            assert result['applied_migrations'] == 6
+            assert result['applied_migrations'] == 8
             cursor.execute("SELECT hashed_password FROM users WHERE username='interrupted_probe'")
             assert cursor.fetchall() == [('preserved-hash',)]
     finally:
@@ -98,7 +98,7 @@ def test_one_file_fresh_repeat_and_migration_compatibility(monkeypatch):
             cursor.execute('SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=%s AND TABLE_NAME=%s', (name, expected['table']))
             assert cursor.fetchone()[0] == len(expected['foreign_keys'])
         cursor.execute('SHOW TABLES');tables=[r[0] for r in cursor.fetchall()]
-        assert len(tables)==30
+        assert len(tables)==32
         def structure():
             result={}
             for table in tables:
@@ -166,7 +166,7 @@ def test_upgrade_keeps_account_data_and_does_not_hide_incomplete_schema(scenario
         for _ in range(2):
             result = run_installer(cursor)
             assert result['upgrade_status'] == ('OK' if scenario == 'previous_29' else 'NEEDS_ATTENTION'), result
-            assert result['applied_migrations'] == (6 if scenario == 'previous_29' else 5)
+            assert result['applied_migrations'] == (8 if scenario == 'previous_29' else 7)
             assert result['migration_conflicts'] == int(scenario == 'checksum_conflict')
             assert result['missing_columns'] == int(scenario == 'missing_field')
             for table in preserved_tables:

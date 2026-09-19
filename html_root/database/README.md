@@ -56,6 +56,10 @@ python scripts/migrate_database.py --apply
 | learning_wrongbook_reviews | 每次自评、心得及下次复习时间 | id；entry_id → learning_wrongbook.id |
 | user_wrongbook | 旧版视频错题归档 | id；应用不再写入此表 |
 | schema_migrations | 迁移版本与校验信息 | version |
+| account_email_codes | 注册、邮箱验证、找回密码的验证码摘要与有效期 | id；邮箱、用途、创建时间 |
+| account_email_limits | 邮件发送的邮箱、来源、账户和全站频率限制 | bucket |
+
+007 迁移为 `users` 补充唯一邮箱、验证状态及验证时间。旧账户默认未验证，原密码、角色和学习数据保留；首次登录后需补充邮箱验证。008 迁移扩展验证码用途，支持登录后验证新邮箱并立即替换绑定。启动入口与单文件 `visdom_db.sql` 均可升级，邮件配置见 `deploy/BAOTA.md`。验证码校验与注册、绑定邮箱、更换邮箱或重置密码在同一事务中完成，失败尝试会保留计数。
 
 ```mermaid
 erDiagram

@@ -16,7 +16,7 @@ from logic.manim_generator import render_matrix_animation, parse_latex_to_list
 
 @pytest.fixture(autouse=True)
 def fake_access(monkeypatch):
-    monkeypatch.setattr('app.access.load_principal',lambda user:{'id':1 if user else None,'username':user,'role':'member' if user else 'guest','disabled':False,'daily_limit':40})
+    monkeypatch.setattr('app.access.load_principal',lambda user:{'id':1 if user else None,'username':user,'role':'member' if user else 'guest','disabled':False,'daily_limit':40,'email_verified':True})
     monkeypatch.setattr('app.access.consume',lambda *args,**kwargs:None)
 
 

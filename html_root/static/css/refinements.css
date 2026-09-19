@@ -44,9 +44,148 @@ body { background-image:radial-gradient(circle at 10% 0,color-mix(in srgb,var(--
 .auth-captcha-row img { display:block; width:125px; height:44px; object-fit:contain; }
 .auth-account-dialog form>button { margin-top:1rem; width:100%; }
 .auth-account-message { min-height:1.5rem; }
+.auth-form-hint { font-size:.85rem; line-height:1.8; color:var(--text-secondary); margin:0 0 1rem; }
+.email-code-row,.auth-email-code { display:flex; align-items:center; gap:.6rem; margin-bottom:1rem; }
+.email-code-row input,.auth-email-code input { flex:1; min-width:0; margin:0!important; }
+.email-code-row button,.auth-email-code button { flex-shrink:0; white-space:nowrap; border-radius:10px; padding:.75rem .85rem; font-size:.8rem; }
+.auth-link-btn,.auth-secondary-actions button { color:var(--primary-color); background:transparent; border:0; cursor:pointer; font:inherit; padding:.7rem .2rem; }
+.auth-link-btn { display:block; margin:.6rem auto 0; font-size:.85rem; }
+.auth-secondary-actions { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:1rem; font-size:.85rem; }
+.auth-secondary-actions a { color:var(--primary-color); }
+.auth-account-message.auth-error { color:var(--danger-color,#c53c4b); }
+#email-verify-form h3 { margin:0 0 .65rem; color:var(--text-main); }
+#email-verify-form .action-btn,#forgot-form .action-btn { margin-bottom:1rem; }
+#auth-modal[data-requires-verify=true] .auth-tabs { display:none; }
+#auth-modal[data-requires-verify=true] .auth-body { padding-top:2.5rem; }
+.auth-account-dialog { max-height:90dvh; overflow-y:auto; }
+@media(max-width:480px) { .email-code-row button,.auth-email-code button { padding:.7rem .6rem; } }
+
+/* 设置中心：统一卡片、导航与账户安全的层次 */
+#settings-modal .settings-modal-content {
+  width:min(920px,95vw);
+  max-height:min(780px,92dvh);
+  border-radius:24px;
+  box-shadow:0 24px 80px rgb(15 43 82 / 18%);
+  background:linear-gradient(145deg,color-mix(in srgb,var(--bg-surface) 96%,var(--primary-color)),var(--bg-surface));
+}
+#settings-modal .settings-modal-header {
+  padding:1.35rem 2rem 1.15rem;
+  background:linear-gradient(110deg,color-mix(in srgb,var(--primary-color) 9%,var(--bg-surface)),var(--bg-surface) 66%);
+}
+#settings-modal .settings-modal-title { font-size:1.35rem; letter-spacing:-.03em; }
+#settings-modal .settings-modal-title::before {
+  content:'✦'; display:inline-grid; place-items:center; width:1.9rem; height:1.9rem; margin-right:.55rem;
+  border-radius:10px; color:#fff; font-size:.95rem; vertical-align:-.2rem;
+  background:linear-gradient(135deg,var(--primary-color),var(--secondary-color));
+  box-shadow:0 6px 16px color-mix(in srgb,var(--primary-color) 25%,transparent);
+}
+#settings-modal .settings-nav { width:190px; padding:1.25rem .85rem 1.25rem 1rem; background:color-mix(in srgb,var(--bg-body) 75%,var(--bg-surface)); }
+#settings-modal .settings-nav-item { padding:.7rem .85rem; border-radius:12px; font-size:.88rem; }
+#settings-modal .settings-nav-item.active { background:linear-gradient(120deg,var(--primary-color),color-mix(in srgb,var(--secondary-color) 70%,var(--primary-color))); box-shadow:0 7px 18px color-mix(in srgb,var(--primary-color) 22%,transparent); }
+#settings-modal .settings-content-inner { padding:2rem 2.25rem 2.3rem; }
+#settings-modal .settings-section { animation:settings-section-in .26s ease both; }
+#settings-modal .settings-section-title { font-size:1.22rem; letter-spacing:-.025em; margin-bottom:1.15rem; }
+#settings-modal .settings-item { border-radius:16px; padding:1.2rem 1.25rem; background:color-mix(in srgb,var(--bg-input) 72%,var(--bg-surface)); }
+#settings-modal .settings-info-item { border-radius:12px; }
+#settings-modal .settings-modal-footer { padding:1rem 1.5rem; background:color-mix(in srgb,var(--bg-surface) 92%,var(--primary-color)); }
+#settings-modal .settings-btn-save { box-shadow:0 7px 16px color-mix(in srgb,var(--primary-color) 22%,transparent); }
+.profile-email-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+.profile-email-value { color:var(--text-main); font-size:1.02rem; font-weight:650; letter-spacing:.01em; }
+.profile-email-status { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .62rem; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap; color:#946200; background:#fff4d6; border:1px solid #f5db98; }
+.profile-email-status::before { content:''; width:.42rem; height:.42rem; border-radius:50%; background:currentColor; }
+.profile-email-status.is-verified { color:#087a59; background:#e6f8f1; border-color:#b8ead8; }
+.profile-email-change-btn { margin-top:.25rem; }
+.profile-email-code-row { margin-top:.8rem; }
+.auth-style-eyebrow { color:var(--primary-color); font-size:.72rem; font-weight:750; letter-spacing:.12em; text-transform:uppercase; margin-bottom:.4rem; }
+#change-email-modal .modal-content { border-radius:22px; box-shadow:0 24px 70px rgb(15 43 82 / 22%); }
+#change-email-modal .auth-style-header { padding-bottom:.4rem; }
+#change-email-hint.is-error { color:var(--danger-color,#c53c4b); }
+#change-email-hint.is-success { color:var(--primary-color); }
+@keyframes settings-section-in { from { opacity:.35; transform:translateY(5px); } to { opacity:1; transform:none; } }
+[data-theme="dark"] #settings-modal .settings-modal-content { box-shadow:0 24px 80px rgb(0 0 0 / 38%); }
+[data-theme="dark"] .profile-email-status { color:#f4c86b; background:rgb(133 88 0 / 20%); border-color:rgb(244 200 107 / 30%); }
+[data-theme="dark"] .profile-email-status.is-verified { color:#5ce0b2; background:rgb(8 122 89 / 18%); border-color:rgb(92 224 178 / 30%); }
+@media(max-width:760px) {
+  #settings-modal .settings-modal-content { width:calc(100vw - 18px); max-height:calc(100dvh - 18px); border-radius:20px; }
+  #settings-modal .settings-modal-header { padding:1rem 1.25rem .9rem; }
+  #settings-modal .settings-modal-main { flex-direction:column; }
+  #settings-modal .settings-nav { width:100%; flex-direction:row; overflow-x:auto; border-right:0; border-bottom:1px solid var(--border-color); padding:.65rem .7rem; gap:.35rem; scrollbar-width:none; }
+  #settings-modal .settings-nav::-webkit-scrollbar { display:none; }
+  #settings-modal .settings-nav-item { flex:0 0 auto; padding:.55rem .75rem; }
+  #settings-modal .settings-nav-text { display:none; }
+  #settings-modal .settings-nav-short { display:inline; }
+  #settings-modal .settings-content-inner { padding:1.25rem 1rem 1.5rem; }
+  #settings-modal .settings-modal-footer { padding:.8rem 1rem; }
+  .profile-email-heading { align-items:flex-start; }
+}
+
+@media(max-width:600px) {
+  #auth-modal .modal-content { position:relative; inset:auto; width:calc(100vw - 24px); max-width:450px; max-height:calc(100dvh - 32px); border-radius:20px; }
+  #auth-modal .captcha-row { flex-direction:row; align-items:center; }
+  #auth-modal .captcha-row input { width:0; flex:1; min-width:0; }
+  #auth-modal .captcha-row img { width:112px; flex-shrink:0; }
+}
 .navbar .header-user-display { min-width:0; }
 .navbar .header-username { display:inline-block;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .navbar .nav-links { min-width:0;overflow-x:auto;scrollbar-width:none; }
 .navbar .desktop-auth { flex-shrink:0;margin-left:10px; }
 @media(max-width:760px) { .section>.section-title{margin-top:1.5rem;font-size:1.6rem}.section>.section-subtitle{font-size:.8rem;padding:0 .6rem}.formulas-panel-header{padding:1rem;gap:.6rem}.formulas-panel-title{font-size:.95rem}.formulas-sub-tab{font-size:.76rem;padding:.65rem .8rem} }
 @media(prefers-reduced-motion:reduce) { .section,.action-btn,.formula-card{animation:none!important;transition:none!important} }
+
+/* 设置中心：减少重复留白，让导航、内容和账户操作更直接。 */
+#settings-modal .settings-modal-content { width:min(980px,calc(100vw - 32px)); max-height:min(820px,calc(100dvh - 32px)); }
+#settings-modal .settings-modal-header { min-height:66px; padding:1rem 1.5rem 1rem 1.65rem; }
+#settings-modal .settings-modal-title { font-size:1.25rem; }
+#settings-modal .settings-modal-main { min-height:0; }
+#settings-modal .settings-nav { width:176px; padding:.85rem .7rem; gap:.18rem; }
+#settings-modal .settings-nav-item { display:flex; align-items:center; min-height:40px; padding:.58rem .72rem; font-size:.84rem; }
+#settings-modal .settings-nav-item > i { width:1.15rem; margin-right:.55rem; text-align:center; opacity:.78; }
+#settings-modal .settings-nav-item.active > i { opacity:1; }
+#settings-modal .settings-nav-item.active { box-shadow:0 5px 14px color-mix(in srgb,var(--primary-color) 18%,transparent); }
+#settings-modal .settings-content-inner { padding:1.35rem 1.65rem 1.6rem; }
+#settings-modal .settings-section { margin-bottom:1.5rem; }
+#settings-modal .settings-section-title { margin-bottom:.85rem; font-size:1.15rem; padding-bottom:.6rem; }
+#settings-modal .settings-item { margin-bottom:.75rem; padding:.9rem 1rem; border-radius:13px; }
+#settings-modal .settings-item-description { margin-top:.45rem; font-size:.78rem; line-height:1.55; }
+#settings-modal .settings-info-item { margin-bottom:.5rem; padding:.7rem .85rem; }
+#settings-modal .settings-modal-footer { min-height:58px; padding:.7rem 1.15rem; }
+#settings-modal .settings-footer-btns { gap:.5rem; }
+#settings-modal .settings-footer-btns .action-btn { padding:.55rem .9rem; }
+.profile-email-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.55rem; margin-top:.65rem; }
+.profile-email-actions .action-btn { margin-top:0; }
+.profile-email-verify-btn { background:color-mix(in srgb,var(--primary-color) 11%,var(--bg-surface)); color:var(--primary-color); border:1px solid color-mix(in srgb,var(--primary-color) 32%,var(--border-color)); }
+.profile-email-verify-btn:hover { background:var(--primary-color); color:#fff; }
+@media(max-width:760px) {
+  #settings-modal .settings-modal-content { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }
+  #settings-modal .settings-content-inner { padding:.95rem .85rem 1.2rem; }
+  #settings-modal .settings-nav { padding:.5rem; }
+  #settings-modal .settings-nav-item { min-height:36px; }
+  #settings-modal .settings-nav-item > i { margin-right:.35rem; }
+}
+
+/* Keep search, navigation and account controls in separate layout tracks. */
+.navbar { gap:12px; transition:background-color .3s,color .3s,border-color .3s,box-shadow .3s; }
+.navbar .logo { flex-shrink:0; }
+.navbar #nav-search-wrap { flex:0 1 210px; min-width:140px; overflow:visible; }
+.navbar #nav-search-input { width:100%; min-width:0; flex:1; }
+.navbar .header-account-access { min-width:0; }
+.navbar .header-account-access [data-verify-email] { white-space:normal; overflow-wrap:anywhere; text-align:left; }
+@media (min-width:901px) and (max-width:1800px) {
+  .navbar { display:grid; grid-template-columns:auto minmax(180px,1fr) minmax(180px,320px); gap:10px 24px; padding:12px 3%; }
+  .navbar .logo { grid-column:1; grid-row:1; max-width:none; }
+  .navbar #nav-search-wrap { grid-column:2; grid-row:1; width:100%; max-width:340px; min-width:0; margin-right:0!important; padding:5px 12px; }
+  .navbar .desktop-auth { grid-column:3; grid-row:1; min-width:0; margin-left:0; }
+  .navbar .desktop-auth .header-account-access { max-width:100%; flex-wrap:wrap; justify-content:flex-end; }
+  .navbar .desktop-auth .header-user-display { max-width:100%; }
+  .navbar .nav-links { grid-column:1/-1; grid-row:2; width:100%; max-width:none; justify-content:space-between; }
+  .navbar .nav-links .nav-btn { padding:8px 10px; white-space:nowrap; }
+}
+@media (max-width:900px) {
+  .navbar { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:8px; padding:12px 3%; }
+  .navbar .desktop-nav,.navbar .desktop-auth { display:none; }
+  .navbar .logo { max-width:none; }
+  .navbar .mobile-account-access { width:100%; max-width:100%; min-width:0; margin:0; justify-self:end; }
+  .navbar .mobile-account-access .header-access-trigger { max-width:100%; flex-wrap:wrap; justify-content:flex-end; }
+  .navbar .mobile-account-access .header-admin-link { white-space:normal; }
+  .navbar .mobile-menu-btn { padding:6px; }
+}

@@ -6,9 +6,11 @@ import time
 import hmac
 import hashlib
 import base64
+import re
+from email.utils import formatdate
 from typing import Optional, Dict, Set, List, Any
 from fastapi import APIRouter, Cookie, Query, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from pydantic import BaseModel, Field
 from pathlib import Path
 
@@ -492,11 +494,15 @@ async def get_player_config(
 @router.get("/v1/player/stream/{video_id}")
 async def stream_video(
     video_id: str,
+    request: Request,
     token: str = Query(""),
     expires: str = Query(""),
 ):
-    """鉴权视频流：仅在校验 token 通过后返回 storage 内 MP4 文件。"""
+    """鉴权视频流，支持 HTTP Range，便于拖动、断点和边下边播。"""
     video_id = (video_id or "").strip()[:128]
+    # video_id 来自 URL，严格限制为存储文件名，避免路径穿越和无效文件请求。
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", video_id):
+        return JSONResponse(status_code=400, content={"code": -1, "message": "无效的视频标识"})
     if not _verify_video_token(video_id, token, expires):
         return JSONResponse(
             status_code=403,
@@ -506,11 +512,66 @@ async def stream_video(
     file_path = os.path.join(STORAGE_DIR, filename)
     if not os.path.isfile(file_path):
         return JSONResponse(status_code=404, content={"code": -1, "message": "视频不存在"})
-    return FileResponse(
-        file_path,
-        media_type="video/mp4",
-        filename=filename,
-    )
+    file_size = os.path.getsize(file_path)
+    stat = os.stat(file_path)
+    etag = '"%x-%x"' % (stat.st_mtime_ns, file_size)
+    common_headers = {
+        "Accept-Ranges": "bytes",
+        "ETag": etag,
+        "Last-Modified": formatdate(stat.st_mtime, usegmt=True),
+        # 签名 URL 有效期为一小时；同一资源可由浏览器/CDN复用，减少重复下载。
+        "Cache-Control": "public, max-age=3600",
+        "X-Content-Type-Options": "nosniff",
+    }
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=common_headers)
+
+    range_header = request.headers.get("range")
+    if_range = request.headers.get("if-range")
+    if if_range and if_range not in {etag, common_headers['Last-Modified']}:
+        # A changed video must start fresh, rather than append bytes to an old cached copy.
+        range_header = None
+    start, end = 0, file_size - 1
+    status_code = 200
+    if range_header:
+        # 只处理单段 Range；多段响应会显著增加开销，浏览器播放场景不需要。
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+        if not match or (not match.group(1) and not match.group(2)):
+            return Response(status_code=416, headers={**common_headers, "Content-Range": f"bytes */{file_size}"})
+        try:
+            if match.group(1):
+                start = int(match.group(1))
+                end = int(match.group(2)) if match.group(2) else file_size - 1
+            else:
+                # suffix-byte-range-spec，例如 bytes=-1048576
+                suffix = int(match.group(2))
+                start = max(file_size - suffix, 0)
+                end = file_size - 1
+        except ValueError:
+            return Response(status_code=416, headers={**common_headers, "Content-Range": f"bytes */{file_size}"})
+        if start >= file_size or start > end:
+            return Response(status_code=416, headers={**common_headers, "Content-Range": f"bytes */{file_size}"})
+        end = min(end, file_size - 1)
+        status_code = 206
+
+    content_length = max(0, end - start + 1)
+
+    def iter_file():
+        with open(file_path, "rb") as video_file:
+            video_file.seek(start)
+            remaining = content_length
+            # 1 MiB 块适合大多数教学视频，同时避免把整段视频读入内存。
+            while remaining > 0:
+                chunk = video_file.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    headers = {**common_headers, "Content-Length": str(content_length)}
+    if status_code == 206:
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+    return StreamingResponse(iter_file(), status_code=status_code, media_type="video/mp4", headers=headers)
 
 
 @router.get("/v1/danmaku/list")

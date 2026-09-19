@@ -37,15 +37,24 @@ function render(){
             host.innerHTML=`<span class="access-mobile-name">${esc(current.username||'游客')}</span><button type="button" class="header-access-trigger" data-access-details aria-haspopup="dialog" aria-label="查看我的权限与申请方式"><span class="account-type ${esc(current.role)}">${esc(role)}</span><span class="header-quota ${summary.known&&!summary.unlimited&&summary.quota.remaining===0?'exhausted':''}" title="${esc(summary.description)}">${esc(summary.short)}</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>${current.can_manage===true?'<button type="button" class="header-admin-link" data-access-admin title="进入用户管理页面"><i class="fa-solid fa-sliders" aria-hidden="true"></i> 管理中心</button>':''}`;
             host.setAttribute('aria-label',`${current.username||'游客'} · ${role} · ${summary.description}`);
         }
+        if(current?.username && current.email_verified===false) {
+            host.innerHTML='<button type="button" class="header-access-trigger" data-verify-email>'+(current.email_address?'邮箱待验证 · 点击完成验证':'尚未绑定邮箱 · 点击绑定')+'</button>';
+        }
         bindAccessActions(host);
     });
     document.querySelectorAll('.account-access-card').forEach(card=>{
         if(!current){card.innerHTML=accessError?'<p>账户信息暂时无法读取</p><button type="button" data-access-retry>重新加载</button>':'<p>正在读取账户权益…</p>';bindAccessActions(card);return;}
         card.innerHTML=`<div class="access-card-main"><div class="access-card-identity"><span class="access-card-icon"><i class="fa-solid ${current.can_manage?'fa-shield-halved':summary.unlimited?'fa-crown':'fa-user-graduate'}" aria-hidden="true"></i></span><div><span class="account-type ${esc(current.role)}">${esc(current.can_manage?'主账号 · 管理员':names[current.role]||'账户')}</span><strong>${esc(current.username||'从一次尝试，开始理解数学')}</strong></div></div><p>${esc(summary.description)}</p><span class="access-card-caption">${current.can_manage?'用户权限、题目请求与管理记录，在一处查看。':summary.guest?'登录后可保存题解、整理错题与创建课包。':summary.unlimited?'解题、识图、动画与学习资料整理，随时继续。':'计算、识图、助手与动画共享每日额度；VIP 免个人每日次数限制。'}</span></div><div class="account-access-actions">${current.can_manage?'<button class="access-primary" type="button" data-access-admin><i class="fa-solid fa-sliders" aria-hidden="true"></i> 进入管理中心</button>':summary.guest?'<button class="access-primary" type="button" data-access-login>登录，保存我的学习</button>':`<a class="vip-contact access-primary" href="${AUTHOR_URL}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github" aria-hidden="true"></i> ${summary.unlimited?'联系作者':'联系作者 · 申请 VIP'} ↗</a>`}<button type="button" data-access-details aria-haspopup="dialog">${current.can_manage?'查看主账号权益':summary.guest?'查看试用与申请说明':'我的权益与申请说明'} <span aria-hidden="true">→</span></button>${summary.guest||current.can_manage?`<a class="vip-contact access-secondary" href="${AUTHOR_URL}" target="_blank" rel="noopener noreferrer">GitHub · 联系作者 ↗</a>`:''}</div>`;
+        if(current?.username && current.email_verified===false) {
+            const label=current.email_address?'邮箱待验证':'尚未绑定邮箱';
+            const action=current.email_address?'验证邮箱':'绑定邮箱';
+            card.innerHTML=`<div class="access-card-main"><strong>${esc(current.username)} · ${label}</strong><p>完成邮箱${current.email_address?'验证':'绑定'}后即可继续解题、保存笔记和使用其他功能。已有学习资料会保留。</p></div><div class="account-access-actions"><button type="button" class="access-primary" data-verify-email>${action}</button></div>`;
+        }
         bindAccessActions(card);
     });
 }
 function bindAccessActions(host){
+    host.querySelector('[data-verify-email]')?.addEventListener('click',()=>window.openEmailVerification?.(current?.email_address||''));
     host.querySelector('[data-access-details]')?.addEventListener('click',openAccessDetails);
     host.querySelector('[data-access-login]')?.addEventListener('click',()=>window.toggleAuthModal?.(true));
     host.querySelector('[data-access-admin]')?.addEventListener('click',openAdmin);
@@ -95,6 +104,7 @@ window.fetch=async(...args)=>{
     const path=new URL(typeof args[0]==='string'?args[0]:args[0]?.url||String(args[0]),location.href);
     if(path.origin===location.origin&&path.pathname.startsWith('/api/')){
         const code=response.headers.get('X-Wisdom-Access');
+        if(code==='email_verification_required')window.openEmailVerification?.(current?.email_address||'');
         if(['trial_exhausted','daily_exhausted'].includes(code)){
             try{const data=await response.clone().json();showAccessPrompt(data.message,code);}catch{}
         }

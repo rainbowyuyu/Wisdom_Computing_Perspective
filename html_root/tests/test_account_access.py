@@ -28,7 +28,7 @@ def environment(tmp_path,monkeypatch):
     with transaction() as (_,cur):
         for role in ['admin','member','vip']:
             username='qa_access_'+role+'_'+suffix
-            cur.execute('INSERT INTO users(username,hashed_password) VALUES(%s,%s)',(username,password));ident=cur.lastrowid
+            cur.execute('INSERT INTO users(username,hashed_password,email_verified) VALUES(%s,%s,1)',(username,password));ident=cur.lastrowid
             cur.execute('INSERT INTO account_access(user_id,role,daily_limit) VALUES(%s,%s,2)',(ident,role))
             users[role]={'id':ident,'username':username};session=uuid.uuid4().hex;sessions[role]=session;SESSION_STORE[session]=username
     monkeypatch.setattr(access,'OWNER_USERNAME',users['admin']['username'])

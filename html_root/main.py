@@ -27,6 +27,11 @@ async def lifespan(app):
     from app.database import apply_migrations
     if db_pool:
         await asyncio.to_thread(apply_migrations)
+        from app.email_service import prune_expired
+        try:
+            await asyncio.to_thread(prune_expired)
+        except Exception:
+            logger.warning('过期邮箱验证记录暂未清理，下次启动重试')
     else:
         logger.warning('数据库不可用，账户存储功能暂不可用')
     from app.math_jobs import manager
@@ -48,6 +53,11 @@ async def revalidate_site_code(request, call_next):
     # Revalidate first-party code after deployment without disabling media caching.
     if path == '/' or path.startswith(('/js/', '/css/', '/static/js/', '/static/css/')):
         response.headers['Cache-Control'] = 'no-cache'
+    # 视频内容变化少，允许浏览器和反向代理复用；stream 接口会额外返回 Range/ETag。
+    if path.startswith('/assets/storage/') and path.lower().endswith(('.mp4', '.webm', '.m3u8', '.ts')):
+        response.headers.setdefault('Cache-Control', 'public, max-age=86400')
+        response.headers.setdefault('Access-Control-Allow-Origin', '*')
+        response.headers.setdefault('Cross-Origin-Resource-Policy', 'cross-origin')
     if path.startswith(('/api/search', '/api/wrongbook', '/api/examples/course-packs', '/api/formulas/solutions')):
         response.headers['Cache-Control'] = 'private, no-store'
     return response

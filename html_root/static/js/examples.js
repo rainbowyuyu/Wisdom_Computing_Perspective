@@ -1,3 +1,4 @@
+import { canUseAccountFeatures } from './account-session.js';
 import { renderWrongbook, editWrongbook, openWrongbook } from './wrongbook.js';
 import { textWithMath } from './math-text.js';
 import { mountCurriculum } from './curriculum-ui.js?v=20260919-teaching-2';
@@ -49,6 +50,11 @@ export async function loadExamples() {
     const grid = document.getElementById('examples-grid');
     if (!grid) return;
     disposeCurriculum?.();disposeCurriculum=null;
+    if(!await canUseAccountFeatures()){
+        if(generation===loadGeneration)grid.innerHTML='<p class="video-grid-error">完成邮箱绑定与验证后，即可浏览教学案例。</p>';
+        return;
+    }
+    if(generation!==loadGeneration||!grid.isConnected)return;
     initExamplesFilterTabs();
 
     const filterTab = document.querySelector('.examples-filter-tab.active');
@@ -247,6 +253,7 @@ function renderExampleCards(videos) {
         const description = escapeHtml(v.description || '');
         const videoId = escapeAttr(v.video_id || (v.filename ? v.filename.replace(/\.mp4$/i, '') : ''));
         const urlAttr = escapeAttr(v.url || '');
+        const posterAttr = escapeAttr(v.poster || '');
         const titleAttr = escapeAttr(v.title || '');
         const descAttr = escapeAttr(v.description || '');
         const spriteAttr = escapeAttr(v.sprite_url || '');
@@ -265,7 +272,7 @@ function renderExampleCards(videos) {
         return [
             '<div class="video-card" data-video-url="' + urlAttr + '" data-video-id="' + videoId + '" data-video-title="' + titleAttr + '" data-video-desc="' + descAttr + '" data-video-sprite="' + spriteAttr + '" data-video-duration="' + durationSec + '" data-video-sprite-cols="' + spriteCols + '" data-video-sprite-rows="' + spriteRows + '" data-video-hls="' + hlsAttr + '" data-video-mask="' + maskAttr + '" data-video-high-energy="' + highEnergyAttr + '">',
             '  <div class="thumbnail video-preview-container">',
-            '    <video src="' + url + '#t=0.5" muted loop playsinline preload="metadata" onmouseover="this.play().catch(function(){})" onmouseout="this.pause(); this.currentTime=0.5;" style="width:100%; height:100%; object-fit:cover;"></video>',
+            '    <video data-preview-src="' + urlAttr + '"' + (posterAttr ? ' poster="' + posterAttr + '"' : '') + ' muted loop playsinline preload="none" aria-label="预览 ' + titleAttr + '" style="width:100%; height:100%; object-fit:cover;"></video>',
             '    <div class="play-overlay"><i class="fa-solid fa-play-circle"></i></div>',
             durationBadge,
             '    <div class="video-card-meta"><span><i class="fa-regular fa-thumbs-up"></i> ' + likeCount + '</span></div>',
@@ -290,6 +297,29 @@ function renderExampleCards(videos) {
     }
 
     grid.innerHTML = cardsHtml + paginationHtml;
+
+    // 预览按需加载：只有鼠标/键盘真正指向卡片时才请求视频，避免首屏同时打开多个连接。
+    grid.querySelectorAll('.video-card').forEach(card => {
+        const preview = card.querySelector('video[data-preview-src]');
+        if (!preview) return;
+        const startPreview = () => {
+            if (!preview.src) {
+                const source = preview.dataset.previewSrc;
+                if (!source) return;
+                preview.src = source + (source.includes('?') ? '&' : '?') + 'preview=1#t=0.5';
+                preview.load();
+            }
+            safePlay(preview);
+        };
+        const stopPreview = () => {
+            preview.pause();
+            try { preview.currentTime = 0.5; } catch (_) {}
+        };
+        card.addEventListener('mouseenter', startPreview, { passive: true });
+        card.addEventListener('mouseleave', stopPreview, { passive: true });
+        card.addEventListener('focusin', startPreview);
+        card.addEventListener('focusout', stopPreview);
+    });
 
     if (totalPages > 1) {
         const prevBtn = grid.querySelector('.examples-page-prev');
@@ -815,6 +845,12 @@ function initCustomPlayer() {
         player.addEventListener('timeupdate', syncTimeUI);
         player.addEventListener('progress', syncBufferUI);
         player.addEventListener('loadedmetadata', () => { syncTimeUI(); syncBufferUI(); });
+        // 网络抖动时给用户明确反馈，恢复后立即收起，不阻塞播放器操作。
+        player.addEventListener('waiting', () => wrapper?.classList.add('is-buffering'));
+        player.addEventListener('stalled', () => wrapper?.classList.add('is-buffering'));
+        player.addEventListener('canplay', () => wrapper?.classList.remove('is-buffering'));
+        player.addEventListener('playing', () => wrapper?.classList.remove('is-buffering'));
+        player.addEventListener('error', () => wrapper?.classList.remove('is-buffering'));
     }
 
     if (centerPlay) centerPlay.addEventListener('click', (e) => { e.stopPropagation(); if (player) safePlay(player); });

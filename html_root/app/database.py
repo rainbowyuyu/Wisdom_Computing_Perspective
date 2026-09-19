@@ -106,6 +106,22 @@ def apply_migrations():
                         if fk and fk['UPDATE_RULE']=='CASCADE':continue
                         if fk:statement=re.sub(r'DROP FOREIGN KEY \w+', 'DROP FOREIGN KEY `'+fk['CONSTRAINT_NAME'].replace('`','``')+'`',statement)
                         else:statement=re.sub(r'DROP FOREIGN KEY \w+,\s*','',statement)
+                    if path.name == '007_email_verification.sql':
+                        # MySQL 5.7 lacks ADD COLUMN IF NOT EXISTS.  Keep the
+                        # migration portable by checking old installations before
+                        # applying each additive users definition.
+                        column_match = re.search(r'ALTER TABLE\s+users\s+ADD COLUMN\s+(\w+)', statement, re.I)
+                        index_match = re.search(r'ALTER TABLE\s+users\s+ADD UNIQUE KEY\s+(\w+)', statement, re.I)
+                        if column_match:
+                            cursor.execute('''SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+                                WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME=%s''', (column_match.group(1),))
+                            if cursor.fetchone()['n']:
+                                continue
+                        if index_match:
+                            cursor.execute('''SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+                                WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND INDEX_NAME=%s''', (index_match.group(1),))
+                            if cursor.fetchone()['n']:
+                                continue
                     # Hash the original migration above; adapt only its execution copy.
                     cursor.execute(compatible_migration_statement(statement, collation))
                 if path.name=='001_learning_records.sql': backfill_legacy(cursor)

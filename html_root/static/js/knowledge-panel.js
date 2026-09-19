@@ -1,3 +1,4 @@
+import { canUseAccountFeatures } from './account-session.js';
 import { mountTaskProgress } from '/static/js/task-progress.js';
 /**
  * 智算星云 - 全局浮动面板
@@ -34,6 +35,7 @@ async function fetchUserStats() {
     const user=getCurrentUser();
     const stats={formulas:0,scripts:0,templates:0,wrongbook:0,tutorialDone:!!localStorage.getItem('tutorial_played')};
     if(!user){try{const rows=JSON.parse(localStorage.getItem(WRONGBOOK_STORAGE_KEY)||'[]');stats.wrongbook=Array.isArray(rows)?rows.length:0;}catch{}return stats;}
+    if(!await canUseAccountFeatures())return stats;
     if(statsCache?.user===user&&Date.now()-statsCache.at<30000)return {...stats,...statsCache.data};
     if(statsPending?.user===user)return statsPending.promise;
     const version=statsEpoch;
@@ -118,7 +120,7 @@ function renderBadge(label, value, icon, unlocked) {
 async function fetchAchievements(stats) {
     const user = getCurrentUser();
     // 未登录：不参与成就系统，不请求后端
-    if (!user) return [];
+    if (!user || !await canUseAccountFeatures()) return [];
     const params = new URLSearchParams({
         formulas: String(stats.formulas || 0),
         scripts: String(stats.scripts || 0),
@@ -138,7 +140,7 @@ async function fetchAchievements(stats) {
 /** 同步成就到数据库 */
 async function syncAchievementToDb(achievementId, progress, unlocked) {
     const user = getCurrentUser();
-    if (!user) return;
+    if (!user || !await canUseAccountFeatures()) return;
     try {
         await fetch('/api/achievements/upsert', {
             method: 'POST',

@@ -69,6 +69,9 @@ def test_upgrade_18_tables_preserves_data_and_is_repeatable(collation):
             statement = statement.replace(' ON UPDATE CASCADE', '')
             if table == 'example_video_danmaku':
                 statement = re.sub(r'^\s*`(?:color|mode)`[^\n]+\n', '', statement, flags=re.M)
+            if table == 'users':
+                statement = re.sub(r'^\s*`email(?:_verified(?:_at)?)?`[^\n]+\n', '', statement, flags=re.M)
+                statement = re.sub(r'^\s*UNIQUE KEY `uq_users_email`[^\n]+\n', '', statement, flags=re.M)
             statement = re.sub(r'`fk_\w+_username`', f'`{table}_ibfk_1`', statement)
             statement = re.sub(r',\s*\) ENGINE', '\n) ENGINE', statement)
             cursor.execute(statement)
@@ -93,12 +96,12 @@ def test_upgrade_18_tables_preserves_data_and_is_repeatable(collation):
         for _ in range(2):
             result = run_installer(cursor)
             assert result['upgrade_status'] == 'OK', result
-            assert result['applied_migrations'] == 6
+            assert result['applied_migrations'] == len(list((ROOT/'database/migrations').glob('*.sql')))
             assert result['unmatched_legacy_wrongbook'] == 1
         cursor.execute('SELECT DATABASE()')
         assert cursor.fetchone()[0] == name
         cursor.execute('SHOW TABLES')
-        assert len(cursor.fetchall()) == 30
+        assert len(cursor.fetchall()) == 32
         for table in LEGACY:
             cursor.execute(f'SELECT {original_columns[table]} FROM `{table}`')
             assert cursor.fetchall() == before[table], table

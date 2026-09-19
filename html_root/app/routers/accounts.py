@@ -29,12 +29,14 @@ def list_users(q:str=Query('',max_length=80),page:int=Query(1,ge=1,le=10000)):
     with transaction() as (_,cur):
         pattern='%'+q.replace('!','!!').replace('%','!%').replace('_','!_')+'%'
         cur.execute("SELECT COUNT(*) AS total FROM users WHERE username LIKE %s ESCAPE '!'",(pattern,));total=cur.fetchone()['total']
-        cur.execute('''SELECT u.id,u.username,u.created_at,COALESCE(a.role,'member') AS role,
+        cur.execute('''SELECT u.id,u.username,u.created_at,u.email,u.email_verified,u.email_verified_at,COALESCE(a.role,'member') AS role,
             COALESCE(a.disabled,0) AS disabled,a.daily_limit,COALESCE(t.used,0) AS used
             FROM users u LEFT JOIN account_access a ON a.user_id=u.id
             LEFT JOIN access_usage t ON t.principal=CONCAT('u:',u.id) AND t.period=%s AND t.feature='all'
             WHERE u.username LIKE %s ESCAPE '!' ORDER BY u.id DESC LIMIT 20 OFFSET %s''',(access.today(),pattern,(page-1)*20))
         users=cur.fetchall();config=access.settings(cur)
+        from ..email_service import mask_email
+        for user in users:user['email']=mask_email(user.get('email'))
     return {'items':users,'total':total,'page':page,'settings':config}
 
 

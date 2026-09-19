@@ -46,6 +46,8 @@ ALIYUN_CDN_PUBLIC_BASE=https://cdn.wiscomper.com
 
 当视频仍走本站时，建议在宝塔面板中配置 Nginx，以支持 Range 请求和合理缓冲。
 
+本站播放器接口 `/api/v1/player/stream/{video_id}` 已内置单段 Range、ETag、Last-Modified 和 1 小时缓存头；无需额外改 Python 配置即可边下边播和拖动进度。Nginx 只需要把请求保持为 HTTP/1.1 并允许回源流式传输。
+
 ### 1. 打开 Nginx 配置
 
 宝塔 → 网站 → 选择站点 → 设置 → 配置文件
@@ -104,3 +106,13 @@ location /assets/ {
 1. 打开教学案例页，播放视频，观察加载速度
 2. 浏览器开发者工具 → Network，确认视频请求的域名是否为 CDN 域名
 3. 若有 `Accept-Ranges: bytes`，表示支持 Range 请求，拖拽进度条可正常使用
+
+## 五、视频文件建议
+
+上传前建议统一为 H.264 视频 + AAC 音频，并使用 `faststart` 将索引移到文件开头。这样浏览器拿到开头的小段数据即可显示时长和开始播放，不必等待整个文件下载：
+
+```bash
+ffmpeg -i input.mp4 -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k -movflags +faststart output.mp4
+```
+
+教学案例卡片采用按需预览：首屏只加载封面或元数据，鼠标移入单个卡片后才请求视频，打开播放器后再使用鉴权分段地址。没有 CDN 时会自动使用本站流；CDN 回源失败时播放器会切换到本站地址。

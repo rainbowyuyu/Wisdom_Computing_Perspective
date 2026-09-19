@@ -29,7 +29,8 @@
                 <!-- 0 背景层 -->
                 <div class="player-layer player-layer-bg" aria-hidden="true"></div>
                 <!-- 1 视频层 -->
-                <video id="example-video-player" class="player-layer player-layer-video" autoplay playsinline></video>
+                <video id="example-video-player" class="player-layer player-layer-video" autoplay playsinline preload="metadata"></video>
+                <div class="player-buffering-indicator" aria-live="polite"><i class="fa-solid fa-circle-notch fa-spin"></i><span>正在缓冲…</span></div>
                 <!-- 2 防挡弹幕蒙版层（占位，后续可接蒙版数据） -->
                 <div class="player-layer player-layer-mask" id="player-layer-mask" aria-hidden="true"></div>
                 <!-- 3 弹幕渲染层 Canvas -->

@@ -63,6 +63,19 @@ client = GuardedClient(OpenAI(
 AVATAR_DIR = os.path.join(ROOT_DIR, "static", "avatars")
 os.makedirs(AVATAR_DIR, exist_ok=True)
 ALLOWED_AVATAR_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+# 邮箱验证与找回密码。凭据只从环境变量读取，绝不下发到浏览器。
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = _int_env("SMTP_PORT", 465)
+SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USERNAME).strip()
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "智算视界").strip() or "智算视界"
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "1").strip().lower() not in {"0", "false", "no"}
+EMAIL_CODE_EXPIRE_SECONDS = _int_env("EMAIL_CODE_EXPIRE_SECONDS", 600)
+EMAIL_SEND_COOLDOWN_SECONDS = _int_env("EMAIL_SEND_COOLDOWN_SECONDS", 60)
+EMAIL_DAILY_LIMIT = _int_env("EMAIL_DAILY_LIMIT", 10)
+EMAIL_CODE_SECRET = os.getenv("EMAIL_CODE_SECRET", "")
 VIDEOS_DIR = os.path.join(ROOT_DIR, "static", "videos")
 os.makedirs(VIDEOS_DIR, exist_ok=True)
 

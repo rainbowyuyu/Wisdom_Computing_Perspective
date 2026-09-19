@@ -83,52 +83,26 @@ export function showSection(sectionId) {
 export function toggleAuthModal(show) {
     const modal = document.getElementById('auth-modal');
     if (!modal) return;
-
-    if (show) {
-        modal.style.display = 'flex';
-        // 强制重绘，确保 transition 生效
-        // requestAnimationFrame 可以保证在下一帧添加 class，从而触发 CSS transition
-        requestAnimationFrame(() => {
-            modal.classList.add('show');
-        });
-
-        // 尝试自动聚焦用户名输入框，提升体验
-        setTimeout(() => {
-            const userParams = document.getElementById('login-user');
-            if(userParams) userParams.focus();
-        }, 100);
-
-    } else {
-        modal.classList.remove('show');
-        // 等待 CSS transition (0.3s) 结束后再隐藏 display
-        setTimeout(() => {
-            modal.style.display = 'none';
-        }, 300);
-    }
-
+    if(show && modal.dataset.requiresVerify==='true')switchAuthMode('verify');
     toggleModal('auth-modal', show);
 }
 
 // ... 其他函数保持不变 ...
 export function switchAuthMode(mode) {
+    if(document.getElementById('auth-modal')?.dataset.requiresVerify==='true')mode='verify';
     const loginForm = document.getElementById('login-form');
     const regForm = document.getElementById('register-form');
+    const forgotForm = document.getElementById('forgot-form');
+    const verifyForm = document.getElementById('email-verify-form');
     const tabs = document.querySelectorAll('.auth-tab');
 
     tabs.forEach(t => t.classList.remove('active'));
-
-    if(mode === 'login') {
-        loginForm.style.display = 'block';
-        regForm.style.display = 'none';
-        tabs[0].classList.add('active'); // 假设第一个是登录
-    } else {
-        loginForm.style.display = 'none';
-        regForm.style.display = 'block';
-        tabs[1].classList.add('active'); // 假设第二个是注册
-    }
-    if (window.refreshCaptcha) {
-        window.refreshCaptcha(mode);
-    }
+    [loginForm, regForm, forgotForm, verifyForm].forEach(form => { if (form) form.style.display = 'none'; });
+    if(mode === 'register') { regForm.style.display = 'block'; tabs[1]?.classList.add('active'); }
+    else if(mode === 'forgot') { forgotForm.style.display = 'block'; }
+    else if(mode === 'verify') { verifyForm.style.display = 'block'; }
+    else { loginForm.style.display = 'block'; tabs[0]?.classList.add('active'); }
+    if (window.refreshCaptcha && ['login','register','forgot'].includes(mode)) window.refreshCaptcha(mode);
 }
 // ...
 

@@ -21,7 +21,7 @@ def accounts():
     try:
         import bcrypt
         hashed=bcrypt.hashpw(b'Library-QA-test-password',bcrypt.gensalt()).decode()
-        cursor.executemany('INSERT INTO users (username,hashed_password) VALUES (%s,%s)',[(u,hashed) for u in users]);conn.commit()
+        cursor.executemany('INSERT INTO users (username,hashed_password,email_verified) VALUES (%s,%s,1)',[(u,hashed) for u in users]);conn.commit()
         for session,user in zip(sessions,users): SESSION_STORE[session]=user
         yield users,sessions
     finally:

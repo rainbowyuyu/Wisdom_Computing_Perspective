@@ -83,7 +83,7 @@
     }
     </script>
     <link rel="stylesheet" href="/static/css/pages/step-tutor.css?v=20260919-teaching-2">
-    <link rel="stylesheet" href="/static/css/refinements.css?v=20260918-hero-1">
+    <link rel="stylesheet" href="/static/css/refinements.css?v=20260919-responsive-nav-1">
     <link rel="stylesheet" href="/static/css/pages/home-background.css?v=20260918-horizontal-fade-4">
 <link rel="stylesheet" href="/static/css/pages/assistant-workspace.css?v=20260919-tasks-1">
 <link rel="stylesheet" href="/static/css/pages/teaching-workspace.css?v=20260919-teaching-2">
@@ -164,10 +164,10 @@
         </div>
     </div>
 
-    <!-- 顶部更新消息：v0.4.6 -->
+    <!-- 顶部更新消息：v0.4.7 -->
     <div class="agent-update-banner" id="agent-update-banner">
-        <span class="agent-update-text">新更新：安全性加强，使用速度加强，整体体验更加流畅</span>
-        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志', 'update-v-0.4.6')" class="agent-update-detail" title="查看更新详情（定位到 v0.4.6）">v0.4.6 更新详情</a>
+        <span class="agent-update-text">新更新：邮箱验证与密码找回，设置更清楚，使用更顺畅</span>
+        <a href="javascript:void(0)" onclick="openDoc('update.md', '更新日志', 'update-v-0.4.7')" class="agent-update-detail" title="查看更新详情（定位到 v0.4.7）">v0.4.7 更新详情</a>
         <button type="button" class="agent-update-close" onclick="closeAgentBanner()" title="关闭" aria-label="关闭"><i class="fa-solid fa-times"></i></button>
     </div>
 
@@ -779,10 +779,12 @@
                     </div>
 
                     <button type="button" id="btn-login-submit" class="action-btn full-width" onclick="handleLogin()">立即登录</button>
+                    <button type="button" class="auth-link-btn" onclick="switchAuthMode('forgot')">忘记密码？</button>
                 </form>
 
                 <!-- 注册表单 -->
                 <form id="register-form" style="display:none;">
+                    <p class="auth-form-hint">验证常用邮箱，保存你的学习进度，也方便找回密码。</p>
                     <div class="username-check-wrap">
                         <input type="text" placeholder="设置用户名" class="tech-input" id="reg-user" autocomplete="username">
                         <span id="reg-username-hint" class="username-hint" aria-live="polite"></span>
@@ -799,8 +801,14 @@
                     <input type="password" placeholder="确认密码" class="tech-input" id="reg-pass-confirm">
 
                     <div class="captcha-row">
-                        <input type="text" placeholder="验证码" class="tech-input" id="reg-captcha">
+                        <input type="text" placeholder="发邮件前填写图片验证码" aria-label="图片验证码" class="tech-input" id="reg-captcha" maxlength="8">
                         <img id="captcha-img-reg" src="" alt="点击刷新" class="captcha-img" onclick="refreshCaptcha('register')" title="点击刷新验证码">
+                    </div>
+
+                    <input type="email" placeholder="常用邮箱（用于验证账户）" class="tech-input" id="reg-email" autocomplete="email">
+                    <div class="email-code-row">
+                        <input type="text" placeholder="邮箱验证码" aria-label="邮箱验证码" class="tech-input" id="reg-email-code" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                        <button type="button" class="action-btn" id="btn-reg-email-code" onclick="sendRegisterEmailCode()">获取验证码</button>
                     </div>
 
                     <!-- 新增：隐私协议勾选 -->
@@ -813,7 +821,35 @@
                         </label>
                     </div>
 
-                    <button type="button" id="btn-reg-submit" class="action-btn full-width" onclick="handleRegister()">注册账户</button>
+                    <p class="auth-account-message" role="status" aria-live="polite"></p>
+                    <button type="button" id="btn-reg-submit" class="action-btn full-width" onclick="handleRegister()">验证并注册</button>
+                </form>
+
+                <form id="forgot-form" style="display:none;">
+                    <p class="auth-form-hint">通过已验证的邮箱找回账户。旧账户若尚未绑定邮箱，请联系作者协助。</p>
+                    <input type="email" placeholder="注册邮箱" class="tech-input" id="forgot-email" autocomplete="email">
+                    <div class="captcha-row">
+                        <input type="text" placeholder="图片验证码" class="tech-input" id="forgot-captcha">
+                        <img id="captcha-img-forgot" src="" alt="点击刷新" class="captcha-img" onclick="refreshCaptcha('forgot')" title="点击刷新验证码">
+                    </div>
+                    <button type="button" class="action-btn full-width" id="btn-forgot-code" onclick="sendForgotCode()">发送邮箱验证码</button>
+                    <input type="text" placeholder="邮箱验证码" class="tech-input" id="forgot-email-code" maxlength="6">
+                    <input type="password" placeholder="新密码（至少 6 位）" class="tech-input" id="forgot-new-pass" autocomplete="new-password">
+                    <input type="password" placeholder="确认新密码" class="tech-input" id="forgot-new-pass-confirm" autocomplete="new-password">
+                    <p class="auth-account-message" role="status" aria-live="polite"></p>
+                    <button type="button" id="btn-reset-password" class="action-btn full-width" onclick="resetForgotPassword()">重置密码</button>
+                    <div class="auth-secondary-actions"><button type="button" onclick="switchAuthMode('login')">返回登录</button><a href="https://github.com/rainbowyuyu" target="_blank" rel="noopener noreferrer">联系作者</a></div>
+                </form>
+
+                <form id="email-verify-form" style="display:none;">
+                    <h3 id="verify-email-title">验证邮箱</h3>
+                    <p id="verify-email-hint" class="auth-form-hint">你的学习资料会保留。请先验证常用邮箱，再继续使用其他功能。</p>
+                    <input type="email" placeholder="邮箱地址" class="tech-input" id="verify-email" autocomplete="email">
+                    <button type="button" id="btn-verify-code" class="action-btn full-width" onclick="sendVerifyEmailCode()">获取验证码</button>
+                    <input type="text" placeholder="邮箱验证码" class="tech-input" id="verify-email-code" maxlength="6">
+                    <p class="auth-account-message" role="status" aria-live="polite"></p>
+                    <button type="button" id="btn-verify-submit" class="action-btn full-width" onclick="verifyCurrentEmail()">验证并继续</button>
+                    <div class="auth-secondary-actions"><button type="button" onclick="logout()">退出当前账户</button><a href="https://github.com/rainbowyuyu" target="_blank" rel="noopener noreferrer">联系作者</a></div>
                 </form>
             </div>
         </div>
@@ -859,6 +895,29 @@
         </div>
     </div>
 
+    <!-- 更换邮箱独立弹窗 -->
+    <div id="change-email-modal" class="modal auth-style-modal" style="z-index: 2200;">
+        <div class="modal-content">
+            <span class="close-modal auth-style-close" onclick="Profile.closeChangeEmailModal()" aria-label="关闭">&times;</span>
+            <header class="auth-style-header">
+                <div class="auth-style-eyebrow"><i class="fa-solid fa-shield-halved"></i> 账户安全</div>
+                <h3 class="auth-title">更换绑定邮箱</h3>
+                <p class="auth-form-hint">验证码会发送到新邮箱，验证成功后立即替换当前邮箱。</p>
+            </header>
+            <div id="change-email-guest" class="auth-body" style="display:none; color: var(--text-secondary);">请先登录后再更换邮箱。</div>
+            <div id="change-email-form" class="auth-body" style="display:none;">
+                <label class="auth-field-label" for="change-email-new">新邮箱地址</label>
+                <input type="email" id="change-email-new" class="tech-input" placeholder="name@example.com" maxlength="254" autocomplete="email">
+                <div class="email-code-row profile-email-code-row">
+                    <input type="text" id="change-email-code" class="tech-input" placeholder="6 位验证码" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                    <button type="button" id="btn-change-email-code" class="action-btn secondary" onclick="Profile.sendChangeEmailCode()">获取验证码</button>
+                </div>
+                <p id="change-email-hint" class="auth-account-message" role="status" aria-live="polite"></p>
+                <button type="button" id="btn-change-email-submit" class="action-btn full-width" onclick="Profile.submitChangeEmailModal()"><i class="fa-solid fa-check"></i> 验证并更换</button>
+            </div>
+        </div>
+    </div>
+
     <!-- index.html Settings Modal 部分 -->
 
     <div id="settings-modal" class="modal">
@@ -872,14 +931,14 @@
                 <!-- 中间区域：左侧导航 + 右侧内容（一行） -->
                 <div class="settings-modal-main">
                     <nav id="settings-nav" class="settings-nav" aria-label="设置分类">
-                        <a href="javascript:void(0)" class="settings-nav-item active" data-section="settings-appearance"><span class="settings-nav-text">外观与关于</span><span class="settings-nav-short">外观</span></a>
-                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-profile"><span class="settings-nav-text">账户与资料</span><span class="settings-nav-short">账户</span></a>
-                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-agent"><span class="settings-nav-text">智能体</span><span class="settings-nav-short">智能体</span></a>
-                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-detect"><span class="settings-nav-text">智能识别与画板</span><span class="settings-nav-short">画板</span></a>
-                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-shortcuts"><span class="settings-nav-text">画板快捷键</span><span class="settings-nav-short">快捷键</span></a>
-                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-calc"><span class="settings-nav-text">动态计算</span><span class="settings-nav-short">计算</span></a>
-                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-devtools"><span class="settings-nav-text">开发者工具</span><span class="settings-nav-short">开发</span></a>
-                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-examples"><span class="settings-nav-text">教学案例与弹幕</span><span class="settings-nav-short">案例</span></a>
+                        <a href="javascript:void(0)" class="settings-nav-item active" data-section="settings-appearance"><i class="fa-solid fa-palette" aria-hidden="true"></i><span class="settings-nav-text">外观与关于</span><span class="settings-nav-short">外观</span></a>
+                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-profile"><i class="fa-solid fa-user" aria-hidden="true"></i><span class="settings-nav-text">账户与资料</span><span class="settings-nav-short">账户</span></a>
+                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-agent"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span class="settings-nav-text">智能体</span><span class="settings-nav-short">智能体</span></a>
+                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-detect"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span class="settings-nav-text">智能识别与画板</span><span class="settings-nav-short">画板</span></a>
+                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-shortcuts"><i class="fa-solid fa-keyboard" aria-hidden="true"></i><span class="settings-nav-text">画板快捷键</span><span class="settings-nav-short">快捷键</span></a>
+                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-calc"><i class="fa-solid fa-calculator" aria-hidden="true"></i><span class="settings-nav-text">动态计算</span><span class="settings-nav-short">计算</span></a>
+                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-devtools"><i class="fa-solid fa-code" aria-hidden="true"></i><span class="settings-nav-text">开发者工具</span><span class="settings-nav-short">开发</span></a>
+                        <a href="javascript:void(0)" class="settings-nav-item" data-section="settings-examples"><i class="fa-solid fa-play-circle" aria-hidden="true"></i><span class="settings-nav-text">教学案例与弹幕</span><span class="settings-nav-short">案例</span></a>
                     </nav>
                     <div class="settings-modal-body" id="settings-scroll-container">
                 <div class="settings-content-inner">
@@ -957,6 +1016,21 @@
                         <div class="settings-item">
                             <label class="settings-item-label" for="profile-nickname">昵称</label>
                             <input type="text" id="profile-nickname" class="tech-input" placeholder="选填，用于展示" maxlength="64" style="width: 100%; max-width: 300px;">
+                            <p class="settings-item-description">昵称只用于页面展示，修改后会自动保存。</p>
+                        </div>
+                        <div class="settings-item profile-email-card">
+                            <div class="profile-email-heading">
+                                <div>
+                                    <label class="settings-item-label" style="margin-bottom:.35rem;">绑定邮箱</label>
+                                    <div id="profile-email-display" class="profile-email-value">暂未绑定</div>
+                                </div>
+                                <span id="profile-email-status" class="profile-email-status">未验证</span>
+                            </div>
+                            <p id="profile-email-hint" class="settings-item-description">更换邮箱需要验证新邮箱，验证完成后立即生效。</p>
+                            <div class="profile-email-actions">
+                                <button type="button" id="profile-email-verify-btn" class="action-btn profile-email-verify-btn" onclick="window.openEmailVerification?.(this.dataset.email || '')" hidden><i class="fa-solid fa-shield-check"></i> 立即验证</button>
+                                <button type="button" class="action-btn secondary profile-email-change-btn" onclick="Profile.openChangeEmailModal()"><i class="fa-solid fa-envelope"></i> 更换邮箱</button>
+                            </div>
                         </div>
                         <div class="settings-item">
                             <label class="settings-item-label">用户名</label>
@@ -1655,7 +1729,7 @@
                 <p>基于 AI 视觉识别与 Manim 动态引擎的下一代数学可视化计算平台。致力于降低数学学习门槛，让抽象公式触手可及。</p>
                 <div class="social-links">
                     <a href="https://github.com/rainbowyuyu/Wisdom_Computing_Perspective" target="_blank" class="social-link" title="GitHub"><i class="fa-brands fa-github"></i></a>
-                    <a href="https://www.bilibili.com/video/BV1n3dGYJEEJ/" target="_blank" class="social-link" title="Bilibili"><i class="fa-brands fa-bilibili"></i></a>
+                    <a href="https://www.bilibili.com/video/BV1sxeS6MEWE/?vd_source=947c20a2be9c3b661ee26e445f2291d8" target="_blank" rel="noopener noreferrer" class="social-link" title="Bilibili"><i class="fa-brands fa-bilibili"></i></a>
                     <a href="mailto:rainbowyu619@gmail.com" class="social-link" title="Email"><i class="fa-solid fa-envelope"></i></a>
                 </div>
             </div>

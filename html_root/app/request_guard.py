@@ -31,6 +31,14 @@ FEATURE_ROUTES={'/api/solve/stream':'calculate','/api/animate':'calculate','/api
 
 CODE_ROUTES = {'/api/devtools/run_manim', '/api/devtools/run_manim_stream', '/api/devtools/render_keyframe', '/api/animate/stream'}
 EXPENSIVE = CODE_ROUTES | {'/api/solve/stream', '/api/solve/render', '/api/agent/execute', '/api/detect', '/api/animate', '/api/devtools/edit_code', '/api/devtools/generate_video_copy', '/api/login', '/api/register'}
+EXPENSIVE |= {'/api/email/send-code', '/api/email/verify', '/api/email/change', '/api/password/forgot/request', '/api/password/forgot/reset'}
+
+# 未完成邮箱验证的账户只保留恢复账户所需的基础接口。
+EMAIL_RECOVERY_ROUTES = {
+    '/api/login', '/api/logout', '/api/register', '/api/captcha',
+    '/api/user/me', '/api/account/access', '/api/user/check-username', '/api/email/send-code',
+    '/api/email/verify', '/api/email/change', '/api/password/forgot/request', '/api/password/forgot/reset',
+}
 
 
 def client_ip(scope, headers):
@@ -79,10 +87,13 @@ class RequestGuard:
             await response(scope, receive, send)
         try:
             principal=None
-            if user and path.startswith('/api/') and path not in {'/api/login','/api/logout','/api/register','/api/captcha','/api/user/check-username'}:
+            if user and path.startswith('/api/') and path not in {'/api/login','/api/logout','/api/register','/api/captcha','/api/user/check-username','/api/password/forgot/request','/api/password/forgot/reset'}:
                 try:principal=await asyncio.to_thread(access.load_principal,user)
                 except access.AccessDenied as error:return await reject(str(error),error.status,code=error.code)
                 except Exception:return await reject('账户服务暂不可用，请稍后重试。',503)
+            if (user and principal and path.startswith('/api/') and
+                    not principal.get('email_verified') and path not in EMAIL_RECOVERY_ROUTES):
+                return await reject('请先完成邮箱验证，验证后即可继续使用完整功能。', 403, code='email_verification_required')
             if any(part.startswith('.') for part in path.split('/') if part) or (path.startswith(('/videos/', '/static/videos/')) and path.lower().endswith(('.py', '.json', '.log', '.tex', '.aux'))):
                 return await reject('Not Found', 404)
             if path.startswith('/api/') and method not in {'GET','HEAD','OPTIONS'}:
@@ -165,7 +176,7 @@ class RequestGuard:
                         (b'referrer-policy', b'strict-origin-when-cross-origin'),
                         (b'x-frame-options', b'SAMEORIGIN'),
                     ]
-                    if path.startswith(('/api/agent/tasks','/api/account/','/api/admin/','/api/user/')):
+                    if path in EMAIL_RECOVERY_ROUTES or path.startswith(('/api/agent/tasks','/api/account/','/api/admin/','/api/user/')):
                         message['headers'].append((b'cache-control', b'private, no-store'))
                     if new_guest and path.startswith('/api/'):
                         secure=public_scheme(scope, headers)=='https'

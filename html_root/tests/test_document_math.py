@@ -11,6 +11,17 @@ def test_changelog_math_and_delayed_renderer(url):
     with sync_playwright() as p:
         browser = p.chromium.launch(channel='chrome', headless=True)
         page = browser.new_page()
+        # Rendering regression uses a stable mixed-content document; public release
+        # notes are free to describe user features without embedded technical examples.
+        page.route('**/static/docs/update.md', lambda route: route.fulfill(
+            content_type='text/markdown', body=r'''## v 0.4.2
+示例：$x^2$，$\frac{1}{2}$，$\sqrt{x}$，$\int_0^1 x\,dx$。
+
+配置示例：`EXAMPLES_USE_CDN=1`、`manim_extend_rainbow`、`setting_key`、`setting_value`、```` ```latex ````。
+
+## v 0.4.3
+公式：$a^2+b^2=c^2$。
+'''))
         page.goto(url, wait_until='domcontentloaded')
         page.wait_for_function('!!window.openDoc && !!window.renderMathInElement')
         page.evaluate('''() => {

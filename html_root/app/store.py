@@ -54,6 +54,13 @@ class ExpiringStore(MutableMapping):
             self._purge()
             return len(self._items)
 
+    def remove_value(self, value):
+        """Revoke every session for an account atomically with respect to writes."""
+        with self._lock:
+            for key, (stored, _) in list(self._items.items()):
+                if stored == value:
+                    self._items.pop(key, None)
+
 
 CAPTCHA_STORE = ExpiringStore(300, 1000)
 SESSION_STORE = ExpiringStore(86400, 10000)

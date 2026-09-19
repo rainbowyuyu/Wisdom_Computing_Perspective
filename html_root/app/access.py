@@ -35,7 +35,7 @@ def today():
 
 
 def load_principal(username):
-    if not username:return {'role':'guest','username':None,'id':None,'disabled':False,'daily_limit':None}
+    if not username:return {'role':'guest','username':None,'id':None,'disabled':False,'daily_limit':None,'email':None,'email_verified':False,'email_verified_at':None}
     if not _principal_slots.acquire(timeout=3):raise AccessDenied('账户校验繁忙，请稍后重试。',503)
     try:
         for attempt in range(4):
@@ -48,7 +48,8 @@ def load_principal(username):
 
 def _load_principal(username):
     with transaction() as (_,cur):
-        cur.execute('''SELECT u.id,u.username,COALESCE(a.role,'member') AS role,
+        cur.execute('''SELECT u.id,u.username,u.email,COALESCE(u.email_verified,0) AS email_verified,
+            u.email_verified_at,COALESCE(a.role,'member') AS role,
             COALESCE(a.disabled,0) AS disabled,a.daily_limit
             FROM users u LEFT JOIN account_access a ON a.user_id=u.id WHERE BINARY u.username=BINARY %s''',(username,))
         row=cur.fetchone()
@@ -90,6 +91,8 @@ def consume(feature,who=None,guest=None):
 def _consume(feature,who=None,guest=None):
     who=who or identity.get();guest=guest or guest_id.get()
     principal=load_principal(who[1] if who else None)
+    if principal['id'] is not None and not principal.get('email_verified'):
+        raise AccessDenied('请先完成邮箱验证，再继续使用完整功能。',403,'email_verification_required')
     if principal['role'] in {'vip','admin'}:return
     period='lifetime' if principal['role']=='guest' else today()
     counter=feature if principal['role']=='guest' else 'all'
@@ -124,4 +127,9 @@ def status(who,guest=None):
                 row=cur.fetchone();count=max(count,row['used'] if row else 0)
             maximum=GUEST_LIMITS[feature] if principal['role']=='guest' else None if principal['role'] in {'vip','admin'} else (principal['daily_limit'] if principal['daily_limit'] is not None else config['daily_limit'])
             quotas[feature]={'used':count,'limit':maximum,'remaining':None if maximum is None else max(0,maximum-count)}
-    return {'username':principal['username'],'role':principal['role'],'can_manage':is_owner(principal),'quotas':quotas,'contact_email':config['contact_email'],'reset_timezone':'Asia/Shanghai'}
+    from .email_service import mask_email
+    return {'username':principal['username'],'role':principal['role'],'can_manage':is_owner(principal) and bool(principal.get('email_verified')),
+            'email':mask_email(principal.get('email')),
+            'email_address':principal.get('email') or '',
+            'email_verified':bool(principal.get('email_verified')),
+            'quotas':quotas,'contact_email':config['contact_email'],'reset_timezone':'Asia/Shanghai'}

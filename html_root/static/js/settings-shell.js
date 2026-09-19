@@ -12,7 +12,7 @@ async function ensureSettings() {
         const response = await fetch('/static/index.html', { signal: AbortSignal.timeout(10000) });
         if (!response.ok) throw new Error('设置界面加载失败，请稍后重试');
         const source = new DOMParser().parseFromString(await response.text(), 'text/html');
-        const ids = ['settings-modal', 'change-username-modal', 'change-password-modal'];
+        const ids = ['settings-modal', 'change-username-modal', 'change-password-modal', 'change-email-modal'];
         const modals = ids.map(id => source.getElementById(id));
         if (modals.some(el => !el)) throw new Error('设置界面不完整，请刷新后重试');
         for (const modal of modals) {

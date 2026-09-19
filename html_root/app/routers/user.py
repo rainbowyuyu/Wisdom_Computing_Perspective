@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from ..config import get_db_connection, AVATAR_DIR, ALLOWED_AVATAR_EXT
 from ..store import SESSION_STORE
 from ..models import UserSettingsModel, UserProfileModel, ChangeUsernameModel, ChangePasswordModel
+from ..email_service import mask_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/user", tags=["user"])
@@ -109,12 +110,20 @@ async def get_user_profile(auth_session: Optional[str] = Cookie(None)):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT avatar_url, nickname FROM user_profiles WHERE user_id = %s", (username,))
+        cursor.execute('''SELECT p.avatar_url, p.nickname, u.email, u.email_verified, u.email_verified_at
+            FROM users u LEFT JOIN user_profiles p ON p.user_id = u.username
+            WHERE u.username = %s''', (username,))
         row = cursor.fetchone()
-        out = {"username": username, "avatar_url": None, "nickname": None}
+        out = {"username": username, "avatar_url": None, "nickname": None,
+               "email": '', "email_verified": False, "email_verified_at": None}
         if row:
             out["avatar_url"] = row.get("avatar_url")
             out["nickname"] = row.get("nickname")
+            out["email"] = mask_email(row.get("email"))
+            # 当前账户本人使用，便于设置页直接发起邮箱验证；页面展示仍使用脱敏值。
+            out["email_address"] = row.get("email") or ''
+            out["email_verified"] = bool(row.get("email_verified"))
+            out["email_verified_at"] = row.get("email_verified_at")
         return {"status": "success", "profile": out}
     except Exception as e:
         logger.error(f"get_user_profile: {e}")
