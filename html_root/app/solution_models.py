@@ -122,8 +122,31 @@ class ExactInterval(BaseModel):
     lower_closed: bool = False
     upper_closed: bool = False
 
+    @field_validator('lower', 'upper', mode='before')
+    @classmethod
+    def normalize_infinite_endpoint(cls, value, info):
+        if not isinstance(value, str):
+            return value
+        token = value.strip().strip('$').replace(' ', '').replace('−', '-').lower()
+        positive = {'oo', '+oo', 'inf', '+inf', 'infinity', '+infinity', '∞', '+∞', r'\infty', r'+\infty'}
+        negative = {'-oo', '-inf', '-infinity', '-∞', r'-\infty'}
+        if token in (negative if info.field_name == 'lower' else positive):
+            return None
+        if token in positive | negative:
+            raise ValueError('下界仅可用负无穷，上界仅可用正无穷；请检查区间方向')
+        return value
+
+    @model_validator(mode='after')
+    def open_infinite_endpoints(self):
+        if self.lower is None:
+            self.lower_closed = False
+        if self.upper is None:
+            self.upper_closed = False
+        return self
+
 
 class ParameterAnalysis(BaseModel):
+    purpose: Literal['answer', 'domain'] = Field(default='answer', description='answer 仅用于全部所求就是参数范围；domain 用于方程、函数、证明等答案的适用条件，不替换原结论。')
     variable: constr(pattern=r"^[a-zA-Z]$")
     constraints: conlist(ParameterConstraint, min_length=1, max_length=8)
     answer: conlist(ExactInterval, max_length=8)

@@ -177,9 +177,9 @@ async def ai_solution(data):
             solution.source = "ai"
             solution.verification = "AI 推导与图形数据，未经符号计算验证；请核对题目条件和结论。"
             if solution.completion == 'solved':
-                solution = await asyncio.to_thread(verify_parameter_analysis, solution)
+                solution = await asyncio.to_thread(verify_parameter_analysis, solution, data.problem)
             break
-        except (ValueError, NotImplementedError) as error:
+        except (ValueError, SyntaxError, TypeError, NotImplementedError) as error:
             if attempt: raise
             messages += [{"role": "assistant", "content": content}, {"role": "user", "content": str(error) + "。重新输出完整 JSON，保留原题全部条件。"}]
     return await asyncio.to_thread(resolve_visual_functions, solution)

@@ -6,12 +6,12 @@ import re
 import uuid
 import hashlib
 import threading
-from urllib.parse import urlsplit
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from .store import SESSION_STORE
+from .request_origin import origin_allowed, public_scheme, trusted_proxy
 from .usage_guard import identity, ledger, UsageDenied, request_cancelled
 from . import access
 from .request_records import ROUTES, RequestRecord, request_record_id
@@ -35,9 +35,8 @@ EXPENSIVE = CODE_ROUTES | {'/api/solve/stream', '/api/solve/render', '/api/agent
 
 def client_ip(scope, headers):
     peer = (scope.get('client') or ('unknown', 0))[0]
-    trusted = os.getenv('TRUSTED_PROXY_IPS', '127.0.0.1,::1').split(',')
     # Nginx must OVERWRITE X-Real-IP. Never take an arbitrary X-Forwarded-For entry.
-    value = headers.get('x-real-ip', '') if peer in trusted else peer
+    value = headers.get('x-real-ip', '') if trusted_proxy(scope) else peer
     try:
         return str(ipaddress.ip_address(value or peer))
     except ValueError:
@@ -87,12 +86,7 @@ class RequestGuard:
             if any(part.startswith('.') for part in path.split('/') if part) or (path.startswith(('/videos/', '/static/videos/')) and path.lower().endswith(('.py', '.json', '.log', '.tex', '.aux'))):
                 return await reject('Not Found', 404)
             if path.startswith('/api/') and method not in {'GET','HEAD','OPTIONS'}:
-                origin = headers.get('origin')
-                allowed = {v.strip().rstrip('/') for v in os.getenv('ALLOWED_ORIGINS', '').split(',') if v.strip()}
-                # Local Vue dev server; production permits its own origin by default.
-                allowed.update({'http://127.0.0.1:5173', 'http://localhost:5173'})
-                same = origin and urlsplit(origin).netloc == headers.get('host') and urlsplit(origin).scheme in {'http','https'}
-                if headers.get('sec-fetch-site') == 'cross-site' and origin not in allowed or origin and not same and origin not in allowed:
+                if not origin_allowed(scope, headers):
                     return await reject('请求来源不受支持，请从本站页面操作。', 403)
                 if path in CODE_ROUTES:
                     runners = {v.strip() for v in os.getenv('WISDOM_CODE_RUNNERS', '').split(',') if v.strip()}
@@ -174,7 +168,7 @@ class RequestGuard:
                     if path.startswith(('/api/agent/tasks','/api/account/','/api/admin/','/api/user/')):
                         message['headers'].append((b'cache-control', b'private, no-store'))
                     if new_guest and path.startswith('/api/'):
-                        secure=request.url.scheme=='https' or ((scope.get('client') or ('',))[0] in os.getenv('TRUSTED_PROXY_IPS','127.0.0.1,::1').split(',') and headers.get('x-forwarded-proto')=='https')
+                        secure=public_scheme(scope, headers)=='https'
                         cookie=f'wisdom_trial={guest}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax'+('; Secure' if secure else '')
                         message['headers'].append((b'set-cookie',cookie.encode('ascii')))
                 await send(message)

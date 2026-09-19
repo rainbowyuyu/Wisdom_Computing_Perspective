@@ -31,3 +31,6 @@ html_root/.env
 # Local runtime logs and disposable build/export files
 /html_root/tmp/
 /html_root/scripts/achievement-holo/_gallery_extra_backup.js
+/html_root/product-video
+/html_root/manim_media
+html_root/.env.example

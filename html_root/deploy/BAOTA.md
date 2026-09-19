@@ -20,7 +20,9 @@
 
 升级结尾检查字段、索引和外键是否齐全，核对已有迁移校验和，成功后登记当前六个迁移版本。随后启动 `python main.py` 时会验证相同的记录，不再重复执行这些迁移。若显示 `NEEDS_ATTENTION`，按非零的缺项和前面的 SQL 报错检查；`migration_conflicts` 非零时核对部署代码与历史版本，脚本不会覆盖已有校验和掩盖冲突。此校验检查必需结构是否存在，不会擅自改写自行修改的字段类型或修复未知版本结构。
 
-无需修改 SQL 里的库名，也无需 `CREATE DATABASE` 权限。数据库账号需要当前库的建表、改表、索引和读写权限。无需存储过程权限。使用 **MySQL 8.0+**；本次未验证 MariaDB 或 MySQL 5.7。
+无需修改 SQL 里的库名，也无需 `CREATE DATABASE` 权限。数据库账号需要当前库的建表、改表、索引和读写权限。无需存储过程或临时表权限。单文件脚本兼容 **MySQL 5.7 / 8.0**；正式部署仍建议使用受支持的 MySQL 版本。MariaDB 未完成整套验证。
+
+若此前在 `FROM JSON_TABLE(...)` 处遇到 `#1064`，表示当前数据库不支持这项语法。新版脚本已将全部结构检查和版本登记改为普通 `SELECT / UNION ALL`。选中原数据库，重新执行新版 `visdom_db.sql` **全文**即可接续完成；不用删除之前创建的表或清空迁移记录，已有业务数据保留。最后仍以无报错且 `upgrade_status = OK` 为完成标准。
 
 更新时先暂停网站进程，避免两个导入或应用启动迁移同时修改结构，完成后仍用 `python main.py` 启动。如果提示「没有选择数据库」，重新选中左侧数据库后执行。如果新增外键提示旧数据没有对应父记录，先核对记录归属并修复再重试；脚本不会为通过检查而删除数据或关闭外键检查。MySQL 改表会逐条提交，执行前的数据库备份是回退依据，报错后可以修正问题再重新执行整个文件。
 
@@ -82,7 +84,17 @@ VIDEO_TOKEN_SECRET=自行生成的长随机字符串
 
 自定义 Python 执行（开发者渲染、关键帧及旧 `/api/animate/stream`）默认关闭。只有主账号 `rainbow_yu` 且数据库角色为管理员时可执行自定义 Python；也可在 `WISDOM_CODE_RUNNERS` 中配置可信操作者的**完整用户名**，多个名字以逗号分隔。此权限等同于运行服务端 Python；现有语法检查不能充当安全沙箱，不应授予普通注册用户。普通学生仍可使用 `/api/solve/render` 的固定、数据驱动 Manim 场景，代码助手也可生成和下载建议代码。
 
-Nginx 必须覆盖 `X-Real-IP`，不要透传客户端提供的该请求头。默认仅信任 `127.0.0.1,::1` 的代理，其他代理需配置 `TRUSTED_PROXY_IPS`；Uvicorn 不再自动信任任意转发链。公网只暴露 Nginx，Python 保持监听回环地址。跨域部署时配置精确的 `ALLOWED_ORIGINS`，勿使用通配符。
+Nginx 必须覆盖 `X-Real-IP`、`X-Forwarded-Host` 和 `X-Forwarded-Proto`，不要透传客户端提供的这些请求头。默认仅信任 `127.0.0.1,::1` 的直接代理，其他代理需配置 `TRUSTED_PROXY_IPS`；Uvicorn 不再自动信任任意转发链。公网只暴露 Nginx，Python 保持监听回环地址。`Host` 与 `X-Forwarded-Host` 使用 `$http_host` 保留浏览器地址中的端口。
+
+### 登录提示「请求来源不受支持」
+
+本站正式地址是 `https://www.wiscomper.com`，当前服务器网站目录是 `/www/wwwroot/wiscomper.com`（直接对应本地 `html_root` 内容）。部分旧宝塔代理将 `Host` 改成 `127.0.0.1:8000`，会使原来的来源校验误拦截 HTTPS 登录。
+
+修复需要一起上传 `app/request_origin.py`、`app/request_guard.py`、`app/routers/auth.py` 到网站目录的相同相对位置，然后在宝塔 Python 项目管理中重启原 `main.py` 项目。无需改动数据库，也不要覆盖服务器的 `.env`、`.env.local` 或 `var/`。
+
+未配置或留空 `ALLOWED_ORIGINS` 时，默认明确允许 `https://www.wiscomper.com`；本地 `http://127.0.0.1:8000`、`http://localhost:8000` 等同源地址和原 Vue 开发入口仍可使用。其他域名默认按代理保留的外部协议、域名和端口校验；确需跨域部署时，在服务器 `.env.local` 设置精确的 `ALLOWED_ORIGINS`，例如 `ALLOWED_ORIGINS=https://www.wiscomper.com,https://wiscomper.com`，重启生效，不要使用 `*`。显式配置会替换默认正式域名白名单，必要时包含 www 地址。
+
+宝塔网站的现有反向代理规则建议按 `deploy/nginx.conf.example` 保留外部域名和协议；不要整体替换宝塔的站点配置或证书。HTTPS 代理继续设置 `proxy_set_header X-Forwarded-Proto $scheme;`，以便正确标记登录 Cookie。源码修改及配置保存后必须重启 Python 进程；仅刷新网页不能更新后端校验。
 
 `.env` 和 `.env.local` 只留在服务器，不上传 Git。旧 `.env` 曾被版本库跟踪，应在供应商控制台更换旧密钥，并检查历史提交中其他凭据；删除当前版本文件不会撤销历史凭据。
 
@@ -91,6 +103,8 @@ Nginx 必须覆盖 `X-Real-IP`，不要透传客户端提供的该请求头。�
 新增 `account_access`、`access_settings`、`access_usage`、`access_audit` 四张 MySQL 表，已纳入 `visdom_db.sql` 和 `005_account_access.sql`。用户角色绑定数值用户 ID，管理后台另外严格校验主账号 `rainbow_yu`，不接受浏览器传入的角色；注册默认普通用户。主页显示账户类型、剩余额度和联系作者申请 VIP 入口，主账号可从主页「用户管理」或右上角「管理」打开管理中心。停用在下一次 API 或模型调用前生效，已发送到供应商的请求可能已计费。
 
 部署到其他服务器后，在服务器终端执行 `python scripts/grant_admin.py --username rainbow_yu` 并交互输入该账户密码。若账户尚不存在，可加 `--create` 创建后授予权限。脚本先校验现有密码，不覆盖已有密码；不得把密码写入命令参数、前端代码、SQL 或版本库。当前本机已完成主账号验证与授权。主管理员不能在网页管理页降权或停用，账号名不能从资料页修改，密码仍可按原功能修改。
+
+如果只能使用宝塔数据库面板，数据库管理员可选中网站实际使用的库，执行 `deploy/grant_owner.sql` 全文。它仅将精确匹配的现有 `rainbow_yu` 设置为管理员并解除停用，不修改密码、个人日额度和使用记录，同时写入授权审计。结果 `owner_status = OWNER_ENABLED` 表示成功；`ACCOUNT_NOT_FOUND` 表示选错库或该库尚无此账号，不会创建或授权近似拼写的账号。成功后刷新网页（必要时退出重登）即可出现管理入口，无需重启服务。这个授权脚本独立于通用数据库升级脚本，普通升级不会自动提升账号权限。
 
 普通用户、VIP 及其他管理员身份均不能调用管理 API；其他管理员身份不会获得任意 Python 执行权限。默认作者邮箱沿用 `rainbowyu619@gmail.com`，管理员可在管理中心修改。角色、停用状态和额度调整写入审计记录；不会向管理页返回密码散列。保留业务 MySQL 备份及 `var/` 运行记录。
 

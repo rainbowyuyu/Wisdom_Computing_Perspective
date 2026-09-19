@@ -128,20 +128,19 @@ def resolve_visual_functions(solution):
                     (cx + circle.radius*math.cos(i*math.tau/160), cy + circle.radius*math.sin(i*math.tau/160)) for i in range(161)]))
             item.visual.circles = []
         if item.visual.functions:
-            curves = []
-            try:
-                for spec in item.visual.functions:
+            curves = list(item.visual.curves)
+            omitted = False
+            for spec in item.visual.functions:
+                try:
                     curves.extend(plot(expression(spec.expression), spec.label, *spec.domain))
-            except (ValueError, SyntaxError, TypeError, OverflowError, ZeroDivisionError):
-                # Optional graphics must not discard a valid symbolic explanation.
-                # In particular, an unspecified parameter cannot be sampled as a number.
-                item.visual = Visual(kind="reasoning", caption="本步图像暂不可绘制：函数含未确定的参数或超出绘图范围，请结合公式阅读推导。")
-                continue
+                except (ValueError, SyntaxError, TypeError, OverflowError, ZeroDivisionError):
+                    omitted = True
             item.visual.curves = curves[:6]
             item.visual.functions = []
-            if not curves:
-                item.visual.kind = "reasoning"
-                item.visual.caption = "该区间未取得可绘制的实数函数值，请检查定义域。"
+            if omitted:
+                item.visual.caption = item.visual.caption[:600] + ' 含未确定参数或无法采样的函数未绘制，请结合公式阅读推导。'
+            if not curves and not (item.visual.kind == 'geometry' and len(item.visual.points) >= 2):
+                item.visual = Visual(kind='reasoning', caption=item.visual.caption if omitted else '该区间未取得可绘制的实数函数值，请检查定义域。')
     return solution
 
 
@@ -153,6 +152,14 @@ def step(title, explanation, formula="", curves=None, points=None, caption="", m
 
 def local_solution(problem):
     """Only claim local verification for whole inputs matching supported tasks."""
+    from .coordinate_solver import diameter_circle
+    coordinate_solution = diameter_circle(problem)
+    if coordinate_solution is not None:
+        return coordinate_solution
+    from .rational_solver import rational_equation
+    rational_solution = rational_equation(problem)
+    if rational_solution is not None:
+        return rational_solution
     t = problem.strip().strip("。？?")
     t = re.sub(r"^\$+|\$+$", "", t).strip()
     if (t.startswith(r"\(") and t.endswith(r"\)")) or (t.startswith(r"\[") and t.endswith(r"\]")):

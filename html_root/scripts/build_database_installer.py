@@ -2,7 +2,6 @@
 import ast
 import argparse
 import hashlib
-import json
 import re
 from pathlib import Path
 
@@ -45,33 +44,43 @@ def manifest(base):
     return tables
 
 
+def derived_rows(columns, rows):
+    """Emit a read-only manifest supported without JSON_TABLE or temp-table privileges."""
+    selects = []
+    for row in rows:
+        values = [str(value) if isinstance(value, int) else literal(value) for value in row]
+        if not selects:
+            values = [f'{value} AS `{column}`' for column, value in zip(columns, values)]
+        selects.append('SELECT ' + ', '.join(values))
+    if not selects:
+        return '(SELECT ' + ', '.join(f'NULL AS `{column}`' for column in columns) + ' WHERE 1=0)'
+    return '(\n    ' + '\n    UNION ALL '.join(selects) + '\n)'
+
+
 def completion_sql(base):
     tables = manifest(base)
     versions = [{'version': p.name, 'checksum': hashlib.sha256(p.read_text(encoding='utf-8').encode()).hexdigest()}
                 for p in sorted((ROOT / 'database/migrations').glob('*.sql'))]
-    # One object per line keeps the generated SQL reviewable in phpMyAdmin.
-    schema_json = '[\n' + ',\n'.join(json.dumps(t, ensure_ascii=False) for t in tables) + '\n]'
-    versions_json = json.dumps(versions, indent=2)
+    columns_sql = derived_rows(('table_name', 'column_name'),
+                              [(t['table'], c) for t in tables for c in t['columns']])
+    indexes_sql = derived_rows(('table_name', 'index_name', 'column_names', 'is_unique'),
+                              [(t['table'], i['name'], i['columns'], i['unique'])
+                               for t in tables for i in t['indexes']])
+    relations_sql = derived_rows(('table_name', 'column_name', 'parent_table', 'parent_column', 'delete_rule', 'update_cascade'),
+                                [(t['table'], f['column'], f['parent'], f['parent_column'], f['delete_rule'], f['update_cascade'])
+                                 for t in tables for f in t['foreign_keys']])
+    versions_sql = derived_rows(('version', 'checksum'), [(v['version'], v['checksum']) for v in versions])
     return f"""-- 9. 结构自检与升级版本登记（由 scripts/build_database_installer.py 同步生成）
 -- 缺少字段、索引、关联或历史校验和冲突时，不登记新版本，不覆盖已有记录。
-SET @wisdom_schema = {literal(schema_json)};
-SET @wisdom_versions = {literal(versions_json)};
+-- 使用只读 SELECT / UNION ALL 清单，兼容没有 JSON_TABLE 的数据库，无需临时表权限。
 
 SELECT COUNT(*) INTO @wisdom_missing_columns
-FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
-    table_name VARCHAR(64) PATH '$.table',
-    NESTED PATH '$.columns[*]' COLUMNS (column_name VARCHAR(64) PATH '$')
-)) required_column
+FROM {columns_sql} required_column
 WHERE NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS c
     WHERE c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME=required_column.table_name AND c.COLUMN_NAME=required_column.column_name);
 
 SELECT COUNT(*) INTO @wisdom_missing_indexes
-FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
-    table_name VARCHAR(64) PATH '$.table',
-    NESTED PATH '$.indexes[*]' COLUMNS (
-        index_name VARCHAR(64) PATH '$.name', column_names VARCHAR(512) PATH '$.columns', is_unique INT PATH '$.unique'
-    )
-)) required_index
+FROM {indexes_sql} required_index
 WHERE required_index.index_name IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM information_schema.STATISTICS s
     WHERE s.TABLE_SCHEMA=DATABASE() AND s.TABLE_NAME=required_index.table_name AND s.INDEX_NAME=required_index.index_name
@@ -81,14 +90,7 @@ WHERE required_index.index_name IS NOT NULL AND NOT EXISTS (
 );
 
 SELECT COUNT(*) INTO @wisdom_missing_relations
-FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
-    table_name VARCHAR(64) PATH '$.table',
-    NESTED PATH '$.foreign_keys[*]' COLUMNS (
-        column_name VARCHAR(64) PATH '$.column', parent_table VARCHAR(64) PATH '$.parent',
-        parent_column VARCHAR(64) PATH '$.parent_column', delete_rule VARCHAR(16) PATH '$.delete_rule',
-        update_cascade INT PATH '$.update_cascade'
-    )
-)) required_fk
+FROM {relations_sql} required_fk
 WHERE required_fk.column_name IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k
     JOIN information_schema.REFERENTIAL_CONSTRAINTS r
@@ -99,7 +101,7 @@ WHERE required_fk.column_name IS NOT NULL AND NOT EXISTS (
 );
 
 SELECT COUNT(*) INTO @wisdom_migration_conflicts
-FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version', checksum CHAR(64) PATH '$.checksum')) expected
+FROM {versions_sql} expected
 JOIN schema_migrations existing ON existing.version=expected.version COLLATE utf8mb4_general_ci
 WHERE BINARY existing.checksum<>BINARY expected.checksum;
 
@@ -112,7 +114,7 @@ SET @wisdom_upgrade_ok = (@wisdom_missing_columns=0 AND @wisdom_missing_indexes=
 
 INSERT INTO schema_migrations(version,checksum)
 SELECT expected.version,expected.checksum
-FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version', checksum CHAR(64) PATH '$.checksum')) expected
+FROM {versions_sql} expected
 WHERE @wisdom_upgrade_ok AND NOT EXISTS (SELECT 1 FROM schema_migrations existing WHERE existing.version=expected.version COLLATE utf8mb4_general_ci);
 COMMIT;
 
@@ -125,7 +127,7 @@ SELECT IF(@wisdom_upgrade_ok, 'OK', 'NEEDS_ATTENTION') AS upgrade_status,
     @wisdom_missing_relations AS missing_relations,
     @wisdom_migration_conflicts AS migration_conflicts,
     (SELECT COUNT(*) FROM schema_migrations WHERE version COLLATE utf8mb4_general_ci IN (
-        SELECT version COLLATE utf8mb4_general_ci FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version')) expected
+        SELECT version COLLATE utf8mb4_general_ci FROM {versions_sql} expected
     )) AS applied_migrations,
     @wisdom_pending_legacy AS pending_legacy_wrongbook,
     (SELECT COUNT(*) FROM user_wrongbook w WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id)) AS unmatched_legacy_wrongbook;

@@ -1,4 +1,4 @@
--- 智算视界 · 单文件安装与升级 · MySQL 8.0+
+-- 智算视界 · 单文件安装与升级 · MySQL 5.7 / 8.0
 -- 宝塔：先备份当前库，在 phpMyAdmin 左侧选中 wiscomper_com，再点 SQL，粘贴本文件全部内容执行。
 -- 使用当前选中的数据库，不创建数据库、不切换库名，不需要 CREATE DATABASE 权限。
 -- 支持空库、原网站 18 表及后续版本升级，补齐至 30 表，保留账户、权限、额度和学习数据。
@@ -593,80 +593,250 @@ WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id);
 
 -- 9. 结构自检与升级版本登记（由 scripts/build_database_installer.py 同步生成）
 -- 缺少字段、索引、关联或历史校验和冲突时，不登记新版本，不覆盖已有记录。
-SET @wisdom_schema = '[
-{"table": "users", "columns": ["id", "username", "hashed_password", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "username", "columns": "username", "unique": 1}], "foreign_keys": []},
-{"table": "user_settings", "columns": ["user_id", "settings_json", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id", "unique": 1}], "foreign_keys": []},
-{"table": "user_profiles", "columns": ["user_id", "avatar_url", "nickname", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id", "unique": 1}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "username", "delete_rule": "CASCADE", "update_cascade": 1}]},
-{"table": "account_access", "columns": ["user_id", "role", "disabled", "daily_limit", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id", "unique": 1}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
-{"table": "access_settings", "columns": ["id", "daily_limit", "contact_email", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}], "foreign_keys": []},
-{"table": "access_usage", "columns": ["principal", "period", "feature", "used", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "principal,period,feature", "unique": 1}], "foreign_keys": []},
-{"table": "access_audit", "columns": ["id", "actor_id", "target_id", "action", "details", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_access_audit_created", "columns": "created_at", "unique": 0}], "foreign_keys": []},
-{"table": "formulas", "columns": ["id", "user_id", "latex", "note", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_formulas_owner_created", "columns": "user_id,created_at,id", "unique": 0}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "username", "delete_rule": "CASCADE", "update_cascade": 1}]},
-{"table": "formula_topics", "columns": ["id", "user_id", "formula_id", "tag", "weight", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "idx_user_tag", "columns": "user_id,tag", "unique": 0}, {"name": "idx_formula", "columns": "formula_id", "unique": 0}], "foreign_keys": [{"column": "formula_id", "parent": "formulas", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
-{"table": "formula_solutions", "columns": ["formula_id", "title", "step_count", "video_url", "payload", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "formula_id", "unique": 1}], "foreign_keys": [{"column": "formula_id", "parent": "formulas", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
-{"table": "animation_scripts", "columns": ["id", "user_id", "note", "code", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_scripts_owner_created", "columns": "user_id,created_at,id", "unique": 0}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "username", "delete_rule": "CASCADE", "update_cascade": 1}]},
-{"table": "agent_templates", "columns": ["id", "user_id", "name", "prompt", "steps_json", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_templates_owner_created", "columns": "user_id,created_at,id", "unique": 0}], "foreign_keys": [{"column": "user_id", "parent": "users", "parent_column": "username", "delete_rule": "CASCADE", "update_cascade": 1}]},
-{"table": "user_achievements", "columns": ["id", "user_id", "achievement_id", "progress", "unlocked", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "uq_user_ach", "columns": "user_id,achievement_id", "unique": 1}], "foreign_keys": []},
-{"table": "course_packs", "columns": ["id", "user_id", "name", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_packs_owner_created", "columns": "user_id,created_at,id", "unique": 0}], "foreign_keys": []},
-{"table": "course_pack_documents", "columns": ["pack_id", "description", "lesson_json", "revision", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "pack_id", "unique": 1}], "foreign_keys": [{"column": "pack_id", "parent": "course_packs", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
-{"table": "course_pack_videos", "columns": ["pack_id", "video_id", "sort_order"], "indexes": [{"name": "PRIMARY", "columns": "pack_id,video_id", "unique": 1}, {"name": "ix_pack_order", "columns": "pack_id,sort_order", "unique": 0}], "foreign_keys": [{"column": "pack_id", "parent": "course_packs", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
-{"table": "example_video_likes", "columns": ["video_id", "user_id", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "video_id,user_id", "unique": 1}], "foreign_keys": []},
-{"table": "example_video_comments", "columns": ["id", "video_id", "user_id", "content", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_comments_video_created", "columns": "video_id,created_at,id", "unique": 0}], "foreign_keys": []},
-{"table": "example_video_danmaku", "columns": ["id", "video_id", "user_id", "text", "time", "color", "mode", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_danmaku_video_time", "columns": "video_id,time,id", "unique": 0}], "foreign_keys": []},
-{"table": "example_play_history", "columns": ["user_id", "video_id", "progress", "last_active"], "indexes": [{"name": "PRIMARY", "columns": "user_id,video_id", "unique": 1}], "foreign_keys": []},
-{"table": "example_video_notes", "columns": ["id", "user_id", "video_id", "time_sec", "content", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_notes_owner_video_time", "columns": "user_id,video_id,time_sec,id", "unique": 0}], "foreign_keys": []},
-{"table": "user_favorites", "columns": ["user_id", "video_id", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id,video_id", "unique": 1}], "foreign_keys": []},
-{"table": "watch_later", "columns": ["user_id", "video_id", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "user_id,video_id", "unique": 1}], "foreign_keys": []},
-{"table": "user_wrongbook", "columns": ["id", "user_id", "video_id", "title", "time_sec", "note", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}], "foreign_keys": []},
-{"table": "learning_wrongbook", "columns": ["id", "owner_id", "legacy_id", "source_type", "video_id", "formula_id", "time_sec", "title", "problem", "answer", "note", "solution_snapshot", "fingerprint", "status", "difficulty", "review_count", "interval_days", "next_review_at", "last_reviewed_at", "revision", "created_at", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "uq_wrongbook_origin", "columns": "owner_id,fingerprint", "unique": 1}, {"name": "uq_wrongbook_legacy", "columns": "legacy_id", "unique": 1}, {"name": "ix_wrongbook_due", "columns": "owner_id,status,next_review_at,id", "unique": 0}, {"name": "ix_wrongbook_recent", "columns": "owner_id,updated_at,id", "unique": 0}, {"name": "ix_wrongbook_video", "columns": "owner_id,video_id,time_sec", "unique": 0}, {"name": "fk_wrongbook_formula", "columns": "formula_id", "unique": 0}], "foreign_keys": [{"column": "formula_id", "parent": "formulas", "parent_column": "id", "delete_rule": "SET NULL", "update_cascade": 0}, {"column": "owner_id", "parent": "users", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
-{"table": "learning_wrongbook_tags", "columns": ["entry_id", "tag"], "indexes": [{"name": "PRIMARY", "columns": "entry_id,tag", "unique": 1}, {"name": "ix_wrongbook_tag", "columns": "tag,entry_id", "unique": 0}], "foreign_keys": [{"column": "entry_id", "parent": "learning_wrongbook", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
-{"table": "learning_wrongbook_reviews", "columns": ["id", "entry_id", "grade", "note", "interval_days", "next_review_at", "reviewed_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_wrongbook_review", "columns": "entry_id,reviewed_at,id", "unique": 0}], "foreign_keys": [{"column": "entry_id", "parent": "learning_wrongbook", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}]},
-{"table": "course_pack_resources", "columns": ["id", "pack_id", "kind", "formula_id", "wrongbook_id", "snapshot", "sort_order", "created_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_pack_resource_order", "columns": "pack_id,sort_order,id", "unique": 0}, {"name": "uq_pack_formula", "columns": "pack_id,formula_id", "unique": 1}, {"name": "uq_pack_wrongbook", "columns": "pack_id,wrongbook_id", "unique": 1}], "foreign_keys": [{"column": "pack_id", "parent": "course_packs", "parent_column": "id", "delete_rule": "CASCADE", "update_cascade": 0}, {"column": "formula_id", "parent": "formulas", "parent_column": "id", "delete_rule": "SET NULL", "update_cascade": 0}, {"column": "wrongbook_id", "parent": "learning_wrongbook", "parent_column": "id", "delete_rule": "SET NULL", "update_cascade": 0}]},
-{"table": "request_records", "columns": ["id", "owner_id", "username", "role", "feature", "endpoint", "problem", "has_image", "content_truncated", "device", "status", "http_status", "duration_ms", "job_id", "created_at", "updated_at"], "indexes": [{"name": "PRIMARY", "columns": "id", "unique": 1}, {"name": "ix_requests_time", "columns": "created_at,id", "unique": 0}, {"name": "ix_requests_owner_time", "columns": "owner_id,created_at,id", "unique": 0}, {"name": "ix_requests_status_time", "columns": "status,created_at,id", "unique": 0}, {"name": "ix_requests_feature_time", "columns": "feature,created_at,id", "unique": 0}, {"name": "ix_requests_job", "columns": "job_id", "unique": 0}], "foreign_keys": [{"column": "owner_id", "parent": "users", "parent_column": "id", "delete_rule": "SET NULL", "update_cascade": 0}]},
-{"table": "schema_migrations", "columns": ["version", "checksum", "applied_at"], "indexes": [{"name": "PRIMARY", "columns": "version", "unique": 1}], "foreign_keys": []}
-]';
-SET @wisdom_versions = '[
-  {
-    "version": "001_learning_records.sql",
-    "checksum": "4ce4e3d9091238723bcc8f0d1938247e99397ea6807eda64be21c3edff11aba6"
-  },
-  {
-    "version": "002_account_rename.sql",
-    "checksum": "a56e0712c4fdfe7d6e4aae5cd9a17d174056104cc3ed83d7a239957a77fd7321"
-  },
-  {
-    "version": "003_teaching_relations.sql",
-    "checksum": "4d7b1bb79769a5ce6701b1cda22306a30bda8b97d48ee88a82e00efe78e780d1"
-  },
-  {
-    "version": "004_course_resources.sql",
-    "checksum": "ee1e4911a8e4084512ad40386996a9366369b96699198eb3803c98315298e95f"
-  },
-  {
-    "version": "005_account_access.sql",
-    "checksum": "283739d568f5a77b4568cdcc8147974ce0a2befc5fec97b00e28aaf98f429f21"
-  },
-  {
-    "version": "006_request_records.sql",
-    "checksum": "83f0fabe24c26efae762c8d6cd958ec17773b833f94e1e1af27803f5cc81e042"
-  }
-]';
+-- 使用只读 SELECT / UNION ALL 清单，兼容没有 JSON_TABLE 的数据库，无需临时表权限。
 
 SELECT COUNT(*) INTO @wisdom_missing_columns
-FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
-    table_name VARCHAR(64) PATH '$.table',
-    NESTED PATH '$.columns[*]' COLUMNS (column_name VARCHAR(64) PATH '$')
-)) required_column
+FROM (
+    SELECT 'users' AS `table_name`, 'id' AS `column_name`
+    UNION ALL SELECT 'users', 'username'
+    UNION ALL SELECT 'users', 'hashed_password'
+    UNION ALL SELECT 'users', 'created_at'
+    UNION ALL SELECT 'user_settings', 'user_id'
+    UNION ALL SELECT 'user_settings', 'settings_json'
+    UNION ALL SELECT 'user_settings', 'updated_at'
+    UNION ALL SELECT 'user_profiles', 'user_id'
+    UNION ALL SELECT 'user_profiles', 'avatar_url'
+    UNION ALL SELECT 'user_profiles', 'nickname'
+    UNION ALL SELECT 'user_profiles', 'updated_at'
+    UNION ALL SELECT 'account_access', 'user_id'
+    UNION ALL SELECT 'account_access', 'role'
+    UNION ALL SELECT 'account_access', 'disabled'
+    UNION ALL SELECT 'account_access', 'daily_limit'
+    UNION ALL SELECT 'account_access', 'updated_at'
+    UNION ALL SELECT 'access_settings', 'id'
+    UNION ALL SELECT 'access_settings', 'daily_limit'
+    UNION ALL SELECT 'access_settings', 'contact_email'
+    UNION ALL SELECT 'access_settings', 'updated_at'
+    UNION ALL SELECT 'access_usage', 'principal'
+    UNION ALL SELECT 'access_usage', 'period'
+    UNION ALL SELECT 'access_usage', 'feature'
+    UNION ALL SELECT 'access_usage', 'used'
+    UNION ALL SELECT 'access_usage', 'updated_at'
+    UNION ALL SELECT 'access_audit', 'id'
+    UNION ALL SELECT 'access_audit', 'actor_id'
+    UNION ALL SELECT 'access_audit', 'target_id'
+    UNION ALL SELECT 'access_audit', 'action'
+    UNION ALL SELECT 'access_audit', 'details'
+    UNION ALL SELECT 'access_audit', 'created_at'
+    UNION ALL SELECT 'formulas', 'id'
+    UNION ALL SELECT 'formulas', 'user_id'
+    UNION ALL SELECT 'formulas', 'latex'
+    UNION ALL SELECT 'formulas', 'note'
+    UNION ALL SELECT 'formulas', 'created_at'
+    UNION ALL SELECT 'formula_topics', 'id'
+    UNION ALL SELECT 'formula_topics', 'user_id'
+    UNION ALL SELECT 'formula_topics', 'formula_id'
+    UNION ALL SELECT 'formula_topics', 'tag'
+    UNION ALL SELECT 'formula_topics', 'weight'
+    UNION ALL SELECT 'formula_topics', 'created_at'
+    UNION ALL SELECT 'formula_solutions', 'formula_id'
+    UNION ALL SELECT 'formula_solutions', 'title'
+    UNION ALL SELECT 'formula_solutions', 'step_count'
+    UNION ALL SELECT 'formula_solutions', 'video_url'
+    UNION ALL SELECT 'formula_solutions', 'payload'
+    UNION ALL SELECT 'formula_solutions', 'updated_at'
+    UNION ALL SELECT 'animation_scripts', 'id'
+    UNION ALL SELECT 'animation_scripts', 'user_id'
+    UNION ALL SELECT 'animation_scripts', 'note'
+    UNION ALL SELECT 'animation_scripts', 'code'
+    UNION ALL SELECT 'animation_scripts', 'created_at'
+    UNION ALL SELECT 'agent_templates', 'id'
+    UNION ALL SELECT 'agent_templates', 'user_id'
+    UNION ALL SELECT 'agent_templates', 'name'
+    UNION ALL SELECT 'agent_templates', 'prompt'
+    UNION ALL SELECT 'agent_templates', 'steps_json'
+    UNION ALL SELECT 'agent_templates', 'created_at'
+    UNION ALL SELECT 'user_achievements', 'id'
+    UNION ALL SELECT 'user_achievements', 'user_id'
+    UNION ALL SELECT 'user_achievements', 'achievement_id'
+    UNION ALL SELECT 'user_achievements', 'progress'
+    UNION ALL SELECT 'user_achievements', 'unlocked'
+    UNION ALL SELECT 'user_achievements', 'updated_at'
+    UNION ALL SELECT 'course_packs', 'id'
+    UNION ALL SELECT 'course_packs', 'user_id'
+    UNION ALL SELECT 'course_packs', 'name'
+    UNION ALL SELECT 'course_packs', 'created_at'
+    UNION ALL SELECT 'course_pack_documents', 'pack_id'
+    UNION ALL SELECT 'course_pack_documents', 'description'
+    UNION ALL SELECT 'course_pack_documents', 'lesson_json'
+    UNION ALL SELECT 'course_pack_documents', 'revision'
+    UNION ALL SELECT 'course_pack_documents', 'updated_at'
+    UNION ALL SELECT 'course_pack_videos', 'pack_id'
+    UNION ALL SELECT 'course_pack_videos', 'video_id'
+    UNION ALL SELECT 'course_pack_videos', 'sort_order'
+    UNION ALL SELECT 'example_video_likes', 'video_id'
+    UNION ALL SELECT 'example_video_likes', 'user_id'
+    UNION ALL SELECT 'example_video_likes', 'created_at'
+    UNION ALL SELECT 'example_video_comments', 'id'
+    UNION ALL SELECT 'example_video_comments', 'video_id'
+    UNION ALL SELECT 'example_video_comments', 'user_id'
+    UNION ALL SELECT 'example_video_comments', 'content'
+    UNION ALL SELECT 'example_video_comments', 'created_at'
+    UNION ALL SELECT 'example_video_danmaku', 'id'
+    UNION ALL SELECT 'example_video_danmaku', 'video_id'
+    UNION ALL SELECT 'example_video_danmaku', 'user_id'
+    UNION ALL SELECT 'example_video_danmaku', 'text'
+    UNION ALL SELECT 'example_video_danmaku', 'time'
+    UNION ALL SELECT 'example_video_danmaku', 'color'
+    UNION ALL SELECT 'example_video_danmaku', 'mode'
+    UNION ALL SELECT 'example_video_danmaku', 'created_at'
+    UNION ALL SELECT 'example_play_history', 'user_id'
+    UNION ALL SELECT 'example_play_history', 'video_id'
+    UNION ALL SELECT 'example_play_history', 'progress'
+    UNION ALL SELECT 'example_play_history', 'last_active'
+    UNION ALL SELECT 'example_video_notes', 'id'
+    UNION ALL SELECT 'example_video_notes', 'user_id'
+    UNION ALL SELECT 'example_video_notes', 'video_id'
+    UNION ALL SELECT 'example_video_notes', 'time_sec'
+    UNION ALL SELECT 'example_video_notes', 'content'
+    UNION ALL SELECT 'example_video_notes', 'created_at'
+    UNION ALL SELECT 'user_favorites', 'user_id'
+    UNION ALL SELECT 'user_favorites', 'video_id'
+    UNION ALL SELECT 'user_favorites', 'created_at'
+    UNION ALL SELECT 'watch_later', 'user_id'
+    UNION ALL SELECT 'watch_later', 'video_id'
+    UNION ALL SELECT 'watch_later', 'created_at'
+    UNION ALL SELECT 'user_wrongbook', 'id'
+    UNION ALL SELECT 'user_wrongbook', 'user_id'
+    UNION ALL SELECT 'user_wrongbook', 'video_id'
+    UNION ALL SELECT 'user_wrongbook', 'title'
+    UNION ALL SELECT 'user_wrongbook', 'time_sec'
+    UNION ALL SELECT 'user_wrongbook', 'note'
+    UNION ALL SELECT 'user_wrongbook', 'created_at'
+    UNION ALL SELECT 'learning_wrongbook', 'id'
+    UNION ALL SELECT 'learning_wrongbook', 'owner_id'
+    UNION ALL SELECT 'learning_wrongbook', 'legacy_id'
+    UNION ALL SELECT 'learning_wrongbook', 'source_type'
+    UNION ALL SELECT 'learning_wrongbook', 'video_id'
+    UNION ALL SELECT 'learning_wrongbook', 'formula_id'
+    UNION ALL SELECT 'learning_wrongbook', 'time_sec'
+    UNION ALL SELECT 'learning_wrongbook', 'title'
+    UNION ALL SELECT 'learning_wrongbook', 'problem'
+    UNION ALL SELECT 'learning_wrongbook', 'answer'
+    UNION ALL SELECT 'learning_wrongbook', 'note'
+    UNION ALL SELECT 'learning_wrongbook', 'solution_snapshot'
+    UNION ALL SELECT 'learning_wrongbook', 'fingerprint'
+    UNION ALL SELECT 'learning_wrongbook', 'status'
+    UNION ALL SELECT 'learning_wrongbook', 'difficulty'
+    UNION ALL SELECT 'learning_wrongbook', 'review_count'
+    UNION ALL SELECT 'learning_wrongbook', 'interval_days'
+    UNION ALL SELECT 'learning_wrongbook', 'next_review_at'
+    UNION ALL SELECT 'learning_wrongbook', 'last_reviewed_at'
+    UNION ALL SELECT 'learning_wrongbook', 'revision'
+    UNION ALL SELECT 'learning_wrongbook', 'created_at'
+    UNION ALL SELECT 'learning_wrongbook', 'updated_at'
+    UNION ALL SELECT 'learning_wrongbook_tags', 'entry_id'
+    UNION ALL SELECT 'learning_wrongbook_tags', 'tag'
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'id'
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'entry_id'
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'grade'
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'note'
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'interval_days'
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'next_review_at'
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'reviewed_at'
+    UNION ALL SELECT 'course_pack_resources', 'id'
+    UNION ALL SELECT 'course_pack_resources', 'pack_id'
+    UNION ALL SELECT 'course_pack_resources', 'kind'
+    UNION ALL SELECT 'course_pack_resources', 'formula_id'
+    UNION ALL SELECT 'course_pack_resources', 'wrongbook_id'
+    UNION ALL SELECT 'course_pack_resources', 'snapshot'
+    UNION ALL SELECT 'course_pack_resources', 'sort_order'
+    UNION ALL SELECT 'course_pack_resources', 'created_at'
+    UNION ALL SELECT 'request_records', 'id'
+    UNION ALL SELECT 'request_records', 'owner_id'
+    UNION ALL SELECT 'request_records', 'username'
+    UNION ALL SELECT 'request_records', 'role'
+    UNION ALL SELECT 'request_records', 'feature'
+    UNION ALL SELECT 'request_records', 'endpoint'
+    UNION ALL SELECT 'request_records', 'problem'
+    UNION ALL SELECT 'request_records', 'has_image'
+    UNION ALL SELECT 'request_records', 'content_truncated'
+    UNION ALL SELECT 'request_records', 'device'
+    UNION ALL SELECT 'request_records', 'status'
+    UNION ALL SELECT 'request_records', 'http_status'
+    UNION ALL SELECT 'request_records', 'duration_ms'
+    UNION ALL SELECT 'request_records', 'job_id'
+    UNION ALL SELECT 'request_records', 'created_at'
+    UNION ALL SELECT 'request_records', 'updated_at'
+    UNION ALL SELECT 'schema_migrations', 'version'
+    UNION ALL SELECT 'schema_migrations', 'checksum'
+    UNION ALL SELECT 'schema_migrations', 'applied_at'
+) required_column
 WHERE NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS c
     WHERE c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME=required_column.table_name AND c.COLUMN_NAME=required_column.column_name);
 
 SELECT COUNT(*) INTO @wisdom_missing_indexes
-FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
-    table_name VARCHAR(64) PATH '$.table',
-    NESTED PATH '$.indexes[*]' COLUMNS (
-        index_name VARCHAR(64) PATH '$.name', column_names VARCHAR(512) PATH '$.columns', is_unique INT PATH '$.unique'
-    )
-)) required_index
+FROM (
+    SELECT 'users' AS `table_name`, 'PRIMARY' AS `index_name`, 'id' AS `column_names`, 1 AS `is_unique`
+    UNION ALL SELECT 'users', 'username', 'username', 1
+    UNION ALL SELECT 'user_settings', 'PRIMARY', 'user_id', 1
+    UNION ALL SELECT 'user_profiles', 'PRIMARY', 'user_id', 1
+    UNION ALL SELECT 'account_access', 'PRIMARY', 'user_id', 1
+    UNION ALL SELECT 'access_settings', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'access_usage', 'PRIMARY', 'principal,period,feature', 1
+    UNION ALL SELECT 'access_audit', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'access_audit', 'ix_access_audit_created', 'created_at', 0
+    UNION ALL SELECT 'formulas', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'formulas', 'ix_formulas_owner_created', 'user_id,created_at,id', 0
+    UNION ALL SELECT 'formula_topics', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'formula_topics', 'idx_user_tag', 'user_id,tag', 0
+    UNION ALL SELECT 'formula_topics', 'idx_formula', 'formula_id', 0
+    UNION ALL SELECT 'formula_solutions', 'PRIMARY', 'formula_id', 1
+    UNION ALL SELECT 'animation_scripts', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'animation_scripts', 'ix_scripts_owner_created', 'user_id,created_at,id', 0
+    UNION ALL SELECT 'agent_templates', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'agent_templates', 'ix_templates_owner_created', 'user_id,created_at,id', 0
+    UNION ALL SELECT 'user_achievements', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'user_achievements', 'uq_user_ach', 'user_id,achievement_id', 1
+    UNION ALL SELECT 'course_packs', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'course_packs', 'ix_packs_owner_created', 'user_id,created_at,id', 0
+    UNION ALL SELECT 'course_pack_documents', 'PRIMARY', 'pack_id', 1
+    UNION ALL SELECT 'course_pack_videos', 'PRIMARY', 'pack_id,video_id', 1
+    UNION ALL SELECT 'course_pack_videos', 'ix_pack_order', 'pack_id,sort_order', 0
+    UNION ALL SELECT 'example_video_likes', 'PRIMARY', 'video_id,user_id', 1
+    UNION ALL SELECT 'example_video_comments', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'example_video_comments', 'ix_comments_video_created', 'video_id,created_at,id', 0
+    UNION ALL SELECT 'example_video_danmaku', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'example_video_danmaku', 'ix_danmaku_video_time', 'video_id,time,id', 0
+    UNION ALL SELECT 'example_play_history', 'PRIMARY', 'user_id,video_id', 1
+    UNION ALL SELECT 'example_video_notes', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'example_video_notes', 'ix_notes_owner_video_time', 'user_id,video_id,time_sec,id', 0
+    UNION ALL SELECT 'user_favorites', 'PRIMARY', 'user_id,video_id', 1
+    UNION ALL SELECT 'watch_later', 'PRIMARY', 'user_id,video_id', 1
+    UNION ALL SELECT 'user_wrongbook', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'learning_wrongbook', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'learning_wrongbook', 'uq_wrongbook_origin', 'owner_id,fingerprint', 1
+    UNION ALL SELECT 'learning_wrongbook', 'uq_wrongbook_legacy', 'legacy_id', 1
+    UNION ALL SELECT 'learning_wrongbook', 'ix_wrongbook_due', 'owner_id,status,next_review_at,id', 0
+    UNION ALL SELECT 'learning_wrongbook', 'ix_wrongbook_recent', 'owner_id,updated_at,id', 0
+    UNION ALL SELECT 'learning_wrongbook', 'ix_wrongbook_video', 'owner_id,video_id,time_sec', 0
+    UNION ALL SELECT 'learning_wrongbook', 'fk_wrongbook_formula', 'formula_id', 0
+    UNION ALL SELECT 'learning_wrongbook_tags', 'PRIMARY', 'entry_id,tag', 1
+    UNION ALL SELECT 'learning_wrongbook_tags', 'ix_wrongbook_tag', 'tag,entry_id', 0
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'ix_wrongbook_review', 'entry_id,reviewed_at,id', 0
+    UNION ALL SELECT 'course_pack_resources', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'course_pack_resources', 'ix_pack_resource_order', 'pack_id,sort_order,id', 0
+    UNION ALL SELECT 'course_pack_resources', 'uq_pack_formula', 'pack_id,formula_id', 1
+    UNION ALL SELECT 'course_pack_resources', 'uq_pack_wrongbook', 'pack_id,wrongbook_id', 1
+    UNION ALL SELECT 'request_records', 'PRIMARY', 'id', 1
+    UNION ALL SELECT 'request_records', 'ix_requests_time', 'created_at,id', 0
+    UNION ALL SELECT 'request_records', 'ix_requests_owner_time', 'owner_id,created_at,id', 0
+    UNION ALL SELECT 'request_records', 'ix_requests_status_time', 'status,created_at,id', 0
+    UNION ALL SELECT 'request_records', 'ix_requests_feature_time', 'feature,created_at,id', 0
+    UNION ALL SELECT 'request_records', 'ix_requests_job', 'job_id', 0
+    UNION ALL SELECT 'schema_migrations', 'PRIMARY', 'version', 1
+) required_index
 WHERE required_index.index_name IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM information_schema.STATISTICS s
     WHERE s.TABLE_SCHEMA=DATABASE() AND s.TABLE_NAME=required_index.table_name AND s.INDEX_NAME=required_index.index_name
@@ -676,14 +846,25 @@ WHERE required_index.index_name IS NOT NULL AND NOT EXISTS (
 );
 
 SELECT COUNT(*) INTO @wisdom_missing_relations
-FROM JSON_TABLE(@wisdom_schema, '$[*]' COLUMNS (
-    table_name VARCHAR(64) PATH '$.table',
-    NESTED PATH '$.foreign_keys[*]' COLUMNS (
-        column_name VARCHAR(64) PATH '$.column', parent_table VARCHAR(64) PATH '$.parent',
-        parent_column VARCHAR(64) PATH '$.parent_column', delete_rule VARCHAR(16) PATH '$.delete_rule',
-        update_cascade INT PATH '$.update_cascade'
-    )
-)) required_fk
+FROM (
+    SELECT 'user_profiles' AS `table_name`, 'user_id' AS `column_name`, 'users' AS `parent_table`, 'username' AS `parent_column`, 'CASCADE' AS `delete_rule`, 1 AS `update_cascade`
+    UNION ALL SELECT 'account_access', 'user_id', 'users', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'formulas', 'user_id', 'users', 'username', 'CASCADE', 1
+    UNION ALL SELECT 'formula_topics', 'formula_id', 'formulas', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'formula_solutions', 'formula_id', 'formulas', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'animation_scripts', 'user_id', 'users', 'username', 'CASCADE', 1
+    UNION ALL SELECT 'agent_templates', 'user_id', 'users', 'username', 'CASCADE', 1
+    UNION ALL SELECT 'course_pack_documents', 'pack_id', 'course_packs', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'course_pack_videos', 'pack_id', 'course_packs', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'learning_wrongbook', 'formula_id', 'formulas', 'id', 'SET NULL', 0
+    UNION ALL SELECT 'learning_wrongbook', 'owner_id', 'users', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'learning_wrongbook_tags', 'entry_id', 'learning_wrongbook', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'learning_wrongbook_reviews', 'entry_id', 'learning_wrongbook', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'course_pack_resources', 'pack_id', 'course_packs', 'id', 'CASCADE', 0
+    UNION ALL SELECT 'course_pack_resources', 'formula_id', 'formulas', 'id', 'SET NULL', 0
+    UNION ALL SELECT 'course_pack_resources', 'wrongbook_id', 'learning_wrongbook', 'id', 'SET NULL', 0
+    UNION ALL SELECT 'request_records', 'owner_id', 'users', 'id', 'SET NULL', 0
+) required_fk
 WHERE required_fk.column_name IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k
     JOIN information_schema.REFERENTIAL_CONSTRAINTS r
@@ -694,7 +875,14 @@ WHERE required_fk.column_name IS NOT NULL AND NOT EXISTS (
 );
 
 SELECT COUNT(*) INTO @wisdom_migration_conflicts
-FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version', checksum CHAR(64) PATH '$.checksum')) expected
+FROM (
+    SELECT '001_learning_records.sql' AS `version`, '4ce4e3d9091238723bcc8f0d1938247e99397ea6807eda64be21c3edff11aba6' AS `checksum`
+    UNION ALL SELECT '002_account_rename.sql', 'a56e0712c4fdfe7d6e4aae5cd9a17d174056104cc3ed83d7a239957a77fd7321'
+    UNION ALL SELECT '003_teaching_relations.sql', '4d7b1bb79769a5ce6701b1cda22306a30bda8b97d48ee88a82e00efe78e780d1'
+    UNION ALL SELECT '004_course_resources.sql', 'ee1e4911a8e4084512ad40386996a9366369b96699198eb3803c98315298e95f'
+    UNION ALL SELECT '005_account_access.sql', '283739d568f5a77b4568cdcc8147974ce0a2befc5fec97b00e28aaf98f429f21'
+    UNION ALL SELECT '006_request_records.sql', '83f0fabe24c26efae762c8d6cd958ec17773b833f94e1e1af27803f5cc81e042'
+) expected
 JOIN schema_migrations existing ON existing.version=expected.version COLLATE utf8mb4_general_ci
 WHERE BINARY existing.checksum<>BINARY expected.checksum;
 
@@ -707,7 +895,14 @@ SET @wisdom_upgrade_ok = (@wisdom_missing_columns=0 AND @wisdom_missing_indexes=
 
 INSERT INTO schema_migrations(version,checksum)
 SELECT expected.version,expected.checksum
-FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version', checksum CHAR(64) PATH '$.checksum')) expected
+FROM (
+    SELECT '001_learning_records.sql' AS `version`, '4ce4e3d9091238723bcc8f0d1938247e99397ea6807eda64be21c3edff11aba6' AS `checksum`
+    UNION ALL SELECT '002_account_rename.sql', 'a56e0712c4fdfe7d6e4aae5cd9a17d174056104cc3ed83d7a239957a77fd7321'
+    UNION ALL SELECT '003_teaching_relations.sql', '4d7b1bb79769a5ce6701b1cda22306a30bda8b97d48ee88a82e00efe78e780d1'
+    UNION ALL SELECT '004_course_resources.sql', 'ee1e4911a8e4084512ad40386996a9366369b96699198eb3803c98315298e95f'
+    UNION ALL SELECT '005_account_access.sql', '283739d568f5a77b4568cdcc8147974ce0a2befc5fec97b00e28aaf98f429f21'
+    UNION ALL SELECT '006_request_records.sql', '83f0fabe24c26efae762c8d6cd958ec17773b833f94e1e1af27803f5cc81e042'
+) expected
 WHERE @wisdom_upgrade_ok AND NOT EXISTS (SELECT 1 FROM schema_migrations existing WHERE existing.version=expected.version COLLATE utf8mb4_general_ci);
 COMMIT;
 
@@ -720,7 +915,14 @@ SELECT IF(@wisdom_upgrade_ok, 'OK', 'NEEDS_ATTENTION') AS upgrade_status,
     @wisdom_missing_relations AS missing_relations,
     @wisdom_migration_conflicts AS migration_conflicts,
     (SELECT COUNT(*) FROM schema_migrations WHERE version COLLATE utf8mb4_general_ci IN (
-        SELECT version COLLATE utf8mb4_general_ci FROM JSON_TABLE(@wisdom_versions, '$[*]' COLUMNS (version VARCHAR(128) PATH '$.version')) expected
+        SELECT version COLLATE utf8mb4_general_ci FROM (
+    SELECT '001_learning_records.sql' AS `version`, '4ce4e3d9091238723bcc8f0d1938247e99397ea6807eda64be21c3edff11aba6' AS `checksum`
+    UNION ALL SELECT '002_account_rename.sql', 'a56e0712c4fdfe7d6e4aae5cd9a17d174056104cc3ed83d7a239957a77fd7321'
+    UNION ALL SELECT '003_teaching_relations.sql', '4d7b1bb79769a5ce6701b1cda22306a30bda8b97d48ee88a82e00efe78e780d1'
+    UNION ALL SELECT '004_course_resources.sql', 'ee1e4911a8e4084512ad40386996a9366369b96699198eb3803c98315298e95f'
+    UNION ALL SELECT '005_account_access.sql', '283739d568f5a77b4568cdcc8147974ce0a2befc5fec97b00e28aaf98f429f21'
+    UNION ALL SELECT '006_request_records.sql', '83f0fabe24c26efae762c8d6cd958ec17773b833f94e1e1af27803f5cc81e042'
+) expected
     )) AS applied_migrations,
     @wisdom_pending_legacy AS pending_legacy_wrongbook,
     (SELECT COUNT(*) FROM user_wrongbook w WHERE NOT EXISTS (SELECT 1 FROM learning_wrongbook n WHERE n.legacy_id=w.id)) AS unmatched_legacy_wrongbook;

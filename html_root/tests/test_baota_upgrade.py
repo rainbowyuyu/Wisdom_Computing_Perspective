@@ -47,6 +47,9 @@ def test_upgrade_18_tables_preserves_data_and_is_repeatable(collation):
     cursor = conn.cursor()
     created = False
     try:
+        cursor.execute('SELECT COUNT(*) FROM information_schema.COLLATIONS WHERE COLLATION_NAME=%s', (collation,))
+        if not cursor.fetchone()[0]:
+            pytest.skip(f'Server does not support {collation}')
         cursor.execute(f'CREATE DATABASE `{name}` CHARACTER SET utf8mb4 COLLATE {collation}')
         created = True
         cursor.execute(f'USE `{name}`')

@@ -13,7 +13,7 @@ def test_fresh_sql_and_repeatable_migrations_preserve_legacy(monkeypatch):
     options=dict(host=config.MYSQL_HOST,port=config.MYSQL_PORT,user=config.MYSQL_USER,password=config.MYSQL_PASSWORD)
     admin=mysql.connector.connect(**options);cursor=admin.cursor()
     try:
-        cursor.execute('CREATE DATABASE `'+name+'` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci')
+        cursor.execute('CREATE DATABASE `'+name+'` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci')
         cursor.execute('USE `'+name+'`')
         sql=Path('visdom_db.sql').read_text(encoding='utf-8')
         for statement in sql.split(';'):

@@ -1,6 +1,5 @@
 # 认证：验证码、注册、登录、登出、当前用户、用户名查重
 import logging
-import os
 import uuid
 import bcrypt
 from typing import Optional
@@ -9,6 +8,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..config import get_db_connection
 from ..store import CAPTCHA_STORE, SESSION_STORE
+from ..request_origin import public_scheme
 from ..models import AuthModel
 from logic.captcha import generate_captcha_image_bytes
 
@@ -76,8 +76,7 @@ def login(data: AuthModel, response: Response, request: Request):
             except AccessDenied as error:return JSONResponse(status_code=error.status,content={'status':'error','message':str(error),'code':error.code})
             session_id = str(uuid.uuid4())
             SESSION_STORE[session_id] = user["username"]
-            trusted_proxy = request.client and request.client.host in os.getenv('TRUSTED_PROXY_IPS', '127.0.0.1,::1').split(',')
-            secure = request.url.scheme == 'https' or (trusted_proxy and request.headers.get('x-forwarded-proto') == 'https')
+            secure = public_scheme(request.scope, request.headers) == 'https'
             response.set_cookie(key="auth_session", value=session_id, max_age=86400, httponly=True, samesite="lax", secure=bool(secure))
             return {"status": "success", "username": user["username"],"role":principal['role']}
         return JSONResponse(status_code=401, content={"status": "error", "message": "用户名或密码错误"})

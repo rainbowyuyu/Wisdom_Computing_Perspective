@@ -63,7 +63,7 @@ def test_expression_rejects_code_and_unbounded_operations(text):
         expression(text)
 
 
-@pytest.mark.parametrize('problem', ['已知三角形，请证明角平分线定理', 'x/x*x=0', 'x^2=1 且 x>0', '积分 sin(x)'])
+@pytest.mark.parametrize('problem', ['已知三角形，请证明角平分线定理', 'x/x*x=0 且 x>0', 'x^2=1 且 x>0', '积分 sin(x)'])
 def test_local_tool_does_not_drop_conditions(problem):
     assert local_solution(problem) is None
 
