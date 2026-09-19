@@ -6,6 +6,7 @@ import re
 import uuid
 import hashlib
 import threading
+import logging
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -81,6 +82,9 @@ class RequestGuard:
         send=recorded_send
         lease = None
         duplicate = None
+        retry_digest = None
+        retry_started = False
+        server_failed = False
         async def reject(message, status=429, retry=60,code='access_denied'):
             response = JSONResponse({'status':'error', 'message':message,'code':code}, status_code=status,
                 headers={'Retry-After': str(retry), 'Cache-Control':'no-store','X-Wisdom-Access':code})
@@ -165,9 +169,19 @@ class RequestGuard:
                     from logic.task_planning import needs_agent
                     if needs_agent(validated.problem):feature=None
                 if feature:
-                    try:await access.consume_async(feature)
+                    try:
+                        free_retry=False
+                        if validated is not None:
+                            retry_owner=owner if principal else owner+'\0'+guest
+                            retry_digest=hashlib.sha256((retry_owner+'\0'+path+'\0'+canonical).encode()).hexdigest()
+                            free_retry=await asyncio.to_thread(ledger.claim_failed_retry,retry_digest)
+                            if headers.get('x-wisdom-retry')=='1' and not free_retry:
+                                return await reject('原任务尚未确认失败，或已超过 24 小时重试期限。本次未扣额度，请稍后重试或作为新任务提交。',409,code='retry_unavailable')
+                        if not free_retry:await access.consume_async(feature)
                     except access.AccessDenied as error:return await reject(str(error),error.status,code=error.code)
+                    except UsageDenied as error:return await reject(str(error),retry=error.retry_after,code='retry_unavailable')
                     access.feature_authorized.set(True)
+                    retry_started=True
             async def secure_send(message):
                 if message['type'] == 'http.response.start':
                     message = dict(message)
@@ -183,13 +197,26 @@ class RequestGuard:
                         cookie=f'wisdom_trial={guest}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax'+('; Secure' if secure else '')
                         message['headers'].append((b'set-cookie',cookie.encode('ascii')))
                 await send(message)
-            await self.app(scope, receive, secure_send)
+            try:await self.app(scope, receive, secure_send)
+            except Exception:
+                server_failed=True
+                raise
         finally:
             cancelled.set()
+            retry_outcome=record.status if record else None
             if record:record.finish()
             request_record_id.reset(record_token)
             from .async_cleanup import finish_cleanup
             async def cleanup():
+                if retry_started and retry_digest and record:
+                    # Terminal SSE errors count even if the client closes after
+                    # receiving them. Client cancellation alone grants no credit.
+                    failed=server_failed or retry_outcome=='failed' or bool(record.code and record.code>=500)
+                    successful=retry_outcome in {'completed','partial','needs_information','handoff'}
+                    if failed or successful:
+                        try:await asyncio.to_thread(ledger.finish_failed_retry,retry_digest,failed)
+                        except Exception:
+                            logging.getLogger(__name__).warning('Unable to persist retry outcome',exc_info=False)
                 if duplicate: await asyncio.to_thread(ledger.release,duplicate)
                 if lease: await asyncio.to_thread(ledger.release,lease)
             try:

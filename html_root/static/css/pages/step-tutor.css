@@ -159,6 +159,9 @@
 
 .role-graph-wrap{height:auto!important}.role-graph-3d{min-width:0}[data-theme="dark"] .role-graph-wrap{mask-image:none;-webkit-mask-image:none}.role-graph-wrap:fullscreen{background:var(--bg-body);padding:24px;display:flex;flex-direction:column}.role-graph-wrap:fullscreen .role-graph-3d{height:calc(100dvh - 180px);flex:1}.graph-explorer .graph-fullscreen{border:1px solid var(--border-color);border-radius:8px;padding:.5rem;background:var(--bg-surface);color:var(--text-main);cursor:pointer}
 .math-render-error { overflow-wrap:anywhere; }
+.step-tutor .katex-display,.solution-reader .katex-display { max-width:100%;overflow-x:auto;overflow-y:hidden; }
+.tutor-input-preview .katex-display { margin:.45em 0;text-align:left; }
+.tutor-input-preview .katex-display>.katex { text-align:left; }
 
 .tutor-advice { margin:1rem 0; padding:1rem 1.2rem; border:1px solid color-mix(in srgb,var(--primary-color) 30%,var(--border-color)); border-radius:12px; background:color-mix(in srgb,var(--primary-color) 5%,var(--bg-surface)); }
 .tutor-advice strong { font-size:.9rem; color:var(--text-main); }.tutor-advice p { font-size:.8rem; line-height:1.8; color:var(--text-secondary); margin:.5rem 0; }.tutor-advice>div { display:flex; flex-wrap:wrap; gap:.5rem; }.tutor-advice button { font-size:.8rem; text-align:left; white-space:normal; }

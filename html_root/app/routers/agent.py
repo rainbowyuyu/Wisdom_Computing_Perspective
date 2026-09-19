@@ -7,10 +7,34 @@ from fastapi.responses import JSONResponse
 
 from ..config import client, api_key
 from ..models import AgentRequest
-from ..llm_errors import llm_error_message
+from ..llm_errors import llm_error_message, recoverable_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent", tags=["agent"])
+
+
+def generate_plan(prompt):
+    """Repair malformed plans once, within the original authorized request."""
+    messages=[{'role':'user','content':prompt}]
+    for attempt in range(2):
+        completion=client.with_options(timeout=40,max_retries=0).chat.completions.create(
+            model='qwen-plus',response_format={'type':'json_object'},temperature=0.2,messages=messages)
+        raw=completion.choices[0].message.content or ''
+        raw=re.sub(r'^```(?:json)?\s*|\s*```$', '', raw.strip())
+        try:
+            parsed=json.loads(raw)
+            if not isinstance(parsed,dict):raise ValueError('执行计划必须为 JSON 对象')
+            steps=parsed.get('steps',[parsed])
+            sections={'detect','calculate','devtools','my-formulas','examples','help','chat','settings'}
+            if not isinstance(steps,list) or not 1<=len(steps)<=12:raise ValueError('steps 需要包含 1 至 12 个步骤')
+            for step in steps:
+                if not isinstance(step,dict) or step.get('section') not in sections:raise ValueError('每一步需要有效的 section')
+                if step['section']=='chat' and not str(step.get('reply') or '').strip():raise ValueError('回复内容不能为空')
+            return parsed
+        except (ValueError,TypeError) as error:
+            if attempt:raise ValueError('执行计划修复后仍不可用，请重试。') from error
+            messages.extend([{'role':'assistant','content':raw[:20000]},
+                {'role':'user','content':'执行计划格式检查失败：'+str(error)[:180]+'。请修复并重新输出完整 JSON，保留原题和要求，LaTeX 的反斜杠按 JSON 正确转义。'}])
 
 
 def sanitize_latex_for_mathlive(latex: str) -> str:
@@ -257,7 +281,7 @@ def agent_execute(data: AgentRequest):
         try:
             base64_image = re.sub(r"^data:image/[^;]+;base64,", "", data.image_base64.strip())
             if not api_key:
-                return {"status": "error", "message": "图片识别需要配置 ALIYUN_KEY，请先输入文字题目。"}
+                return {"status": "error", "message": "图片识别需要配置 ALIYUN_KEY，请先输入文字题目。", "retryable":False}
             else:
                 completion = client.with_options(timeout=70, max_retries=0).chat.completions.create(
                     model="qwen-vl-max",
@@ -273,7 +297,7 @@ def agent_execute(data: AgentRequest):
                 latex_from_image = latex_from_image.replace("```latex", "").replace("```", "").replace("\\[", "").replace("\\]", "").strip()
         except Exception as e:
             logger.error(f"Agent image recognition: {e}")
-            return JSONResponse(status_code=200, content={"status": "error", "message": llm_error_message(e)})
+            return JSONResponse(status_code=200, content={"status": "error", "message": llm_error_message(e), "retryable":recoverable_error(e)})
 
     context_prefix = ""
     if data.last_user_message or data.last_assistant_message:
@@ -294,7 +318,7 @@ def agent_execute(data: AgentRequest):
         if local is not None:
             return {"status": "success", "prompt": data.prompt, "steps": [{"section": "calculate", "operation": "solution", "trigger": "generate", "formula": data.prompt, "reply": "将调用符号计算、交互图形和 Manim，逐步展示这道题的解答。"}]}
     if not api_key:
-        return {"status": "error", "message": "复杂题目与自然语言调度需要在服务端配置 ALIYUN_KEY。可先输入：解方程 x^2-5*x+6=0。"}
+        return {"status": "error", "message": "复杂题目与自然语言调度需要在服务端配置 ALIYUN_KEY。可先输入：解方程 x^2-5*x+6=0。", "retryable":False}
 
     intent_hint = _classify_intent(data.prompt or "")
     intent_hint_json = json.dumps(intent_hint, ensure_ascii=False)
@@ -342,10 +366,7 @@ def agent_execute(data: AgentRequest):
         " trigger：立刻生成动画填 generate；仅识别填 recognize；只跳转填 none。"
     )
     try:
-        completion = client.with_options(timeout=70, max_retries=0).chat.completions.create(model="qwen-plus", response_format={"type":"json_object"}, temperature=0.2, messages=[{"role": "user", "content": prompt_for_llm}])
-        raw = completion.choices[0].message.content.strip()
-        if "```" in raw:
-            raw = raw.split("```")[1].replace("json", "").strip()
+        parsed = generate_plan(prompt_for_llm)
 
         user_prompt = data.prompt or ""
 
@@ -416,11 +437,6 @@ def agent_execute(data: AgentRequest):
                 "trigger": trigger,
             }
 
-        try:
-            parsed = json.loads(raw)
-        except Exception:
-            raise ValueError("模型返回了无效的执行计划")
-
         if isinstance(parsed.get("steps"), list) and len(parsed["steps"]) > 0:
             steps_arr = [normalize_step(s) if isinstance(s, dict) else normalize_step({}) for s in parsed["steps"][:12]]
         else:
@@ -429,7 +445,7 @@ def agent_execute(data: AgentRequest):
         if not data.image_base64 and any(s.get("trigger") == "recognize" for s in steps_arr):
             return JSONResponse(
                 status_code=200,
-                content={"status": "error", "message": "进行识别需要您先上传或粘贴一张公式图片，请上传后再试。"},
+                content={"status": "error", "message": "进行识别需要您先上传或粘贴一张公式图片，请上传后再试。", "retryable":False},
             )
 
         return {
@@ -439,4 +455,4 @@ def agent_execute(data: AgentRequest):
         }
     except Exception as e:
         logger.error(f"Agent LLM parse: {e}")
-        return JSONResponse(status_code=200, content={"status": "error", "message": llm_error_message(e)})
+        return JSONResponse(status_code=200, content={"status": "error", "message": llm_error_message(e), "retryable":recoverable_error(e)})

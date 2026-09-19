@@ -7,7 +7,7 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from .async_cleanup import finish_cleanup
-from .llm_errors import llm_error_message
+from .llm_errors import llm_error_message, recoverable_error
 
 
 @contextmanager
@@ -129,7 +129,7 @@ async def repair_progress(factory, request, timeout=140):
         raise
     except Exception as error:
         message = str(error) if isinstance(error, ValueError) and not hasattr(error,'errors') else llm_error_message(error)
-        yield {'type':'repair_failed','message':message[:400]}
+        yield {'type':'repair_failed','message':message[:400],'retryable':recoverable_error(error)}
     finally:
         if not task.done():
             task.cancel()

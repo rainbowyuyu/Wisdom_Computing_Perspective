@@ -84,15 +84,22 @@ export function normalizeMathText(value = '') {
                 const char = part[to];
                 if (part.startsWith('\\begin{', to)) environments++;
                 if (part.startsWith('\\end{', to)) environments = Math.max(0, environments - 1);
-                if (char === '{') depth++;
-                if (char === '}') { if (!depth) break; depth--; }
+                // TeX control symbols (\{ and \}) are visible delimiters, not groups.
+                let slashes=0;for(let i=to-1;i>=0&&part[i]==='\\';i--)slashes++;
+                const escaped=slashes%2===1;
+                if (char === '{' && !escaped) depth++;
+                if (char === '}' && !escaped) { if (!depth) break; depth--; }
+                // A complete outer environment is its own display block. Do not
+                // swallow the following explanation (including English prose).
+                if(char==='}'&&!escaped&&!depth&&!environments&&part.startsWith('\\begin{',from)) {to++;break;}
                 if (!depth && !environments && !/[a-zA-Z0-9\s\\{}()[\]+*/=^_.,:;!|<>−\-]/.test(char)) break;
                 if (!depth && !environments && /[\n,;:]/.test(char) && part[to-1] !== '\\') break;
             }
-            const raw = part.slice(from, to).trimEnd().replace(/[.]+$/, '');
+            const raw = part.slice(from, to).trimEnd().replace(/(?<!\\right|\\left|\\)[.]+$/, '');
             // Do not guess incomplete LaTeX during typing.
             if (raw && depth === 0 && environments === 0) {
-                result += part.slice(cursor, from) + '\\(' + normalizeLatex(raw) + '\\)';
+                const display=/\\begin\s*\{/.test(raw);
+                result += part.slice(cursor, from) + (display?'\\[':'\\(') + normalizeLatex(raw) + (display?'\\]':'\\)');
                 cursor = from + raw.length;
             }
             start.lastIndex = Math.max(to, from + 1);

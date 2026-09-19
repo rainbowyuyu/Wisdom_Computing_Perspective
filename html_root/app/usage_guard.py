@@ -51,6 +51,7 @@ class UsageLedger:
             db.execute('CREATE TABLE IF NOT EXISTS usage (bucket TEXT, period TEXT, value INTEGER NOT NULL, PRIMARY KEY(bucket, period))')
             db.execute('CREATE TABLE IF NOT EXISTS leases (id TEXT PRIMARY KEY, owner TEXT, expires REAL)')
             db.execute('CREATE TABLE IF NOT EXISTS provider_circuit (provider TEXT PRIMARY KEY, failures INTEGER NOT NULL, last_failure REAL NOT NULL, blocked_until REAL NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS failed_requests (digest TEXT PRIMARY KEY, retries INTEGER NOT NULL, expires REAL NOT NULL)')
             db.execute('BEGIN IMMEDIATE')
             yield db
             db.commit()
@@ -135,6 +136,32 @@ class UsageLedger:
             return lease
         except (sqlite3.Error,OSError) as error:
             raise UsageDenied('请求保护暂不可用，本次未开始生成，请稍后重试。') from error
+
+    def claim_failed_retry(self, digest):
+        """Only server-observed failures qualify, under the duplicate lease.
+
+        Hash-only receipts survive restarts. Two retries within 24 hours are
+        free of personal quota; provider budgets and admission still apply.
+        """
+        try:
+            with self.connection() as db:
+                now=time.time()
+                db.execute('DELETE FROM failed_requests WHERE expires < ?', (now,))
+                row=db.execute('SELECT retries,expires FROM failed_requests WHERE digest=?', (digest,)).fetchone()
+                if row is None:return False
+                if row[0]>=2:
+                    raise UsageDenied('本题已连续重试两次仍未完成，已暂停继续生成，未扣额外额度。请检查题目、拆分后再提交，或稍后再试。', max(1,int(row[1]-now)))
+                db.execute('UPDATE failed_requests SET retries=retries+1 WHERE digest=?', (digest,))
+                return True
+        except (sqlite3.Error,OSError) as error:
+            raise UsageDenied('重试记录暂不可用，本次未开始生成，也未扣额度，请稍后重试。') from error
+
+    def finish_failed_retry(self, digest, failed):
+        with self.connection() as db:
+            if failed:
+                db.execute('INSERT INTO failed_requests VALUES(?,0,?) ON CONFLICT(digest) DO NOTHING', (digest,time.time()+86400))
+            else:
+                db.execute('DELETE FROM failed_requests WHERE digest=?', (digest,))
 
     def check_provider(self,provider):
         try:

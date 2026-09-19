@@ -84,6 +84,8 @@ def test_parallelism_dependency_order_fairness_and_render_separation(tmp_path,mo
 
 
 def test_cancel_is_scoped_failure_blocks_dependents_and_retry_preserves_done(tmp_path,monkeypatch):
+    charged=[]
+    monkeypatch.setattr('app.access.consume',lambda *args,**kwargs:charged.append(args))
     async def scenario():
         manager=MathJobManager(JobStore(tmp_path/'jobs.db'));calls=Counter();fail=[True]
         async def planner(*_):return plan()
@@ -104,8 +106,9 @@ def test_cancel_is_scoped_failure_blocks_dependents_and_retry_preserves_done(tmp
             await manager.retry(fast['id'],('ip','b'))
             await until(lambda:manager.jobs[fast['id']]['status']=='done')
             assert calls['fast','第一问']==1
-            assert calls['fast','第二问']==2
+            assert calls['fast','第二问']==4  # Initial + two automatic repairs + manual continuation.
             assert calls['fast','综合结论']==1
+            assert len(charged)==2  # Two original jobs; retry never charges again.
             assert manager.jobs[slow['id']]['status']=='cancelled'
         finally:await manager.close()
     asyncio.run(scenario())
@@ -243,5 +246,51 @@ def test_persistence_failure_pauses_before_more_paid_work(tmp_path,monkeypatch):
             failing[0]=False;await manager.retry(job['id'],('ip','a'))
             await until(lambda:manager.jobs[job['id']]['status']=='done')
             assert len(calls)==3
+        finally:await manager.close()
+    asyncio.run(scenario())
+
+
+def test_background_plan_solve_and_animation_recover_without_clicks_or_charges(tmp_path,monkeypatch):
+    async def scenario():
+        manager=MathJobManager(JobStore(tmp_path/'jobs.db'));calls=Counter();charges=[]
+        monkeypatch.setattr('app.access.consume',lambda *a,**k:charges.append(True))
+        async def planner(*_):
+            calls['plan']+=1
+            if calls['plan']==1:raise ValueError('invalid plan JSON')
+            return plan()
+        async def solver(job,node):
+            calls[node['title']]+=1
+            if node['title']=='第二问' and calls[node['title']]==1:raise TimeoutError('temporary timeout')
+            return local_solution('x^2=1')
+        async def render(job,index):
+            calls['render'+str(index)]+=1
+            if index==1 and calls['render1']==1:raise math_jobs.TaskRenderError('temporary render failure')
+            job['nodes'][index]['render_status']='done'
+        monkeypatch.setattr(math_jobs,'plan_problem',planner);monkeypatch.setattr(math_jobs,'solve_subtask',solver)
+        monkeypatch.setattr(manager,'render_node',render)
+        try:
+            submitted=await manager.submit(request(render=True),('ip','student'))
+            await until(lambda:manager.jobs[submitted['id']]['status']=='done',seconds=8)
+            job=manager.jobs[submitted['id']]
+            assert calls['plan']==calls['第二问']==calls['render1']==2
+            assert calls['第一问']==calls['综合结论']==calls['render0']==calls['render2']==1
+            assert len(charges)==1
+            stored=manager.store.load()[0]
+            assert stored['auto_plan_retries']==stored['nodes'][1]['auto_solve_retries']==stored['nodes'][1]['auto_render_retries']==1
+        finally:await manager.close()
+    asyncio.run(scenario())
+
+
+def test_background_stop_during_automatic_recovery_prevents_more_work(tmp_path,monkeypatch):
+    async def scenario():
+        manager=MathJobManager(JobStore(tmp_path/'jobs.db'));calls=[]
+        async def planner(*_):calls.append(True);raise ValueError('invalid plan')
+        monkeypatch.setattr(math_jobs,'plan_problem',planner)
+        try:
+            submitted=await manager.submit(request(),('ip','student'))
+            await until(lambda:manager.jobs[submitted['id']].get('auto_plan_retries')==1)
+            await manager.cancel(submitted['id'],'student')
+            assert manager.jobs[submitted['id']]['status']=='cancelled'
+            assert len(calls)==1 and not manager.work
         finally:await manager.close()
     asyncio.run(scenario())

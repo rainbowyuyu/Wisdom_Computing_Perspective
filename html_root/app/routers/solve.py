@@ -22,7 +22,7 @@ from openai import AsyncOpenAI, APIConnectionError, APITimeoutError, APIStatusEr
 
 from ..config import api_key, client, VIDEOS_DIR
 from ..solution_models import RenderRequest, Solution, SolveRequest
-from ..llm_errors import llm_error_message
+from ..llm_errors import llm_error_message, recoverable_error
 from ..usage_guard import GuardedClient, UsageDenied, identity
 from logic.solution_engine import local_solution, resolve_visual_functions, validate_summary_consistency
 from logic.solution_adaptation import strategy_guidance, parse_solution, verify_parameter_analysis
@@ -196,7 +196,7 @@ async def solve_stream(data: SolveRequest, request: Request):
             if advice:
                 yield event('advice', advice=advice)
                 if advice['blocking']:
-                    yield event('error', message=advice['message'])
+                    yield event('error', message=advice['message'],retryable=False)
                     return
             if needs_agent(data.problem):
                 yield event('handoff', message='题目包含多个阶段，正在转交智能体拆解与安排任务。')
@@ -212,7 +212,7 @@ async def solve_stream(data: SolveRequest, request: Request):
                     yield event('status', message='正在复用本账户最近完成的同题解答，本次不调用 AI。', tool='cache')
             if solution is None:
                 if not api_key:
-                    yield event("error", message="这道题需要 AI 推导，但服务端尚未配置 ALIYUN_KEY。可先体验：解方程 x^2-5*x+6=0、求导 sin(x)、矩阵 [[1,2],[0,1]]。")
+                    yield event("error", message="这道题需要 AI 推导，但服务端尚未配置 ALIYUN_KEY。可先体验：解方程 x^2-5*x+6=0、求导 sin(x)、矩阵 [[1,2],[0,1]]。",retryable=False)
                     return
                 yield event("status", message="数学智能体正在组织逐步推导和图形…", tool="ai")
                 task = asyncio.create_task(ai_solution(data))
@@ -246,7 +246,7 @@ async def solve_stream(data: SolveRequest, request: Request):
             logger.warning("Step tutor failed: %s", type(error).__name__)
             if not isinstance(error, UsageDenied):
                 yield event('advice', advice=study_advice(data.problem, data.context, failure=True))
-            yield event("error", message=llm_error_message(error))
+            yield event("error", message=llm_error_message(error),retryable=recoverable_error(error))
         finally:
             if task and not task.done():
                 task.cancel()
@@ -262,7 +262,7 @@ async def _render_solution_once(data: RenderRequest, request: Request):
         acquired = False
         try:
             if not importlib.util.find_spec("manim"):
-                yield event("error", message="Manim 尚未安装。分步讲解与交互图形仍可使用。")
+                yield event("error", message="Manim 尚未安装。分步讲解与交互图形仍可使用。",retryable=False)
                 return
             yield event("status", message="动画任务已提交，正在等待渲染资源…", tool="manim")
             queued = time.monotonic()
@@ -377,7 +377,8 @@ async def render_solution(data: RenderRequest, request: Request):
                     and 1<=step<=len(working.solution.steps) and eligible(failure,diagnostic))
                 if not can_repair:
                     if repaired:failed['message']='自动修复后仍未完成动画。'+failed['message']
-                    yield event('error',message=failed['message']);return
+                    retryable=failed.get('retryable',True) and diagnostic.get('code') not in {'compiler','converter','package','font'}
+                    yield event('error',message=failed['message'],retryable=retryable);return
                 yield event('status',message=f'第 {step} 步公式渲染失败，正在请模型判断并修复排版（最多一次）…',tool='manim',repairing=True)
                 async def repair():
                     current=working.solution.steps[step-1]
@@ -389,7 +390,7 @@ async def render_solution(data: RenderRequest, request: Request):
                     kind=update.pop('type')
                     if kind=='repair_result':replacement=update['value']
                     elif kind=='repair_failed':
-                        yield event('error',message=failed['message']+' 修复未完成：'+update['message']);return
+                        yield event('error',message=failed['message']+' 修复未完成：'+update['message'],retryable=update.get('retryable',True));return
                     else:yield event(kind,**update)
                 if replacement is None:return
                 working.solution.steps[step-1].formula=replacement

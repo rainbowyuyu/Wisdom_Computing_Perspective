@@ -25,8 +25,23 @@ test('bare nested LaTeX in Chinese prose is normalized without changing delimite
 
 test('matrices retain row breaks; incomplete input and HTML-like text stay literal', () => {
   const matrix=String.raw`\begin{bmatrix}1&2\\0&1\end{bmatrix}`;
-  assert.equal(normalizeMathText(matrix), String.raw`\(${matrix}\)`);
+  assert.equal(normalizeMathText(matrix), String.raw`\[${matrix}\]`);
   assert.equal(normalizeMathText(String.raw`结果为 \frac{1}{`), String.raw`结果为 \frac{1}{`);
   const injection='条件 $x > 2$，<img src=x onerror=alert(1)>';
   assert.equal(normalizeMathText(injection), injection);
+});
+
+test('aligned systems with visible braces render as one display block and preserve prose',()=>{
+  const system=String.raw`\begin{aligned}&(3)\left\{\begin{array}{l}x_{1}-5x_{3}=1\\-x_{1}+x_{2}+6x_{3}=3\\2x_{1}+3x_{2}-7x_{3}=15\end{array}\right.\\&(5)\left\{\begin{array}{l}x_{1}+x_{2}+x_{3}+x_{4}=1\\2x_{1}+3x_{2}+4x_{3}+x_{4}=3\\3x_{1}+x_{2}-x_{3}+5x_{4}=1\end{array}\right.\end{aligned}`;
+  const text=system+'\n本次子目标：代入原方程验证。';
+  const normalized=String.raw`\[${system}\]`+'\n本次子目标：代入原方程验证。';
+  assert.equal(normalizeMathText(text),normalized);
+  assert.equal(normalizeMathText(normalized),normalized);
+  assert.equal(normalizeMathText(system+' Verify the result.'),String.raw`\[${system}\]`+' Verify the result.');
+  const set=String.raw`\left\{x\mid x>0\right\}`;
+  assert.equal(normalizeMathText(set),String.raw`\(${set}\)`);
+  const bare=String.raw`\left\{\begin{array}{l}x=1\\y=2\end{array}\right.`;
+  assert.equal(normalizeMathText(bare),String.raw`\[${bare}\]`);
+  const incomplete=String.raw`\begin{aligned}x&=\frac{1}{`;
+  assert.equal(normalizeMathText(incomplete),incomplete);
 });

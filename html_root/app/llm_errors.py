@@ -2,6 +2,15 @@
 from openai import APIConnectionError, APITimeoutError
 from .usage_guard import UsageDenied
 
+def recoverable_error(error):
+    """Never retry missing permissions, exhausted budgets or invalid requests."""
+    if isinstance(error,UsageDenied) or getattr(error,'retryable',True) is False:return False
+    status=getattr(error,'status_code',None)
+    if status is not None and 400<=status<500 and status!=408:return False
+    body=getattr(error,'body',{}) or {}
+    detail=body.get('error',body) if isinstance(body,dict) else {}
+    return not isinstance(detail,dict) or detail.get('code')!='Arrearage'
+
 def llm_error_message(error):
     if isinstance(error, UsageDenied):
         return str(error)

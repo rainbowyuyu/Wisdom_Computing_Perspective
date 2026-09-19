@@ -37,13 +37,13 @@ def test_timeout_retry_completion_and_cancel(url):
         page.wait_for_function('window.tutorRequests.length===1')
         page.evaluate('(step)=>window.sendTutor({type:"step",index:0,step})', solution['steps'][0])
         page.clock.fast_forward(31000)
-        page.wait_for_selector('.tutor-job[data-phase=error]')
-        assert page.locator('[data-action=retry]').is_visible()
+        page.wait_for_function("window.StepTutor.getState().status.includes('自动修复')")
+        assert not page.locator('[data-action=retry]').is_visible()
         assert page.locator('#tutor-problem').input_value() == 'x^2=1'
         assert page.evaluate('window.StepTutor.getState().steps.length') == 1
         assert page.evaluate('window.tutorRequests[0].cancelled')
-        assert not page.evaluate('window.StepTutor.getState().busy')
-        page.locator('[data-action=retry]').click()
+        assert page.evaluate('window.StepTutor.getState().busy')
+        page.clock.run_for(1100)
         page.wait_for_function('window.tutorRequests.length===2')
         page.evaluate('(solution)=>window.sendTutor({type:"complete",solution})', solution)
         page.wait_for_function('!window.StepTutor.getState().busy')

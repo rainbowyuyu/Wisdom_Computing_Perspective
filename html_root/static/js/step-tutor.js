@@ -1,5 +1,6 @@
 import { textWithMath, renderFormula, normalizeSolution } from './math-text.js';
 import { requestEvents } from './event-stream.js?v=20260919-tasks-1';
+import { recoverRequest, requestFailure } from './automatic-recovery.js';
 import { queueMathTask } from '/static/js/agent-task-board.js?v=20260919-tasks-1';
 import { escapeText as esc, visualMarkup } from './solution-visual.js?v=20260918-adaptive-1';
 import { libraryRequest, solutionMarkdown, exportSolution, openSavedSolution } from './solution-library.js';
@@ -38,22 +39,22 @@ export function cancelTutor() {
     stopPlayback(); state.status='已停止。已生成的步骤仍可阅读和操作。'; publish();
 }
 
-export async function solveProblem(problem, {autoRender=true, context=''}={}) {
+export async function solveProblem(problem, {autoRender=true, context='', retry=false}={}) {
     problem=String(problem||'').trim();
     if(!problem) { state.status='请先输入完整题目。'; publish(); return false; }
     if(problem.length>6000) {state.status='题目请控制在 6000 字以内。';publish();return false;}
     controller?.abort(); renderController?.abort(); stopPlayback();
     const run=++generation; const aborter=new AbortController(); controller=aborter;
-    Object.assign(state,{advice:null,problem,context,draftProblem:problem,draftContext:context,solution:null,steps:[],index:0,progress:1,busy:true,rendering:false,video:null,error:false,tools:['planner'],libraryId:null,libraryOwner:null,savedVersion:'',status:'正在分析题目…'});
+    Object.assign(state,{autoRender,failedStage:null,advice:null,problem,context,draftProblem:problem,draftContext:context,solution:null,steps:[],index:0,progress:1,busy:true,rendering:false,video:null,error:false,tools:['planner'],libraryId:null,libraryOwner:null,savedVersion:'',status:retry?'正在重新推导原题，不重复扣额度…':'正在分析题目…'});
     state.job={phase:'solve',completed:0,total:0};
     mounts.forEach(view=>view.reset()); publish();
     let succeeded=false, handoff=false;
     try {
-        await requestEvents('/api/solve/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({problem,context}),signal:aborter.signal},event=> {
+        await recoverRequest(attempt=>requestEvents('/api/solve/stream',{method:'POST',headers:{'Content-Type':'application/json',...(retry||attempt?{'X-Wisdom-Retry':'1'}:{})},body:JSON.stringify({problem,context}),signal:aborter.signal},event=> {
             if(run!==generation) return;
             if(event.type==='advice')state.advice=event.advice;
             if(event.type==='handoff'){handoff=true;state.job.phase='delegated';}
-            if(event.type==='error') throw new Error(event.message);
+            if(event.type==='error') throw requestFailure(event.message,{...event,retryable:event.retryable??!state.advice?.blocking});
             if(event.message) state.status=event.message;
             if(event.tool&&!state.tools.includes(event.tool)) state.tools.push(event.tool);
             if(event.type==='plan') {state.status=event.title;state.tools.push(event.source,'interactive_svg');state.job.total=Number.isInteger(event.total)&&event.total>0?event.total:0;}
@@ -69,10 +70,13 @@ export async function solveProblem(problem, {autoRender=true, context=''}={}) {
                 if(state.solution.completion==='partial'){handoff=true;state.job.phase='delegated';}
             }
             publish();
-        });
+        }),{signal:aborter.signal,maxRetries:retry?0:2,onRetry:attempt=>{
+            state.status=`正在自动修复并重新推导（${attempt}/2），不重复扣额度…`;
+            state.job={...state.job,phase:'solve'};publish();
+        }});
         if(run===generation&&!succeeded&&!handoff)throw new Error('解题连接已中断，已接收的步骤保留，请重试。');
     } catch(error) {
-        if(run===generation&&error.name!=='AbortError') {state.error=true;state.job.phase='error';state.status=error.message||'解题失败，请重试。';}
+        if(run===generation&&error.name!=='AbortError') {state.error=true;state.failedStage='solve';state.job.phase='error';state.status=(error.autoRetryCount?'自动修复后仍未完成，已保留题目和已有步骤。':'')+(error.message||'解题失败，请重试。');}
     } finally {
         if(run===generation) {state.busy=false;controller=null;publish();}
     }
@@ -84,7 +88,13 @@ export async function solveProblem(problem, {autoRender=true, context=''}={}) {
     return succeeded&&run===generation&&!state.error;
 }
 
-export async function renderTutor() {
+export async function retryTutor() {
+    if(state.busy||state.rendering||!state.error)return false;
+    if(state.failedStage==='render'&&state.solution){await renderTutor({retry:true});return !state.error;}
+    return solveProblem(state.problem,{context:state.context,autoRender:state.autoRender,retry:true});
+}
+
+export async function renderTutor({retry=state.failedStage==='render'}={}) {
     if(!state.solution||state.busy||state.rendering) return;
     const run=generation; const aborter=new AbortController(); renderController=aborter;
     state.rendering=true;state.error=false;state.status='准备生成分步 Manim 动画…';
@@ -92,9 +102,9 @@ export async function renderTutor() {
     let completed=false;
     if(!state.tools.includes('manim'))state.tools.push('manim');publish();
     try {
-        await requestEvents('/api/solve/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({solution:state.solution}),signal:aborter.signal},event=> {
+        await recoverRequest(attempt=>requestEvents('/api/solve/render',{method:'POST',headers:{'Content-Type':'application/json',...(retry||attempt?{'X-Wisdom-Retry':'1'}:{})},body:JSON.stringify({solution:state.solution}),signal:aborter.signal},event=> {
             if(run!==generation)return;
-            if(event.type==='error')throw new Error(event.message);
+            if(event.type==='error')throw requestFailure(event.message,event);
             if(event.message)state.status=event.message;
             if(event.type==='progress'&&Number.isInteger(event.chapter)&&event.chapter>=0&&Number.isInteger(event.total)&&event.total>0){
                 // The backend emits a chapter when it starts, so only preceding chapters are complete.
@@ -104,14 +114,19 @@ export async function renderTutor() {
                 if(!/^\/videos\/solution_[a-f0-9]+\.mp4$/.test(event.video_url))throw new Error('视频地址无效。');
                 if(event.repaired&&event.solution){state.solution=event.solution;state.steps=event.solution.steps;}
                 state.video={url:event.video_url,chapters:event.chapters};state.status='解答与动画均已完成。点击步骤可跳到对应视频章节。';remember();
-                completed=true;state.job={phase:'done',completed:state.steps.length,total:state.steps.length};
+                completed=true;state.failedStage=null;state.job={phase:'done',completed:state.steps.length,total:state.steps.length};
                 mounts.forEach(view=>view.showVideo());
             }
             publish();
-        },{totalTimeoutMs:780000,timeoutMessage:'等待动画超时，交互解答已保留，请重试动画。'});
+        },{totalTimeoutMs:780000,timeoutMessage:'等待动画超时，交互解答已保留，请重试动画。'}),{
+            signal:aborter.signal,maxRetries:retry?0:2,onRetry:attempt=>{
+                state.status=`正在自动修复并重新生成动画（${attempt}/2），题解保留，不重复扣额度…`;
+                state.job={phase:'render',completed:0,total:0};publish();
+            }
+        });
         if(run===generation&&!completed)throw new Error('动画连接已中断，交互解答已保留，请重试动画。');
     } catch(error) {
-        if(run===generation&&error.name!=='AbortError') {state.error=true;state.job.phase='error';state.status=error.message||'动画未完成，交互解答已保留。';}
+        if(run===generation&&error.name!=='AbortError') {state.error=true;state.failedStage='render';state.job.phase='error';state.status=(error.autoRetryCount?'自动修复后仍未完成，解题结果已保留。':'')+(error.message||'动画未完成，交互解答已保留。');}
     } finally {
         if(run===generation) {state.rendering=false;renderController=null;publish();}
     }
@@ -139,6 +154,7 @@ export function restoreSavedSolution(record) {
     stopPlayback();generation++;
     record={...record,solution:normalizeSolution(record.solution)};
     state.job=null;
+    state.failedStage=null;
     Object.assign(state,{advice:adviceForSolution(record.solution),problem:record.problem,context:record.context||'',draftProblem:record.problem,draftContext:record.context||'',solution:record.solution,steps:record.solution.steps,index:0,progress:1,video:record.video||null,error:false,libraryId:record.id||null,libraryOwner:record.username||null,status:record.id?'正在阅读已保存题解':record.solution.source==='curriculum'?'正在阅读本站典型题解，可保存或生成动画。':'已恢复最近的题解。',tools:[record.solution.source,'interactive_svg']});
     state.savedVersion=record.id?JSON.stringify(recordSnapshot()):'';
     mounts.forEach(view=>{view.reset();view.showStep();view.showVideo();});publish();return true;
@@ -248,6 +264,8 @@ export function mountTutor(host) {
         $('[data-action=cancel]').hidden=!(state.busy||state.rendering);
         $('[data-action=login]').hidden=!state.error||!state.status.includes('登录');
         $('[data-action=retry]').hidden=!state.error||state.busy||state.rendering;
+        $('[data-action=retry]').textContent=state.failedStage==='render'?'修复并重试动画 · 不扣额度':'重新推导 · 不扣额度';
+        $('[data-action=retry]').title='原失败请求 24 小时内可免费重试两次；动画失败只重试动画。';
         $('[data-action=render]').disabled=state.busy||state.rendering;
         $('[data-action=render]').textContent=state.rendering?'动画生成中…':state.video?'重新生成动画':state.error?'重试动画':'生成动画';
         const saved=!!state.savedVersion&&state.savedVersion===JSON.stringify(recordSnapshot());
@@ -313,7 +331,7 @@ export function mountTutor(host) {
         const action=b.dataset.action;
         if(action==='login')window.toggleAuthModal?.(true);
         if(action==='cancel')cancelTutor();
-        if(action==='retry')submit();
+        if(action==='retry')retryTutor();
         if(action==='prev'||action==='next'){stopPlayback();selectStep(state.index+(action==='next'?1:-1));}
         if(action==='play')play();
         if(action==='render')renderTutor();
@@ -343,7 +361,7 @@ export function prefillProblem(problem, context='') {
     mounts.forEach(view=>view.prefill(state.draftProblem));
 }
 
-window.StepTutor={prefill:prefillProblem,mount:mountTutor,solve:solveProblem,cancel:cancelTutor,render:renderTutor,getState:()=>({...state}),selectStep,save:saveToLibrary,restore:restoreSavedSolution};
+window.StepTutor={prefill:prefillProblem,mount:mountTutor,solve:solveProblem,retry:retryTutor,cancel:cancelTutor,render:renderTutor,getState:()=>({...state}),selectStep,save:saveToLibrary,restore:restoreSavedSolution};
 window.addEventListener('auth-state-change',event=>{if(state.libraryOwner&&state.libraryOwner!==event.detail?.username){state.libraryId=null;state.libraryOwner=null;state.savedVersion='';publish();}});
 window.addEventListener('formula-library-deleted',event=>{if(state.libraryId===event.detail?.id){state.libraryId=null;state.savedVersion='';publish();}});
 fetch('/api/solve/capabilities').then(r=>r.ok?r.json():null).then(c=>{state.capabilities=c;publish();}).catch(()=>{});

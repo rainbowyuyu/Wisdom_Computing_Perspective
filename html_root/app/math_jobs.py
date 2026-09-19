@@ -12,12 +12,17 @@ import uuid
 
 from .usage_guard import identity, limit, UsageDenied, request_cancelled
 from .task_models import MathJobRequest
-from .llm_errors import llm_error_message
+from .llm_errors import llm_error_message, recoverable_error
 from logic.task_planning import plan_problem, solve_subtask
 
 ACTIVE = {'queued','planning','running'}
 RETRYABLE = {'error','blocked','cancelled','interrupted'}
 logger=logging.getLogger(__name__)
+
+class TaskRenderError(ValueError):
+    def __init__(self,message,retryable=True):
+        super().__init__(message)
+        self.retryable=retryable
 
 
 class JobStore:
@@ -175,12 +180,15 @@ class MathJobManager:
                 raise UsageDenied('请补充条件后作为新题提交；当前已完成的结果仍可阅读。')
             if sum(j['status'] in ACTIVE for j in self.jobs.values())>=24 or sum(j['status'] in ACTIVE and j['owner']==who[1] for j in self.jobs.values())>=3:
                 raise UsageDenied('当前任务已达上限，请稍后继续。')
-            from .access import consume
-            await asyncio.to_thread(consume,'calculate',who)
+            # The immutable, owned job has already been charged at submission.
+            # Resume only missing work; never silently debit a failed retry.
+            if job.get('retry_count',0)>=2:
+                raise UsageDenied('本题已继续两次仍未完成，未扣额外额度。请检查条件或拆分后重新提交。')
+            job['retry_count']=job.get('retry_count',0)+1
             for node in job['nodes']:
                 if node['status'] in RETRYABLE:node.update(status='queued',message='等待执行')
                 if node['render_status'] in RETRYABLE:node['render_status']='queued' if node['status']=='done' else 'pending'
-            job.update(status='running' if job['nodes'] else 'queued',message='仅继续未完成的部分，已完成结果保留。')
+            job.update(status='running' if job['nodes'] else 'queued',message='正在重试未完成部分，不重复扣额度，已完成结果保留。')
             self.settle(job)
             self.callers[ident]=who
             await self.persist(job);self.wake.set()
@@ -217,6 +225,20 @@ class MathJobManager:
                     key=(job['id'],index,kind)
                     self.work[key]=asyncio.create_task(self.execute(key))
 
+    async def recover(self, job, target, stage, operation):
+        """Persist the stage budget before retry; completed siblings never rerun."""
+        counter='auto_'+stage+'_retries'
+        while True:
+            try:return await operation()
+            except Exception as error:
+                if (not recoverable_error(error) or (isinstance(error,(sqlite3.Error,OSError)) and not isinstance(error,TimeoutError))
+                        or target.get(counter,0)>=2 or self.closing or job['status'] not in ACTIVE):raise
+                target[counter]=target.get(counter,0)+1
+                message=f"正在自动修复并继续（{target[counter]}/2），不重复扣额度，已完成结果保留。"
+                target['render_message' if stage=='render' else 'message']=message
+                await self.persist(job)
+                await asyncio.sleep(target[counter])
+
     async def execute(self, key):
         ident,index,kind=key;job=self.jobs[ident]
         token=identity.set(self.callers[ident])
@@ -228,7 +250,7 @@ class MathJobManager:
             await asyncio.to_thread(load_principal,job['owner'])
             await self.persist(job)
             if index==-1:
-                plan=await asyncio.wait_for(plan_problem(job['problem'],job['context'],job.get('force_decompose',False)),150)
+                plan=await self.recover(job,job,'plan',lambda:asyncio.wait_for(plan_problem(job['problem'],job['context'],job.get('force_decompose',False)),150))
                 if plan.status=='needs_information':
                     job.update(title=plan.title,status='needs_information',message=plan.message)
                 else:
@@ -238,14 +260,14 @@ class MathJobManager:
                                 'render_message':'','render_completed':0,'render_total':0} for t in plan.tasks])
             elif kind=='solve':
                 node=job['nodes'][index]
-                solution=await asyncio.wait_for(solve_subtask(job,node),210)
+                solution=await self.recover(job,node,'solve',lambda:asyncio.wait_for(solve_subtask(job,node),210))
                 solution.task_goal=node['goal']
                 node['solution']=solution.model_dump()
                 node['status']='done' if solution.completion=='solved' else 'partial'
                 node['message']='解答已完成' if node['status']=='done' else '当前推导尚不完整，请补充条件；后续依赖任务不会据此继续。'
                 node['render_status']='queued' if node['status']=='done' and job['auto_render'] else 'skipped'
             else:
-                await self.render_node(job,index)
+                await self.recover(job,job['nodes'][index],'render',lambda:self.render_node(job,index))
         except asyncio.CancelledError:
             if index>=0:
                 node=job['nodes'][index]
@@ -253,7 +275,7 @@ class MathJobManager:
                 else:node['status']='interrupted' if self.closing else 'cancelled'
             raise
         except Exception as error:
-            message=llm_error_message(error)
+            message=str(error) if isinstance(error,TaskRenderError) else llm_error_message(error)
             if index<0:job.update(status='error',message=message)
             elif kind=='solve':job['nodes'][index].update(status='error',message=message,render_status='skipped')
             else:job['nodes'][index].update(render_status='error',render_message=message)
@@ -293,7 +315,7 @@ class MathJobManager:
             async for frame in response.body_iterator:
                 event=json.loads(frame[6:])
                 if event['type']=='error':
-                    node.update(render_status='error',render_message=event['message']);return
+                    raise TaskRenderError(event['message'],event.get('retryable',True))
                 if event['type']=='complete':
                     if event.get('repaired') and event.get('solution'):node['solution']=event['solution']
                     node.update(render_status='done',render_message='动画已完成',video={'url':event['video_url'],'chapters':event['chapters']})
@@ -302,7 +324,7 @@ class MathJobManager:
                     await self.persist(job)
                 elif event['type']=='status':
                     node['render_message']=event.get('message','');await self.persist(job)
-            if node['render_status']=='running':node.update(render_status='error',render_message='动画未完整返回，题解已保留。')
+            if node['render_status']=='running':raise TaskRenderError('动画未完整返回，题解已保留。')
         finally:
             await response.body_iterator.aclose()
 

@@ -1,9 +1,11 @@
+import { requestFailure } from './automatic-recovery.js';
+
 /** Decode complete SSE frames, including split UTF-8, CRLF and multiline data. */
 export async function consumeEvents(response, onEvent, signal) {
     if (!response.ok) {
         let data; try { data = await response.json(); } catch { /* Non-JSON proxy response. */ }
         const message = typeof data?.message === 'string' ? data.message : typeof data?.detail === 'string' ? data.detail : null;
-        throw new Error(message || `请求失败（${response.status}），请检查输入或稍后重试。`);
+        throw requestFailure(message || `请求失败（${response.status}），请检查输入或稍后重试。`,data,response.status);
     }
     if (!response.body) throw new Error('浏览器不支持流式响应。');
     const reader = response.body.getReader();
