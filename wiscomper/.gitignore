@@ -1,0 +1,41 @@
+.venv/
+node_modules/
+data/
+work/
+tmp/
+__pycache__/
+.pytest_cache/
+.env
+.env.local
+*.pyc
+# Private deployment configuration and server state
+.env.*
+!.env.example
+var/
+storage/
+uploads/
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.dpapi
+*.pem
+*.key
+*.p12
+*.pfx
+# Reproducible output and machine-specific setup
+.cache/
+.venv-wiscomper
+dist/
+*.deploy-backups/
+*.deploy-runtimes/
+*.log
+launcher.ini
+.coverage
+htmlcov/
+.ruff_cache/
+.DS_Store
+Thumbs.db
+# Imported engineering geometry stays with its local owner.
+/runtime/engineering-imports/

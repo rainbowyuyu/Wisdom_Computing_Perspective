@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>场景导出</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0c1420}#scene-host{position:relative;width:100vw;height:100vh}.katex-display{margin:0!important}</style></head>
+<body><div id="scene-host"></div><script type="module">
+import {ScenePlayer} from '/web/engine.js';
+window.renderReady = false;
+window.renderError = null;
+try {
+  const job = new URLSearchParams(location.search).get('job');
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(job || '')) throw new Error('导出任务无效。');
+  const response = await fetch(`/api/export-scene/${encodeURIComponent(job)}`, {credentials:'same-origin'});
+  if (!response.ok) throw new Error('无法读取本次导出场景。');
+  const data = await response.json();
+  const player = new ScenePlayer(document.getElementById('scene-host'));
+  await player.load(data.scene || data);
+  window.renderFrame = async seconds => { player.seek(seconds); await document.fonts.ready; return {time:player.time}; };
+  window.scenePlayer = player;
+  window.renderReady = true;
+} catch (error) { window.renderError = error instanceof Error ? error.message : '渲染初始化失败。'; }
+</script></body></html>

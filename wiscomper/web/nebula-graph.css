@@ -1,0 +1,19 @@
+/* A quiet constellation, following the original role graph's glass icon labels. */
+.nebula-host{background:radial-gradient(ellipse at 35% 32%,#e9e4fb99,transparent 58%),radial-gradient(ellipse at 75% 72%,#ddebfa88,transparent 60%),linear-gradient(145deg,#f8f9fe,#f2f6fc)!important;isolation:isolate}
+.nebula-canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab;outline-offset:-4px!important}
+.nebula-host[data-dragging=true] .nebula-canvas{cursor:grabbing}
+.nebula-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.nebula-leaders{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.4}
+.nebula-host .nebula-leaders line{stroke:#929fc5;stroke-width:.6;stroke-dasharray:none}
+.nebula-label{position:absolute;display:grid;grid-template-columns:24px minmax(0,1fr);align-items:center;gap:7px;transform:translate(-50%,-50%);max-width:170px;min-width:0;padding:6px 10px 6px 6px;border:1px solid #ffffffb3;border-radius:24px;background:linear-gradient(120deg,#ffffffc9,#ffffff72);box-shadow:0 3px 13px #586b9a0c;color:#42506c;pointer-events:auto;touch-action:none;cursor:pointer;user-select:none;backdrop-filter:blur(14px);transition:background .18s,border-color .18s,box-shadow .18s}
+.nebula-symbol{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:color-mix(in srgb,var(--nebula-node-color,#6366f1) 9%,transparent);color:var(--nebula-node-color,#6366f1);font:500 16px Georgia,serif;line-height:1}
+.nebula-label:hover,.nebula-label:focus-visible{border-color:#c6b9f0;background:#fffffff0;box-shadow:0 4px 18px #7c72bc1a}
+.nebula-label.nebula-selected{border-color:#b8a3eb;background:linear-gradient(120deg,#fff,#f2edffda);box-shadow:0 0 0 4px #9b81db0e,0 6px 22px #7761b415}
+.nebula-label strong{display:block;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;font-weight:550;line-height:1.5}
+.nebula-math{display:none;grid-column:1/-1;max-width:160px;max-height:34px;overflow:hidden;padding:1px 5px 3px;font-size:10px;color:#64568d;text-align:center}
+.nebula-selected:has(.nebula-math){border-radius:15px}.nebula-selected .nebula-math{display:block}
+.nebula-math .katex-display{margin:0}.nebula-math.kw-math-fallback{white-space:nowrap;font-size:9px}
+.nebula-label[hidden]{display:none!important}
+@media(max-width:600px){.nebula-label{max-width:142px;gap:5px;padding:5px 8px 5px 5px;grid-template-columns:21px minmax(0,1fr)}.nebula-symbol{width:21px;height:21px;font-size:14px}.nebula-label strong{font-size:10px}.nebula-math{max-width:126px;font-size:9px}}
+@media(prefers-reduced-motion:reduce){.nebula-label{transition:none!important}}
+.nebula-label{width:max-content}

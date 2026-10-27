@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8fafc">
+  <meta name="description" content="Wiscomper 智算视界，把文字、公式与图片变成可交互的动态可视化。探索数学、科学与三维模型，保存作品，继续迭代。">
+  <title>Wiscomper 智算视界 · Wisdom Computer Perspective</title>
+  <link rel="icon" type="image/svg+xml" href="/web/assets/wisdom-logo.svg">
+  <link rel="stylesheet" href="/web/style.css">
+  <link rel="stylesheet" href="/web/knowledge-workspace.css">
+  <link rel="stylesheet" href="/web/floating-hub.css">
+  <link rel="stylesheet" href="/web/account-menu.css">
+  <link rel="stylesheet" href="/web/email-auth-dialog.css">
+  <link rel="stylesheet" href="/web/brand.css">
+  <link rel="stylesheet" href="/web/workspace-center.css">
+  <link rel="stylesheet" href="/web/onboarding.css">
+  <link rel="stylesheet" href="/web/theme.css">
+  <link rel="stylesheet" href="/web/sketch-input.css">
+  <link rel="stylesheet" href="/web/global-search.css">
+</head>
+<body>
+  <a class="skip-link" href="#create-form">跳到创作输入</a>
+  <header class="app-header">
+    <a class="brand" href="/" aria-label="Wiscomper 智算视界 Wisdom Computer Perspective 首页">
+      <span class="brand-mark" aria-hidden="true"><img class="brand-logo" src="/web/assets/wisdom-logo.svg" alt="" width="40" height="40"></span>
+      <span class="brand-name"><span>智算视界 <b>Wiscomper</b></span><small>Wisdom Computer Perspective</small></span>
+    </a>
+    <span class="header-divider"></span>
+    <nav class="ecosystem-nav" aria-label="探索工具"><a class="button quiet site-discover" href="/explore">发现</a><button id="open-library" type="button" class="button quiet">ƒ 公式库</button><button id="open-knowledge" type="button" class="button quiet">◈ 知识图谱</button><details class="workspace-more"><summary class="button quiet">我的空间 ▾</summary><div class="more-panel"><button type="button" class="button quiet" data-ecosystem-action="search">搜索全站 ⌕</button><button type="button" class="button quiet" data-ecosystem-action="learning">学习资料与错题本</button><button type="button" class="button quiet" data-ecosystem-action="course-packs">教案与课包</button><button type="button" class="button quiet" data-ecosystem-action="achievements">探索足迹</button><button type="button" class="button quiet" data-ecosystem-action="settings">偏好与悬浮球设置</button><button type="button" class="button quiet" data-ecosystem-action="releases">版本动态</button><button type="button" class="button quiet" data-ecosystem-action="tutorial">新手教程</button></div></details><button id="open-help" type="button" class="button quiet">帮助</button></nav>
+    <div class="header-actions">
+      <button class="button quiet search-toggle" type="button" data-ecosystem-action="search" aria-label="搜索全站" title="搜索 · Ctrl / ⌘ K">⌕</button>
+      <span id="connection" class="connection"><span></span><span id="connection-text">正在连接</span></span>
+      <button id="new-project" class="button quiet" type="button"><span aria-hidden="true">＋</span> 新建探索</button>
+      <div id="account-menu" aria-label="账号"></div>
+    </div>
+  </header>
+  <nav class="workspace-jumps" aria-label="工作区导航"><button type="button" data-workspace-jump="create">写下想法</button><button type="button" data-workspace-jump="preview">查看画面</button><button type="button" data-workspace-jump="details">调整与解释</button><button type="button" data-workspace-jump="jobs">任务进度</button></nav>
+
+  <main class="workspace">
+    <aside class="creation-panel panel" aria-label="创作面板">
+      <div class="panel-tabs" role="tablist" aria-label="创作与项目">
+        <button class="panel-tab active" id="creation-tab" type="button" role="tab" aria-selected="true" aria-controls="creation-content">创作</button>
+        <button class="panel-tab" id="history-tab" type="button" role="tab" aria-selected="false" aria-controls="history-content">项目 <span id="project-count" class="count">0</span></button>
+      </div>
+      <div id="creation-content" class="panel-scroll" role="tabpanel" aria-labelledby="creation-tab">
+        <div class="section-eyebrow">看懂，从看见开始</div>
+        <h1>让想法，清晰可见<span class="accent">。</span></h1>
+        <p class="intro">一句描述、一张图片、一个公式。生成后，还能动手调整，继续探索。</p>
+        <div id="welcome-hint" class="welcome-hint" hidden><span>第一次来？</span><button class="button quiet" type="button" data-ecosystem-action="tutorial">看看怎么用</button><button id="dismiss-welcome" class="icon-button" type="button" aria-label="关闭新手提示">×</button></div>
+        <form id="create-form">
+          <div class="input-tabs" role="tablist" aria-label="输入类型">
+            <button type="button" class="input-tab active" role="tab" aria-selected="true" data-mode="text"><span aria-hidden="true">T</span> 文字</button>
+            <button type="button" class="input-tab" role="tab" aria-selected="false" data-mode="formula"><span aria-hidden="true">ƒ</span> 公式</button>
+            <button type="button" class="input-tab" role="tab" aria-selected="false" data-mode="image"><span aria-hidden="true">▧</span> 图片</button>
+            <button type="button" class="input-sketch" data-ecosystem-action="sketch" title="手写或画一个草图">✎ 手写</button>
+          </div>
+          <div id="composer" class="composer">
+            <label class="sr-only" for="prompt">描述你的可视化</label>
+            <textarea id="prompt" maxlength="6000" placeholder="例如：用动画解释单摆的运动，展示角度与周期的关系……" rows="6"></textarea>
+            <div id="image-input" class="image-input" hidden>
+              <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="sr-only">
+              <button type="button" id="upload-image" class="upload-button"><span aria-hidden="true">↥</span> 上传图片<span>也可拖入或粘贴</span></button>
+            </div>
+            <div id="asset-preview" class="asset-preview" hidden>
+              <img id="asset-image" alt="已上传的参考图片">
+              <span>参考图片已添加</span><button type="button" id="remove-image" class="icon-button" aria-label="移除参考图片">×</button>
+            </div>
+            <div class="composer-footer"><span id="input-hint">⌘ / Ctrl + Enter 生成</span><span id="prompt-count">0 / 6000</span></div>
+          </div>
+          <div class="form-row model-row">
+            <label for="provider">创作模型</label>
+            <select id="provider"><option value="qwen">Qwen · 通义千问</option><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option></select>
+          </div>
+          <p id="provider-status" class="provider-status">正在检查模型连接…</p>
+          <fieldset class="duration-field"><legend>动画时长</legend><div class="segmented">
+            <label><input type="radio" name="duration" value="12" checked><span>12 秒</span></label>
+            <label><input type="radio" name="duration" value="20"><span>20 秒</span></label>
+            <label><input type="radio" name="duration" value="30"><span>30 秒</span></label>
+          </div></fieldset>
+          <label id="iterate-label" class="iterate-label" hidden><input id="iterate" type="checkbox" checked><span>在当前项目中继续修改</span></label>
+          <p id="iteration-context" class="iteration-context" hidden></p>
+          <button id="generate" class="button primary generate-button" type="submit"><span class="sparkle" aria-hidden="true">✦</span><span id="generate-label">生成可视化</span><span aria-hidden="true">↗</span></button>
+          <p class="tool-choice-hint">自动选择二维、三维或公式动画 · 结果可继续修改</p>
+          <button id="login-for-creation" type="button" class="login-for-creation" hidden>登录后创作自己的内容 →</button>
+          <p id="form-message" class="form-message" role="status" hidden></p>
+        </form>
+        <div class="section-heading samples-heading"><h2>灵感起点</h2><span>本地示例</span></div>
+        <label class="sr-only" for="sample-filter">筛选可视化方案</label>
+        <select id="sample-filter" class="sample-filter" aria-label="筛选可视化方案"><option value="all">全部方案</option><option value="math">数学与公式</option><option value="physics">运动与科学</option><option value="spatial">三维与机械</option><option value="process">过程与系统</option></select>
+        <div id="samples" class="samples"><div class="skeleton"></div><div class="skeleton"></div></div>
+        <div class="local-note"><span aria-hidden="true">◈</span><span><span id="storage-note">作品与历史保存在本机</span><br><small>示例无需调用模型即可探索</small><br><a href="/about">了解智算视界</a> · <a href="/explore">查看可视化示例</a></span></div>
+      </div>
+      <div id="history-content" class="panel-scroll history-content" role="tabpanel" aria-labelledby="history-tab" hidden>
+        <div class="section-heading"><h2>我的探索</h2><button id="refresh-history" type="button" class="icon-button" aria-label="刷新项目列表">↻</button></div>
+        <p class="intro">一个想法，一个项目。每次修改都会留下版本，可随时回看与恢复。</p>
+        <div id="projects" class="projects"></div>
+      </div>
+    </aside>
+
+    <section class="stage-panel" aria-label="可视化工作台">
+      <div class="stage-toolbar">
+        <div class="document-heading"><span class="document-icon" aria-hidden="true">◈</span><div><h2 id="scene-title">准备探索</h2><p id="scene-meta">正在加载本地示例</p></div></div>
+        <div class="stage-actions"><span id="scene-mode" class="mode-badge">2D</span><button id="versions-toggle" class="button secondary" type="button" aria-haspopup="dialog" disabled>版本</button><button id="export-toggle" class="button secondary" type="button" aria-haspopup="dialog" aria-expanded="false" disabled><span aria-hidden="true">↥</span> 导出</button></div>
+      </div>
+      <div id="revision-preview" class="revision-preview" role="status" hidden><span id="revision-preview-label"></span><div><button id="revision-return" class="button secondary" type="button">返回最新版</button><button id="revision-restore" class="button primary" type="button">恢复此版本</button></div></div>
+      <div id="project-conflict" class="revision-preview" role="status" hidden><span>此项目已在其他操作中更新。本页输入仍保留，请载入最新版本再继续。</span><button id="reload-latest" class="button secondary" type="button">载入最新版本</button></div>
+      <div class="canvas-wrap">
+        <div class="canvas-topline"><span class="canvas-label"><span></span> 可交互画布</span><div id="camera-toolbar" class="camera-toolbar" aria-label="三维观察" hidden><button id="camera-free" type="button" class="camera-button" aria-pressed="true">自由观察</button><button id="camera-interact" type="button" class="camera-button" aria-pressed="false">构件操控</button><button id="camera-reset" type="button" class="camera-button" aria-label="复位观察视角" title="复位观察视角">↺</button></div><span id="evidence-label">动态解释</span></div>
+        <div id="scene-host" class="scene-host" aria-label="动画预览画布" tabindex="0"></div>
+        <div id="canvas-empty" class="canvas-empty"><div class="empty-orbit" aria-hidden="true"><i></i><i></i><span>✦</span></div><h3>每个想法，都有形状</h3><p id="empty-message">正在准备你的第一段动态解释…</p><button id="retry-bootstrap" class="button secondary" type="button" hidden>重新连接</button></div>
+        <div class="canvas-bottomline"><span id="canvas-hint">拖动时间轴探索 · 点击对象查看图层</span><span class="canvas-ratio">16 : 9</span></div>
+      </div>
+      <section class="timeline panel" aria-label="播放时间轴">
+        <div class="transport">
+          <div class="transport-left"><button id="restart" class="icon-button" aria-label="从头播放" disabled>↤</button><button id="play" class="play-button" aria-label="暂停动画" disabled><span id="play-symbol" aria-hidden="true">Ⅱ</span></button><span class="time-readout"><strong id="current-time">00:00.0</strong><span>/</span><span id="total-time">00:12.0</span></span></div>
+          <div class="transport-right"><label for="speed" class="sr-only">播放速度</label><select id="speed" aria-label="播放速度"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select><span class="timeline-label">时间轴</span></div>
+        </div>
+        <div class="seek-wrap"><input id="seek" type="range" min="0" max="12" step="0.01" value="0" aria-label="播放进度" disabled><div id="timeline-ticks" class="timeline-ticks" aria-hidden="true"></div></div>
+        <div id="step-tracks" class="step-tracks" aria-label="动画步骤定位"></div>
+      </section>
+      <div class="workspace-footer"><span><span class="keyboard-key">Space</span> 播放 / 暂停</span><span id="save-status">作品与历史自动保存</span></div>
+      <nav class="study-actions" aria-label="作品学习操作"><button class="button quiet" type="button" data-study-kind="favorite">♡ 收藏</button><button class="button quiet" type="button" data-study-kind="watch_later">稍后看</button><button class="button quiet" type="button" data-study-kind="note">记笔记</button><button class="button quiet" type="button" data-study-kind="wrongbook">加入错题本</button><button class="button quiet" type="button" data-ecosystem-action="course-packs">教案与课包 ↗</button></nav>
+    </section>
+
+    <aside class="inspector-panel panel" aria-label="场景信息和参数">
+      <div class="panel-tabs" role="tablist" aria-label="场景面板">
+        <button id="detail-tab" class="panel-tab active" type="button" role="tab" aria-selected="true" aria-controls="detail-content">场景</button>
+        <button id="process-tab" class="panel-tab" type="button" role="tab" aria-selected="false" aria-controls="process-content">过程 <span id="active-jobs" class="activity-dot" hidden></span></button>
+      </div>
+      <div id="detail-content" class="panel-scroll" role="tabpanel" aria-labelledby="detail-tab">
+        <div class="section-eyebrow">理解这一刻</div><h2 id="detail-title" class="detail-title">从运动中发现规律</h2><p id="scene-summary" class="scene-summary">选择左侧示例，或输入你想探索的内容。</p>
+        <section id="scene-selection" class="scene-selection" aria-label="场景表现方式" hidden><span class="selection-label">表现方式</span><strong id="selection-title"></strong><p id="selection-reason"></p><span id="selection-renderer" class="selection-renderer"></span></section>
+        <section id="interaction-section" class="inspector-section interaction-section" aria-label="交互探索"><div class="section-heading"><h3>交互探索</h3><span id="interaction-save-state" role="status">等待载入</span></div><p id="interaction-hint" class="interaction-hint">载入场景后，查看可以自由调整的构件。</p><span id="camera-state" class="camera-state" hidden>默认镜头</span><div id="interactions" class="interactions"></div><div class="interaction-actions"><button id="interaction-reset" type="button" class="button secondary" hidden>复位全部</button><button id="interaction-save-retry" type="button" class="button secondary" hidden>重试保存</button></div></section>
+        <div id="assumptions" class="assumptions" hidden></div>
+        <section class="inspector-section"><div class="section-heading"><h3>参数实验</h3><span id="parameter-state">实时重算</span></div><div id="controls" class="controls"><p class="empty-note">载入场景后，在这里调整参数。</p></div></section>
+        <section class="inspector-section"><div class="section-heading"><h3>解释步骤</h3><span id="step-count">0</span></div><div id="steps" class="steps"></div></section>
+        <section class="inspector-section layer-section"><div class="section-heading"><h3>图层</h3><span id="layer-count">0</span></div><div id="layers" class="layers"></div><div id="selected-object" class="selected-object" hidden></div></section>
+      </div>
+      <div id="process-content" class="panel-scroll" role="tabpanel" aria-labelledby="process-tab" hidden>
+        <div class="section-heading"><h2>创作过程</h2><span id="job-count">0 个任务</span></div>
+        <p class="intro">查看实际运行步骤与导出进度。</p><div id="jobs" class="jobs"><p class="empty-note">还没有任务，开始一次探索吧。</p></div>
+      </div>
+    </aside>
+  </main>
+
+  <dialog id="versions-dialog" class="versions-dialog" aria-labelledby="versions-title">
+    <form method="dialog"><button class="dialog-close icon-button" aria-label="关闭版本历史">×</button></form>
+    <div class="section-eyebrow">让每一步探索留下来</div><h2 id="versions-title">版本历史</h2>
+    <p id="versions-project-title" class="intro"></p>
+    <p class="versions-note">回看只改变预览。恢复会生成一个新版本，之后的成果仍然保留。</p>
+    <div id="versions-list" class="versions-list" role="list"></div>
+    <p id="versions-message" class="form-message" role="status" hidden></p>
+  </dialog>
+
+  <dialog id="export-dialog" class="export-dialog" aria-labelledby="export-title">
+    <form method="dialog"><button class="dialog-close icon-button" aria-label="关闭导出窗口">×</button></form>
+    <div class="section-eyebrow">让想法继续流动</div><h2 id="export-title">导出可视化</h2><p id="export-project-title" class="intro"></p>
+    <button id="export-json" class="export-option" type="button"><span class="export-symbol">{ }</span><span><strong>场景文件</strong><small>JSON · 保留参数、对象与关键帧</small></span><span aria-hidden="true">↗</span></button>
+    <fieldset class="export-engines"><legend>视频渲染方式</legend><label><input type="radio" name="export-engine" value="browser" checked><span><strong id="browser-engine-title">浏览器渲染</strong><small id="browser-engine-status">还原当前场景 · 支持 2D / 3D</small></span></label><label><input id="manim-engine" type="radio" name="export-engine" value="manim"><span><strong>Manim</strong><small id="manim-status">数学动画渲染</small></span></label></fieldset>
+    <div class="form-row"><label for="export-fps">视频帧率</label><select id="export-fps"><option value="24">24 fps</option><option value="15">15 fps</option></select></div>
+    <button id="export-video" class="button primary" type="button"><span aria-hidden="true">↥</span> 生成 MP4 视频</button><p class="export-note">导出包含当前构件交互与观察视角，图层临时显隐不计入。<br>渲染在后台运行，你可以继续查看场景。</p><p id="export-message" class="form-message" role="status" hidden></p>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="/web/app.js"></script>
+</body>
+</html>

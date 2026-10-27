@@ -1,0 +1,13 @@
+# Core server packages verified in this release. Manim is optional.
+fastapi==0.143.3
+uvicorn==0.54.0
+pydantic==2.14.1
+Pillow==12.3.0
+numpy>=2,<2.4; python_version < "3.12"
+numpy==2.5.4; python_version >= "3.12"
+sympy==1.14.0
+python-dotenv==1.2.4
+httpx==0.28.1
+playwright==1.64.0
+bcrypt==5.0.0
+mysql-connector-python==9.7.0

@@ -1,0 +1,27 @@
+.sketch-dialog { box-sizing: border-box; width: min(900px, calc(100vw - 28px)); max-width: none; max-height: calc(100dvh - 28px); margin: auto; padding: 23px 26px 20px; overflow: auto; border: 1px solid #dbe6f6; border-radius: 19px; color: #334155; background: #fafdff; box-shadow: 0 20px 90px #0e274b33; font-family: inherit; }
+.sketch-dialog:not([open]) { display: none; } .sketch-dialog::backdrop { background: #172b4f88; backdrop-filter: blur(3px); }
+.input-tabs .input-sketch { flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0; gap: 4px; padding: 7px 5px; border: 0; border-left: 1px solid var(--border, #dde5f2); border-radius: 7px; background: transparent; color: var(--muted, #6b809b); font-size: 12px; white-space: nowrap; }
+.input-tabs .input-sketch:hover { color: var(--primary, #2563eb); background: var(--panel, #fff); }
+.input-tabs .input-sketch:focus-visible { outline: 3px solid #80a9ef; outline-offset: 2px; }
+.input-tabs:has(.input-sketch) .input-tab { min-width: 0; gap: 4px; padding-inline: 4px; white-space: nowrap; }
+.sketch-dialog * { box-sizing: border-box; } .sketch-dialog button, .sketch-dialog input { font: inherit; }
+.sketch-dialog button { cursor: pointer; } .sketch-dialog button:disabled { cursor: default; opacity: .4; }
+.sketch-dialog :is(button,input,canvas):focus-visible { outline: 3px solid #80a9ef; outline-offset: 3px; }
+.sketch-header { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin: 0; }
+.sketch-eyebrow { color: #8498b7; font-size: 10px; letter-spacing: 1.3px; } .sketch-title { margin: 4px 0 0; font-size: 22px; color: #274468; }
+.sketch-close { border: 0; width: 34px; height: 34px; border-radius: 9px; color: #7890ae; background: #eef3fb; font-size: 24px !important; line-height: 1; }
+.sketch-intro { margin: 13px 0 17px; color: #7589a4; font-size: 12px; line-height: 1.8; }
+.sketch-toolbar, .sketch-tools, .sketch-history { display: flex; align-items: center; gap: 6px; }
+.sketch-toolbar { flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-bottom: 11px; }
+.sketch-toolbar button { min-height: 34px; padding: 7px 12px; border: 1px solid #dce5f3; border-radius: 8px; background: #fff; color: #6b809b; font-size: 11px; }
+.sketch-tool[aria-pressed="true"] { border-color: #91b1e9; background: #eaf2ff; color: #3763aa; }
+.sketch-width { display: flex; align-items: center; gap: 7px; padding-left: 8px; color: #8192ab; font-size: 10px; } .sketch-width input { width: 76px; accent-color: #5b84c9; }
+.sketch-stage { overflow: hidden; border: 1px solid #d6e1f0; border-radius: 11px; background: #fff; box-shadow: inset 0 1px 8px #30486b05; }
+.sketch-canvas { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; touch-action: none; user-select: none; }
+.sketch-footer { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-top: 14px; }
+.sketch-footer-copy { min-width: 0; } .sketch-status { margin: 0; color: #647d9c; font-size: 11px; line-height: 1.8; } .sketch-status.error { color: #ba4560; }
+.sketch-note { margin: 5px 0 0; color: #91a0b5; font-size: 10px; line-height: 1.7; }
+.sketch-submit { flex: 0 0 auto; min-height: 40px; padding: 10px 17px; border: 1px solid #4d75bd; border-radius: 10px; background: #4d75bd; color: #fff; font-size: 12px !important; font-weight: 600 !important; }
+.sketch-submit:hover:not(:disabled) { background: #3e64aa; }
+@media (max-width: 540px) { .sketch-dialog { padding: 17px 15px; border-radius: 16px; } .sketch-title { font-size: 19px; } .sketch-intro { margin: 11px 0 13px; font-size: 11px; } .sketch-toolbar button { padding: 7px 10px; } .sketch-width { padding-left: 3px; } .sketch-width input { width: 65px; } .sketch-footer { align-items: stretch; flex-direction: column; gap: 12px; } .sketch-submit { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .sketch-dialog, .sketch-dialog * { transition: none !important; animation: none !important; } }

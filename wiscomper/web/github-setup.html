@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>本机 GitHub 登录配置 · 智算视界</title><link rel="stylesheet" href="/web/github-setup.css"></head>
+<body><main>
+<a class="back" href="/">← 返回智算视界</a><p class="eyebrow">WISCOMPER · 本机设置</p>
+<h1>连接你的 GitHub 账号</h1><p class="intro">先创建 GitHub OAuth App，再通过本机终端保存凭据。完成登录后，当前浏览器的作品会归入你的账号。</p>
+<section><span class="number">1</span><h2>创建本机 OAuth App</h2><p>打开 <a href="https://github.com/settings/developers" target="_blank" rel="noopener noreferrer">GitHub 开发者设置 ↗</a>，进入 OAuth Apps。已有应用可直接打开检查；否则选择 New OAuth App 并填写：</p>
+<dl><dt>Application name</dt><dd>Wiscomper Local</dd><dt>Homepage URL</dt><dd><code>http://127.0.0.1:3088</code></dd><dt>Authorization callback URL</dt><dd><code>http://127.0.0.1:3088/api/auth/github/callback</code></dd></dl>
+<p>注册后，页面会显示 Client ID。选择 Generate a new client secret，并保留页面，供下一步在本机终端输入。</p></section>
+<section><span class="number">2</span><h2>在本机保存凭据</h2><p>打开项目文件夹，双击 <strong>配置GitHub登录.cmd</strong>。已有 Client ID 时直接按回车保留，再粘贴新生成的 Client Secret。输入过程不会显示字符。</p><p>也可以在项目目录运行：</p><pre><code>&amp; .\.venv\Scripts\python.exe .\scripts\configure_github.py</code></pre><p>凭据只保存在本工程的服务端配置文件中。请在终端填写 Secret，不要发到聊天、网页表单或截图中。</p></section>
+<section><span class="number">3</span><h2>重启并登录</h2><p>重启工作台服务，再统一打开 <a href="http://127.0.0.1:3088">http://127.0.0.1:3088</a>，点击账号菜单中的「继续使用 GitHub」。登录往返请使用同一个浏览器和地址。</p><p>本机检查命令如下，只报告配置是否齐全，不显示凭据：</p><pre><code>&amp; .\.venv\Scripts\python.exe .\scripts\configure_github.py --check</code></pre><p>检查通过后，仍需完成 GitHub 授权才能验证实际登录。工作台仅请求读取基本公开资料的权限，不申请仓库或邮箱权限。</p></section>
+<aside><h2>遇到问题</h2><p>「GitHub 登录尚未配置」：确认已填写 Secret，并重启服务。「登录验证已过期」：回到工作台重新开始登录。已有任务正在运行时，先等待任务完成或取消任务。</p><p>此页适用于本机 3088 端口。公网部署应使用单独的 OAuth App、HTTPS 回调和部署配置。完整说明在项目 <code>docs/github-local-setup.md</code>。</p></aside>
+<footer><a href="/">返回工作台</a><span>Wiscomper 智算视界</span></footer>
+</main></body></html>

@@ -1,0 +1,38 @@
+# Merge into the EXISTING HTTPS server block for www.wiscomper.com.
+# Keep existing listen/server_name/certificates and ACME challenge handling.
+# REPLACE the old location / and old /api, /web, /vendor proxy/static locations;
+# do not simply append a duplicate location. Run nginx -t before reload.
+# ^~ prevents Baota's regex JS/CSS/image cache locations intercepting app files.
+
+client_max_body_size 7m;
+
+location = /render.html { return 404; }
+location = /web/render.html { return 404; }
+location = /web/index.html { return 404; }
+
+location = /api/auth/github/callback {
+    access_log off;
+    error_log /dev/null;
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host www.wiscomper.com;
+    proxy_set_header X-Forwarded-Host "";
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header X-Forwarded-Proto "";
+    proxy_set_header X-Real-IP "";
+    proxy_set_header Forwarded "";
+    proxy_cache off;
+}
+
+location ^~ / {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Host www.wiscomper.com;
+    proxy_set_header X-Forwarded-Host "";
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header X-Forwarded-Proto "";
+    proxy_set_header X-Real-IP "";
+    proxy_set_header Forwarded "";
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 180s;
+}

@@ -1,0 +1,25 @@
+# Content-aware interaction contract
+
+`Scene.interactions` defaults to `[]`, maximum 8. Existing `controls` remain trusted recipe recomputation; model custom controls remain empty. Interaction changes are local, bounded presentation/assembly exploration, not arbitrary simulation or executable code.
+
+Interaction fields: `id`, `label`, `value`, `min`, `max`, `step`, `unit` (as Control), plus `kind: 'slider'|'toggle'` (default slider), `description` (max 160), `bindings` (1..24), optional `drag`.
+
+Binding: `{target_id, property, multiplier}`. Allowed properties: x/y/z/rotation/rotation_x/rotation_y/scale/opacity/draw. Multiplier is finite, nonzero, abs<=100. Every binding adds `(current_value - interaction.value) * multiplier` to the sampled object's property. Multiple controls may add to the same property. Clip final state x/y/z/rotations to [-10000,10000], scale to [.01,20], opacity/draw to [0,1]. The default value is neutral. Formula strings, arbitrary geometry/code/URLs cannot be bound. Scene 2D disallows z/rotation_x/rotation_y. Target IDs must exist. Computed scenes use trusted controls only, no generic interactions which could invalidate their numeric result.
+
+Toggle uses min=0/max=1/step=1/value=0|1. Sliders have existing finite Control bounds. A binding must have an effective nonzero range. Drag: `{target_id, axis:'horizontal'|'vertical', sensitivity}` (positive units per CSS pixel, .001..10). Target must be one of that interaction's bound targets, and have rendered content itself or as group descendants; no text/formula drag targets. Multiple controls cannot claim the same drag target. Drag maps horizontal-right or vertical-up distance to increasing value, clamps/snaps to step. Tooltip/description should name the operation. No unbounded arbitrary drag.
+
+## Engine API
+
+`setInteractionValues(values)` updates accepted values and renders immediately; `getInteractionValues()` returns all current values. `setView(cameraOrNull)` / `getView()` read/write an optional Camera override (same schema as Scene.camera). Null restores the scene camera and its automatic orbit; manual orbit produces a fixed camera override with orbit=0. `setManipulationMode('observe'|'interact')`, `resetExploration()` restore initial controls/camera. Load resets values to scene defaults and view=null. Existing APIs stay compatible.
+
+3D observe mode: pointer drag or touch orbit; wheel / two-finger pinch zoom, clamp elevation/distance. Interact mode: hit a declared target or its descendant to drag its bound value; unsupported targets retain selection only (blank drag may orbit). In 2D default interact, only declared targets are movable. Pointer-driven control changes pause playback. Drag/click threshold prevents accidental selection; clean up listeners/captures on disposal and switching scene. UI slider changes call pause and setInteractionValues directly.
+
+Engine events on host: `scene-interaction` detail `{values, committed}` (drag updates and pointerup); `scene-view` detail `{camera, committed}`; existing time/select events unchanged. UI schedules persistence after pointerup / debounce; programmatic setters do not emit user mutation events. Manual camera overrides affect preview/export after saved; UI labels them “观察视角”.
+
+## Persistence/API
+
+Project response includes `exploration: {values: {id:number}, camera: Camera|null}`. Defaults derive from scene. POST `/api/projects/{id}/interaction-state` with the full `{values, camera}` validates IDs/ranges, persists exploration and returns `{project}`. It changes no provider budget. UI should update its project metadata without reloading player on save, and coalesce pending saves by project. Recompute must preserve still-valid values/camera for the same scene. Reset submits defaults and camera=null. No extra model call is made.
+
+`server/interactions.py` bakes current deltas into object base values and frames for video export, adding clipping-crossing frames to preserve interpolation. The video snapshot has no interactions, preventing double application. Export uses the saved camera. Original scene keeps its defaults so reset remains possible. Continued-generation context receives the original scene plus saved exploration. JSON export with `?bundle=true` returns `{format:'visualize-project', version:1, scene, exploration}`; the default `/scene` response remains a plain Scene for compatibility. Existing projects with recognized fan/model3d recipes receive compatible interactive degrees of freedom on read; no unrelated generic movements are invented for old custom scenes.
+
+New generated custom scenes should define a small number (usually 1–4) of semantically useful freedoms where appropriate: gear driving angle coupled to opposite gear angle, joint angle with bounded travel, part separation along its assembly axis, feature visibility. Not all objects are independently movable. Explanatory descriptions distinguish manipulation from physical recomputation. Static formula/image content may have no meaningful continuous freedom; don't invent it. Meaningful solid transform interaction can satisfy mechanical-motion validation alongside normal keyframes.

@@ -34,3 +34,20 @@ html_root/.env
 /html_root/product-video
 /html_root/manim_media
 html_root/.env.example
+
+# Wiscomper source-only publication; local settings and user content remain private.
+__pycache__/
+*.py[cod]
+*.pyc.*
+.env
+.env.*
+!.env.example
+**/.venv/
+**/node_modules/
+**/.pytest_cache/
+/wiscomper/data/
+/wiscomper/var/
+/wiscomper/work/
+/wiscomper/tmp/
+/wiscomper/dist/
+/wiscomper/runtime/engineering-imports/

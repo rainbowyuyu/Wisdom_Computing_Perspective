@@ -1,0 +1,15 @@
+{
+  "name": "visualize-dsh",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent visual explanation workbench with a bounded native DSH agent.",
+  "engines": { "node": "^22.19.0 || >=24.0.0" },
+  "scripts": { "test:runtime": "node --test runtime/*.test.mjs" },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "ajv": "8.17.1",
+    "three": "0.180.0",
+    "katex": "0.16.25"
+  }
+}
